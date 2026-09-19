@@ -115,17 +115,19 @@ function dateFields(model: RangeViewModel): string {
   const errEnd = model.error === "end";
   const errOrder = model.error === "order";
   return (
+    '<div class="dates">' +
     `<div class="field${errOrder ? " is-error" : ""}"><span>Data początkowa</span>` +
     `<input type="date" data-filter="from" value="${escapeHtml(model.from)}"${model.noFrom ? " disabled" : ""} ` +
     `aria-invalid="${errOrder ? "true" : "false"}">` +
     (errOrder ? `<span class="err">${RANGE_ERROR.order}</span>` : "") +
-    `<label class="checkline"><input type="checkbox" data-toggle="nofrom"${model.noFrom ? " checked" : ""}> ` +
-    "bez daty początkowej</label></div>" +
+    "</div>" +
     `<label class="field${errEnd || errOrder ? " is-error" : ""}"><span>Data końcowa</span>` +
     `<input type="date" data-filter="to" value="${escapeHtml(model.to)}" ` +
     `aria-invalid="${errEnd || errOrder ? "true" : "false"}">` +
     (errEnd ? `<span class="err">${RANGE_ERROR.end}</span>` : "") +
-    "</label>"
+    "</label>" +
+    `<label class="checkline"><input type="checkbox" data-toggle="nofrom"${model.noFrom ? " checked" : ""}> ` +
+    "bez daty początkowej</label></div>"
   );
 }
 
@@ -135,14 +137,14 @@ function ratesButton(): string {
 
 function renderRangeScreen(model: RangeViewModel): string {
   const note = model.webappMissing
-    ? '<p class="note">Brak adresu Web App. Dopisz ?webapp= do adresu tej strony.</p>'
+    ? '<p class="callout">Brak adresu Web App. Dopisz ?webapp= do adresu tej strony.</p>'
     : "";
   const status = model.status ? `<p class="err">${escapeHtml(model.status)}</p>` : "";
   return (
     '<div class="setup" data-screen="range"><div class="setup-card">' +
     brand() +
     "<h2>Zakres rozliczenia</h2>" +
-    '<p class="note">Ustal, czego dotyczy to rozliczenie. Pozycje pojawią się na następnym ekranie.</p>' +
+    '<p class="setup-lead">Ustal, czego dotyczy to rozliczenie. Pozycje pojawią się na następnym ekranie.</p>' +
     renderModes() +
     '<div class="filters setup-fields">' +
     contractorField(model) +

@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Rozliczenia</title>
+  <link rel="icon" href="logo.png" type="image/png">
   <style>
 :root {
   --bg: #e7eeee;
@@ -39,7 +40,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .modes {
   display: flex;
   width: 100%;
-  margin: 14px 0;
+  margin: 16px 0 4px;
   padding: 3px;
   border-radius: 10px;
   background: rgba(148, 163, 184, 0.16);
@@ -68,9 +69,12 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   border: 1px solid rgba(148, 163, 184, 0.55);
   background: #fff;
   width: 100%;
+  min-width: 0;
 }
+.field input[type="date"] { display: block; min-height: 38px; }
+.field input:disabled { background: #f8fafc; color: #94a3b8; }
 .field.is-error input { border-color: #e11d48; }
-.err { color: #e11d48; font-weight: 650; font-size: 12px; }
+.err { color: #e11d48; font-weight: 650; font-size: 12px; line-height: 1.35; }
 .btn-teal, .btn-ghost {
   border-radius: 10px;
   padding: 9px 14px;
@@ -79,30 +83,63 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .btn-teal { border: none; color: #fff; background: var(--teal); width: 100%; margin-top: 8px; }
 .btn-teal:hover { background: var(--teal-deep); }
+.setup .btn-teal { margin-top: 14px; }
 .btn-ghost {
   border: 1px solid var(--line);
   background: #fff;
 }
-.note { margin: 8px 0 0; font-size: 12px; color: var(--muted); font-weight: 550; }
-.checkline { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: #334155; font-size: 12px; font-weight: 550; }
+.note { margin: 8px 0 0; font-size: 12px; color: var(--muted); font-weight: 550; line-height: 1.4; }
+.checkline { display: flex; align-items: center; gap: 8px; margin: 0; color: #334155; font-size: 13px; font-weight: 550; line-height: 1.3; }
+.checkline input { width: 16px; height: 16px; margin: 0; accent-color: var(--teal); }
+.callout {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--teal-soft);
+  border: 1px solid rgba(13, 148, 136, 0.28);
+  color: var(--teal-deep);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
 .setup {
   height: 100%;
+  overflow: auto;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 28px 16px;
   background: #f4f7f6;
 }
 .setup-card {
-  width: min(440px, 100%);
+  width: min(480px, 100%);
+  margin-block: auto;
+  flex-shrink: 0;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 16px;
-  padding: 22px 22px 18px;
+  padding: 22px 22px 16px;
   box-shadow: var(--shadow);
 }
-.setup-card h2 { margin: 14px 0 4px; font-size: 18px; }
-.setup-foot { display: flex; justify-content: flex-end; margin-top: 12px; }
+.setup-card h2 { margin: 16px 0 6px; font-size: 20px; letter-spacing: -0.02em; }
+.setup-lead { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); font-weight: 550; }
+.dates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 12px;
+  align-items: start;
+}
+.dates .checkline { grid-column: 1 / -1; }
+.setup-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 520px) {
+  .dates { grid-template-columns: 1fr; }
+}
 .field.picker { position: relative; z-index: 4; }
 .picker-wrap { position: relative; }
 .picker-wrap [data-picker-list] {
@@ -1789,30 +1826,32 @@ function contractorField(model) {
 function dateFields(model) {
     const errEnd = model.error === "end";
     const errOrder = model.error === "order";
-    return (`<div class="field${errOrder ? " is-error" : ""}"><span>Data początkowa</span>` +
+    return ('<div class="dates">' +
+        `<div class="field${errOrder ? " is-error" : ""}"><span>Data początkowa</span>` +
         `<input type="date" data-filter="from" value="${escapeHtml(model.from)}"${model.noFrom ? " disabled" : ""} ` +
         `aria-invalid="${errOrder ? "true" : "false"}">` +
         (errOrder ? `<span class="err">${RANGE_ERROR.order}</span>` : "") +
-        `<label class="checkline"><input type="checkbox" data-toggle="nofrom"${model.noFrom ? " checked" : ""}> ` +
-        "bez daty początkowej</label></div>" +
+        "</div>" +
         `<label class="field${errEnd || errOrder ? " is-error" : ""}"><span>Data końcowa</span>` +
         `<input type="date" data-filter="to" value="${escapeHtml(model.to)}" ` +
         `aria-invalid="${errEnd || errOrder ? "true" : "false"}">` +
         (errEnd ? `<span class="err">${RANGE_ERROR.end}</span>` : "") +
-        "</label>");
+        "</label>" +
+        `<label class="checkline"><input type="checkbox" data-toggle="nofrom"${model.noFrom ? " checked" : ""}> ` +
+        "bez daty początkowej</label></div>");
 }
 function ratesButton() {
     return '<button type="button" class="btn-ghost" data-action="rates">Baza stawek</button>';
 }
 function renderRangeScreen(model) {
     const note = model.webappMissing
-        ? '<p class="note">Brak adresu Web App. Dopisz ?webapp= do adresu tej strony.</p>'
+        ? '<p class="callout">Brak adresu Web App. Dopisz ?webapp= do adresu tej strony.</p>'
         : "";
     const status = model.status ? `<p class="err">${escapeHtml(model.status)}</p>` : "";
     return ('<div class="setup" data-screen="range"><div class="setup-card">' +
         brand() +
         "<h2>Zakres rozliczenia</h2>" +
-        '<p class="note">Ustal, czego dotyczy to rozliczenie. Pozycje pojawią się na następnym ekranie.</p>' +
+        '<p class="setup-lead">Ustal, czego dotyczy to rozliczenie. Pozycje pojawią się na następnym ekranie.</p>' +
         renderModes() +
         '<div class="filters setup-fields">' +
         contractorField(model) +

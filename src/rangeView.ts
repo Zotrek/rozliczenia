@@ -61,33 +61,50 @@ export function renderModes(): string {
   );
 }
 
-function contractorField(model: RangeViewModel): string {
+export const CONTRACTOR_LIST_LIMIT = 80;
+
+function contractorHits(model: RangeViewModel) {
   const browsing =
     model.contractorOpen &&
     model.contractor !== "" &&
     foldPl(model.contractorQuery) === foldPl(model.contractor);
-  const hits = matchingContractors(model.contractors, model.contractorQuery, browsing);
-  const list = hits.length
-    ? '<ul class="picker-list" id="contractor-list">' +
-      hits
-        .map(
-          (item) =>
-            `<li><button type="button" data-action="pick-contractor" data-nazwa="${escapeHtml(item.nazwa)}">` +
-            `<span>${escapeHtml(item.nazwa)}</span><small>${escapeHtml(item.dane)}</small></button></li>`,
-        )
-        .join("") +
-      "</ul>"
-    : '<p class="note picker-empty">Brak podwykonawcy o tej nazwie lub w danych do Worda.</p>';
+  return matchingContractors(model.contractors, model.contractorQuery, browsing).slice(
+    0,
+    CONTRACTOR_LIST_LIMIT,
+  );
+}
+
+/** Lista pod polem: najwyżej 80 krótkich nazw. Dane do Worda tylko zawężają. */
+export function renderContractorList(model: RangeViewModel): string {
+  const hits = contractorHits(model);
+  if (!hits.length) {
+    return '<p class="note picker-empty">Brak podwykonawcy o tej nazwie lub w danych do Worda.</p>';
+  }
+  return (
+    '<ul class="picker-list" id="contractor-list">' +
+    hits
+      .map(
+        (item) =>
+          `<li><button type="button" data-action="pick-contractor" data-nazwa="${escapeHtml(item.nazwa)}">` +
+          `<span>${escapeHtml(item.nazwa)}</span></button></li>`,
+      )
+      .join("") +
+    "</ul>"
+  );
+}
+
+function contractorField(model: RangeViewModel): string {
   const picked = selectedContractor(model.contractors, model.contractor);
   const err = model.error === "contractor";
+  const note = picked ? escapeHtml(picked.dane) : "";
   return (
     `<div class="field picker${err ? " is-error" : ""}"><span>Podwykonawca</span>` +
     `<input type="text" data-filter="contractor" value="${escapeHtml(model.contractorQuery)}" ` +
     'placeholder="Nazwa lub dane do Worda" autocomplete="off" role="combobox" aria-autocomplete="list" ' +
     `aria-expanded="${model.contractorOpen ? "true" : "false"}" aria-controls="contractor-list">` +
-    `<div data-picker-list${model.contractorOpen ? "" : " hidden"}>${model.contractorOpen ? list : ""}</div>` +
-    (picked && !model.contractorOpen ? `<span class="note">${escapeHtml(picked.dane)}</span>` : "") +
-    (err ? `<span class="err">${RANGE_ERROR.contractor}</span>` : "") +
+    `<div data-picker-list${model.contractorOpen ? "" : " hidden"}>${model.contractorOpen ? renderContractorList(model) : ""}</div>` +
+    `<span class="note" data-contractor-note${picked && !model.contractorOpen ? "" : " hidden"}>${note}</span>` +
+    (err ? `<span class="err" data-contractor-error>${RANGE_ERROR.contractor}</span>` : "") +
     "</div>"
   );
 }

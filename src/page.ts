@@ -1,4 +1,4 @@
-import { renderApp, type RangeViewModel } from "./rangeView.js";
+import { renderApp, renderContractorList, type RangeViewModel } from "./rangeView.js";
 import {
   applyNoStartDate,
   fieldsForSearch,
@@ -368,7 +368,7 @@ function onInput(event: Event): void {
     if (VIEW.error === "contractor") {
       VIEW.error = "";
     }
-    paint("contractor");
+    syncContractorPicker();
     return;
   }
   if (el.dataset.filter === "from" || el.dataset.filter === "to") {
@@ -471,7 +471,7 @@ function onFocusIn(event: FocusEvent): void {
     return;
   }
   VIEW.contractorOpen = true;
-  paint("contractor");
+  syncContractorPicker();
 }
 
 function onFocusOut(event: FocusEvent): void {
@@ -480,7 +480,37 @@ function onFocusOut(event: FocusEvent): void {
     return;
   }
   VIEW.contractorOpen = false;
-  paint();
+  syncContractorPicker();
+}
+
+function syncContractorPicker(): void {
+  const input = document.querySelector('[data-filter="contractor"]');
+  const box = document.querySelector("[data-picker-list]");
+  if (!(input instanceof HTMLInputElement) || !(box instanceof HTMLElement)) {
+    return;
+  }
+  input.setAttribute("aria-expanded", VIEW.contractorOpen ? "true" : "false");
+  const picked = selectedContractor(VIEW.contractors, VIEW.contractor);
+  const note = document.querySelector("[data-contractor-note]");
+  if (note instanceof HTMLElement) {
+    const show = picked !== null && !VIEW.contractorOpen;
+    note.hidden = !show;
+    note.textContent = show && picked ? picked.dane : "";
+  }
+  const field = input.closest(".picker");
+  if (field instanceof HTMLElement) {
+    field.classList.toggle("is-error", VIEW.error === "contractor");
+    if (VIEW.error !== "contractor") {
+      field.querySelector("[data-contractor-error]")?.remove();
+    }
+  }
+  if (!VIEW.contractorOpen) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = renderContractorList(VIEW);
 }
 
 function onMouseDown(event: MouseEvent): void {

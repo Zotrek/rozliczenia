@@ -1728,28 +1728,37 @@ function renderModes() {
         '<label class="mode is-off" title="W tej wersji niedostępne">' +
         '<input type="checkbox" id="mode-h" disabled> Harmonogram</label></div>');
 }
-function contractorField(model) {
+const CONTRACTOR_LIST_LIMIT = 80;
+function contractorHits(model) {
     const browsing = model.contractorOpen &&
         model.contractor !== "" &&
         foldPl(model.contractorQuery) === foldPl(model.contractor);
-    const hits = matchingContractors(model.contractors, model.contractorQuery, browsing);
-    const list = hits.length
-        ? '<ul class="picker-list" id="contractor-list">' +
-            hits
-                .map((item) => `<li><button type="button" data-action="pick-contractor" data-nazwa="${escapeHtml(item.nazwa)}">` +
-                `<span>${escapeHtml(item.nazwa)}</span><small>${escapeHtml(item.dane)}</small></button></li>`)
-                .join("") +
-            "</ul>"
-        : '<p class="note picker-empty">Brak podwykonawcy o tej nazwie lub w danych do Worda.</p>';
+    return matchingContractors(model.contractors, model.contractorQuery, browsing).slice(0, CONTRACTOR_LIST_LIMIT);
+}
+/** Lista pod polem: najwyżej 80 krótkich nazw. Dane do Worda tylko zawężają. */
+function renderContractorList(model) {
+    const hits = contractorHits(model);
+    if (!hits.length) {
+        return '<p class="note picker-empty">Brak podwykonawcy o tej nazwie lub w danych do Worda.</p>';
+    }
+    return ('<ul class="picker-list" id="contractor-list">' +
+        hits
+            .map((item) => `<li><button type="button" data-action="pick-contractor" data-nazwa="${escapeHtml(item.nazwa)}">` +
+            `<span>${escapeHtml(item.nazwa)}</span></button></li>`)
+            .join("") +
+        "</ul>");
+}
+function contractorField(model) {
     const picked = selectedContractor(model.contractors, model.contractor);
     const err = model.error === "contractor";
+    const note = picked ? escapeHtml(picked.dane) : "";
     return (`<div class="field picker${err ? " is-error" : ""}"><span>Podwykonawca</span>` +
         `<input type="text" data-filter="contractor" value="${escapeHtml(model.contractorQuery)}" ` +
         'placeholder="Nazwa lub dane do Worda" autocomplete="off" role="combobox" aria-autocomplete="list" ' +
         `aria-expanded="${model.contractorOpen ? "true" : "false"}" aria-controls="contractor-list">` +
-        `<div data-picker-list${model.contractorOpen ? "" : " hidden"}>${model.contractorOpen ? list : ""}</div>` +
-        (picked && !model.contractorOpen ? `<span class="note">${escapeHtml(picked.dane)}</span>` : "") +
-        (err ? `<span class="err">${RANGE_ERROR.contractor}</span>` : "") +
+        `<div data-picker-list${model.contractorOpen ? "" : " hidden"}>${model.contractorOpen ? renderContractorList(model) : ""}</div>` +
+        `<span class="note" data-contractor-note${picked && !model.contractorOpen ? "" : " hidden"}>${note}</span>` +
+        (err ? `<span class="err" data-contractor-error>${RANGE_ERROR.contractor}</span>` : "") +
         "</div>");
 }
 function dateFields(model) {
@@ -2170,7 +2179,7 @@ function onInput(event) {
         if (VIEW.error === "contractor") {
             VIEW.error = "";
         }
-        paint("contractor");
+        syncContractorPicker();
         return;
     }
     if (el.dataset.filter === "from" || el.dataset.filter === "to") {
@@ -2269,7 +2278,7 @@ function onFocusIn(event) {
         return;
     }
     VIEW.contractorOpen = true;
-    paint("contractor");
+    syncContractorPicker();
 }
 function onFocusOut(event) {
     const el = event.target;
@@ -2277,7 +2286,36 @@ function onFocusOut(event) {
         return;
     }
     VIEW.contractorOpen = false;
-    paint();
+    syncContractorPicker();
+}
+function syncContractorPicker() {
+    const input = document.querySelector('[data-filter="contractor"]');
+    const box = document.querySelector("[data-picker-list]");
+    if (!(input instanceof HTMLInputElement) || !(box instanceof HTMLElement)) {
+        return;
+    }
+    input.setAttribute("aria-expanded", VIEW.contractorOpen ? "true" : "false");
+    const picked = selectedContractor(VIEW.contractors, VIEW.contractor);
+    const note = document.querySelector("[data-contractor-note]");
+    if (note instanceof HTMLElement) {
+        const show = picked !== null && !VIEW.contractorOpen;
+        note.hidden = !show;
+        note.textContent = show && picked ? picked.dane : "";
+    }
+    const field = input.closest(".picker");
+    if (field instanceof HTMLElement) {
+        field.classList.toggle("is-error", VIEW.error === "contractor");
+        if (VIEW.error !== "contractor") {
+            field.querySelector("[data-contractor-error]")?.remove();
+        }
+    }
+    if (!VIEW.contractorOpen) {
+        box.hidden = true;
+        box.innerHTML = "";
+        return;
+    }
+    box.hidden = false;
+    box.innerHTML = renderContractorList(VIEW);
 }
 function onMouseDown(event) {
     const target = event.target;

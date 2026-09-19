@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildPage } from "../scripts/build-page.mjs";
-import { renderApp, renderModes, type RangeViewModel } from "./rangeView.js";
+import { CONTRACTOR_LIST_LIMIT, renderApp, renderModes, type RangeViewModel } from "./rangeView.js";
 import type { StartedSearch } from "./range.js";
 import { emptyStatement } from "./statement.js";
 
@@ -82,6 +85,37 @@ describe("renderApp", () => {
     expect(html).not.toContain("GPW <spółka>");
   });
 
+  it("test_renderApp_contractor_list_shows_at_most_80_short_names", () => {
+    const contractors = Array.from({ length: 120 }, (_, index) => ({
+      nazwa: `Firma ${index}`,
+      dane: `DANE-WORD-${index}`,
+    }));
+    const html = renderApp(
+      model({ contractorOpen: true, contractorQuery: "", contractors }),
+    );
+    const buttons = html.match(/data-action="pick-contractor"/g) ?? [];
+    expect(CONTRACTOR_LIST_LIMIT).toBe(80);
+    expect(buttons).toHaveLength(80);
+    expect(html).toContain("Firma 0");
+    expect(html).toContain("Firma 79");
+    expect(html).not.toContain("Firma 80");
+    expect(html).not.toContain("DANE-WORD-0");
+    expect(html).not.toContain("<small>");
+  });
+
+  it("test_renderApp_contractor_list_matches_word_data_but_shows_the_short_name", () => {
+    const html = renderApp(
+      model({
+        contractorOpen: true,
+        contractorQuery: "glogowska",
+        contractors: [{ nazwa: "GPW", dane: "ul. Głogowska 12" }],
+      }),
+    );
+    expect(html).toContain('data-nazwa="GPW"');
+    expect(html).toContain(">GPW</span>");
+    expect(html).not.toContain("Głogowska");
+  });
+
   it("test_renderApp_order_error_is_visible", () => {
     const html = renderApp(model({ error: "order", from: "2026-09-19", to: "2026-09-18" }));
     expect(html).toContain("Data początkowa nie może być późniejsza niż końcowa.");
@@ -141,5 +175,22 @@ describe("buildPage", () => {
     expect(html).toContain("function startSearch");
     expect(html).not.toContain("mix-bar");
     expect(html).not.toMatch(/\bimport\s/);
+  });
+});
+
+describe("contractor picker", () => {
+  it("test_contractor_typing_updates_the_list_not_the_page", () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "page.ts"),
+      "utf8",
+    );
+    const start = source.indexOf('if (el.dataset.filter === "contractor")');
+    const end = source.indexOf('if (el.dataset.filter === "from"', start);
+    const branch = source.slice(start, end);
+    expect(branch).toContain("syncContractorPicker()");
+    expect(branch).not.toContain("paint(");
+    const focus = source.slice(source.indexOf("function onFocusIn"), source.indexOf("function onFocusOut"));
+    expect(focus).toContain("syncContractorPicker()");
+    expect(focus).not.toContain("paint(");
   });
 });

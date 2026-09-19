@@ -133,8 +133,16 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .dates { grid-template-columns: 1fr; }
 }
 .field.picker { position: relative; z-index: 4; }
+.field.picker:focus-within { z-index: 6; }
 .picker-wrap { position: relative; }
 .picker-wrap [data-picker-list] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  z-index: 5;
+}
+.picker-wrap [data-rate-list] {
   position: absolute;
   left: 0;
   right: 0;

@@ -1,13 +1,15 @@
-import { renderApp, renderContractorList, type RangeViewModel } from "./rangeView.js";
+import { renderApp, renderContractorList, renderRateContractorList, renderRateShopList, type RangeViewModel } from "./rangeView.js";
 import {
   applyNoStartDate,
   fieldsForSearch,
+  foldPl,
   readWebAppUrl,
   screenAfterChangeRange,
   screenAfterSearch,
   searchParams,
   selectedContractor,
   resolveContractorText,
+  resolveListText,
   startSearch,
   webAppUrl,
   blocksOnOrder,
@@ -69,7 +71,11 @@ const VIEW: RangeViewModel = {
   loadKind: "logo",
   addresses: [],
   ratesShop: "",
+  ratesShopQuery: "",
+  ratesShopOpen: false,
   ratesContractor: "",
+  ratesContractorQuery: "",
+  ratesContractorOpen: false,
   ratesPickup: "",
   ratesBag: "",
   ratesFrom: "",
@@ -344,6 +350,10 @@ function onInput(event: Event): void {
     paint(el.dataset.keep);
     return;
   }
+  if (el.dataset.rate === "shop" || el.dataset.rate === "contractor") {
+    typeRateField(el);
+    return;
+  }
   if (el.dataset.rate === "pickup" || el.dataset.rate === "bag" || el.dataset.rate === "from") {
     if (el.dataset.rate === "pickup") {
       VIEW.ratesPickup = el.value;
@@ -389,17 +399,6 @@ function syncDate(el: HTMLInputElement): void {
 
 function onChange(event: Event): void {
   const el = event.target;
-  if (el instanceof HTMLSelectElement && (el.dataset.rate === "shop" || el.dataset.rate === "contractor")) {
-    if (el.dataset.rate === "shop") {
-      VIEW.ratesShop = el.value;
-    } else {
-      VIEW.ratesContractor = el.value;
-    }
-    VIEW.ratesMessage = "";
-    VIEW.ratesMessageOk = false;
-    paint();
-    return;
-  }
   if (!(el instanceof HTMLInputElement)) {
     return;
   }
@@ -473,34 +472,131 @@ function pickContractor(nazwa: string): void {
   paint();
 }
 
-function onFocusIn(event: FocusEvent): void {
-  const el = event.target;
-  if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
+type RateField = "shop" | "contractor";
+
+function typeRateField(el: HTMLInputElement): void {
+  const field: RateField = el.dataset.rate === "shop" ? "shop" : "contractor";
+  if (field === "shop") {
+    VIEW.ratesShopQuery = el.value;
+    const resolved = resolveListText(VIEW.addresses, el.value);
+    VIEW.ratesShop =
+      foldPl(el.value) !== "" && foldPl(resolved.query) === foldPl(el.value) ? resolved.value : "";
+    VIEW.ratesShopOpen = true;
+    VIEW.ratesContractorOpen = false;
+  } else {
+    VIEW.ratesContractorQuery = el.value;
+    const picked = selectedContractor(VIEW.contractors, el.value);
+    VIEW.ratesContractor = picked ? picked.nazwa : "";
+    VIEW.ratesContractorOpen = true;
+    VIEW.ratesShopOpen = false;
+  }
+  VIEW.ratesMessage = "";
+  VIEW.ratesMessageOk = false;
+  syncRatesMessage();
+  syncRatePicker("shop");
+  syncRatePicker("contractor");
+}
+
+function commitRateField(field: RateField): void {
+  if (field === "shop") {
+    const resolved = resolveListText(VIEW.addresses, VIEW.ratesShopQuery);
+    VIEW.ratesShop = resolved.value;
+    VIEW.ratesShopQuery = resolved.query;
+    VIEW.ratesShopOpen = false;
     return;
   }
-  VIEW.contractorOpen = true;
-  syncContractorPicker();
+  const resolved = resolveContractorText(VIEW.contractors, VIEW.ratesContractorQuery);
+  VIEW.ratesContractor = resolved.contractor;
+  VIEW.ratesContractorQuery = resolved.query;
+  VIEW.ratesContractorOpen = false;
+}
+
+function commitRateFields(): void {
+  commitRateField("shop");
+  commitRateField("contractor");
+}
+
+function pickRateValue(field: RateField, value: string): void {
+  if (value === "") {
+    return;
+  }
+  if (field === "shop") {
+    VIEW.ratesShop = value;
+    VIEW.ratesShopQuery = value;
+    VIEW.ratesShopOpen = false;
+  } else {
+    VIEW.ratesContractor = value;
+    VIEW.ratesContractorQuery = value;
+    VIEW.ratesContractorOpen = false;
+  }
+  VIEW.ratesMessage = "";
+  VIEW.ratesMessageOk = false;
+  paint();
+}
+
+function onFocusIn(event: FocusEvent): void {
+  const el = event.target;
+  if (!(el instanceof HTMLInputElement)) {
+    return;
+  }
+  if (el.dataset.filter === "contractor") {
+    VIEW.contractorOpen = true;
+    syncContractorPicker();
+    return;
+  }
+  if (el.dataset.rate !== "shop" && el.dataset.rate !== "contractor") {
+    return;
+  }
+  if (el.dataset.rate === "shop") {
+    VIEW.ratesShopOpen = true;
+    VIEW.ratesContractorOpen = false;
+  } else {
+    VIEW.ratesContractorOpen = true;
+    VIEW.ratesShopOpen = false;
+  }
+  syncRatePicker("shop");
+  syncRatePicker("contractor");
 }
 
 function onFocusOut(event: FocusEvent): void {
   const el = event.target;
-  if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
+  if (!(el instanceof HTMLInputElement)) {
     return;
   }
+  if (el.dataset.filter === "contractor") {
+    window.setTimeout(() => {
+      const still = document.activeElement;
+      if (still instanceof HTMLInputElement && still.dataset.filter === "contractor") {
+        return;
+      }
+      const resolved = resolveContractorText(VIEW.contractors, VIEW.contractorQuery);
+      VIEW.contractor = resolved.contractor;
+      VIEW.contractorQuery = resolved.query;
+      VIEW.contractorOpen = false;
+      const input = document.querySelector('[data-filter="contractor"]');
+      if (input instanceof HTMLInputElement) {
+        input.value = VIEW.contractorQuery;
+      }
+      syncContractorPicker();
+    }, 150);
+    return;
+  }
+  if (el.dataset.rate !== "shop" && el.dataset.rate !== "contractor") {
+    return;
+  }
+  const field: RateField = el.dataset.rate === "shop" ? "shop" : "contractor";
   window.setTimeout(() => {
     const still = document.activeElement;
-    if (still instanceof HTMLInputElement && still.dataset.filter === "contractor") {
+    if (still instanceof HTMLInputElement && still.dataset.rate === field) {
       return;
     }
-    const resolved = resolveContractorText(VIEW.contractors, VIEW.contractorQuery);
-    VIEW.contractor = resolved.contractor;
-    VIEW.contractorQuery = resolved.query;
-    VIEW.contractorOpen = false;
-    const input = document.querySelector('[data-filter="contractor"]');
+    commitRateField(field);
+    const input = document.querySelector(`[data-window="rates"] [data-rate="${field}"]`);
     if (input instanceof HTMLInputElement) {
-      input.value = VIEW.contractorQuery;
+      input.value = field === "shop" ? VIEW.ratesShopQuery : VIEW.ratesContractorQuery;
     }
-    syncContractorPicker();
+    syncRatePicker("shop");
+    syncRatePicker("contractor");
   }, 150);
 }
 
@@ -534,29 +630,96 @@ function moveContractorActive(delta: number): void {
   items[next].scrollIntoView({ block: "nearest" });
 }
 
-function onKeyDown(event: KeyboardEvent): void {
-  const el = event.target;
-  if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
+function rateOptions(field: RateField): HTMLElement[] {
+  const box = document.querySelector(`[data-rate-list="${field}"]`);
+  if (!(box instanceof HTMLElement)) {
+    return [];
+  }
+  return [...box.querySelectorAll<HTMLElement>("[role='option']")];
+}
+
+function moveRateActive(field: RateField, delta: number): void {
+  if (field === "shop") {
+    VIEW.ratesShopOpen = true;
+    VIEW.ratesContractorOpen = false;
+  } else {
+    VIEW.ratesContractorOpen = true;
+    VIEW.ratesShopOpen = false;
+  }
+  syncRatePicker("shop");
+  syncRatePicker("contractor");
+  const items = rateOptions(field);
+  if (!items.length) {
     return;
   }
+  const current = items.findIndex((item) => item.classList.contains("is-active"));
+  const next =
+    current < 0
+      ? delta > 0
+        ? 0
+        : items.length - 1
+      : Math.min(items.length - 1, Math.max(0, current + delta));
+  for (let i = 0; i < items.length; i += 1) {
+    items[i].classList.toggle("is-active", i === next);
+  }
+  items[next].scrollIntoView({ block: "nearest" });
+}
+
+function onKeyDown(event: KeyboardEvent): void {
+  const el = event.target;
+  if (!(el instanceof HTMLInputElement)) {
+    return;
+  }
+  if (el.dataset.filter === "contractor") {
+    if (event.key === "Escape") {
+      VIEW.contractorOpen = false;
+      syncContractorPicker();
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      moveContractorActive(event.key === "ArrowDown" ? 1 : -1);
+      return;
+    }
+    if (event.key === "Enter" && VIEW.contractorOpen) {
+      const active = contractorOptions().find((item) => item.classList.contains("is-active"));
+      const pick = active ?? contractorOptions()[0];
+      if (!pick) {
+        return;
+      }
+      event.preventDefault();
+      pickContractor(pick.dataset.nazwa ?? "");
+    }
+    return;
+  }
+  if (el.dataset.rate !== "shop" && el.dataset.rate !== "contractor") {
+    return;
+  }
+  const field: RateField = el.dataset.rate === "shop" ? "shop" : "contractor";
+  const open = field === "shop" ? VIEW.ratesShopOpen : VIEW.ratesContractorOpen;
   if (event.key === "Escape") {
-    VIEW.contractorOpen = false;
-    syncContractorPicker();
+    if (field === "shop") {
+      VIEW.ratesShopOpen = false;
+    } else {
+      VIEW.ratesContractorOpen = false;
+    }
+    syncRatePicker(field);
     return;
   }
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
-    moveContractorActive(event.key === "ArrowDown" ? 1 : -1);
+    moveRateActive(field, event.key === "ArrowDown" ? 1 : -1);
     return;
   }
-  if (event.key === "Enter" && VIEW.contractorOpen) {
-    const active = contractorOptions().find((item) => item.classList.contains("is-active"));
-    const pick = active ?? contractorOptions()[0];
+  if (event.key === "Enter" && open) {
+    const items = rateOptions(field);
+    const active = items.find((item) => item.classList.contains("is-active"));
+    const pick = active ?? items[0];
     if (!pick) {
       return;
     }
     event.preventDefault();
-    pickContractor(pick.dataset.nazwa ?? "");
+    pickRateValue(field, pick.dataset.value ?? "");
   }
 }
 
@@ -590,9 +753,43 @@ function syncContractorPicker(): void {
   box.innerHTML = renderContractorList(VIEW);
 }
 
+function syncRatesMessage(): void {
+  const el = document.querySelector("[data-rates-message]");
+  if (!(el instanceof HTMLElement)) {
+    return;
+  }
+  el.hidden = VIEW.ratesMessage === "";
+  el.textContent = VIEW.ratesMessage;
+  el.className = VIEW.ratesMessageOk ? "note" : "err";
+}
+
+function syncRatePicker(field: RateField): void {
+  const input = document.querySelector(`[data-window="rates"] [data-rate="${field}"]`);
+  const box = document.querySelector(`[data-rate-list="${field}"]`);
+  if (!(input instanceof HTMLInputElement) || !(box instanceof HTMLElement)) {
+    return;
+  }
+  const open = field === "shop" ? VIEW.ratesShopOpen : VIEW.ratesContractorOpen;
+  input.setAttribute("aria-expanded", open ? "true" : "false");
+  if (!open) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = field === "shop" ? renderRateShopList(VIEW) : renderRateContractorList(VIEW);
+}
+
 function onMouseDown(event: MouseEvent): void {
   const target = event.target;
   if (!(target instanceof Element)) {
+    return;
+  }
+  const ratePick = target.closest("[data-action='pick-rate-shop'], [data-action='pick-rate-contractor']");
+  if (ratePick instanceof HTMLElement) {
+    event.preventDefault();
+    const field: RateField = ratePick.dataset.action === "pick-rate-shop" ? "shop" : "contractor";
+    pickRateValue(field, ratePick.dataset.value ?? "");
     return;
   }
   const pick = target.closest("[data-action='pick-contractor']");
@@ -622,6 +819,10 @@ function decodeLine(value: string): string {
 
 async function openRates(): Promise<void> {
   VIEW.ratesOpen = true;
+  VIEW.ratesShopOpen = false;
+  VIEW.ratesContractorOpen = false;
+  VIEW.ratesShopQuery = VIEW.ratesShop;
+  VIEW.ratesContractorQuery = VIEW.ratesContractor;
   VIEW.ratesMessage = "";
   VIEW.ratesMessageOk = false;
   if (webapp === "") {
@@ -638,11 +839,13 @@ async function openRates(): Promise<void> {
     if (!read.ok) {
       VIEW.addresses = [];
       VIEW.ratesShop = "";
+      VIEW.ratesShopQuery = "";
       VIEW.ratesMessage = rateSaveMessage("addresses");
     } else {
       VIEW.addresses = read.addresses;
       if (!read.addresses.includes(VIEW.ratesShop)) {
         VIEW.ratesShop = "";
+        VIEW.ratesShopQuery = "";
       }
     }
     if (VIEW.contractors.length === 0) {
@@ -654,9 +857,12 @@ async function openRates(): Promise<void> {
     }
     if (!rateContractorNames(VIEW.contractors).includes(VIEW.ratesContractor)) {
       VIEW.ratesContractor = "";
+      VIEW.ratesContractorQuery = "";
     }
   } catch {
     VIEW.addresses = [];
+    VIEW.ratesShop = "";
+    VIEW.ratesShopQuery = "";
     VIEW.ratesMessage = rateSaveMessage("addresses");
   } finally {
     VIEW.loading = false;
@@ -665,6 +871,7 @@ async function openRates(): Promise<void> {
 }
 
 async function saveRates(): Promise<void> {
+  commitRateFields();
   const built = saveRateBody({
     shop: VIEW.ratesShop,
     contractor: VIEW.ratesContractor,

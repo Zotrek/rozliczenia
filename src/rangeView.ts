@@ -3,6 +3,7 @@ import {
   RANGE_ERROR,
   foldPl,
   matchingContractors,
+  matchingTexts,
   rangeLabel,
   selectedContractor,
   type ContractorListItem,
@@ -10,7 +11,6 @@ import {
   type ScreenId,
   type StartedSearch,
 } from "./range.js";
-import { rateContractorNames } from "./rateWindow.js";
 import type { StatementScreen } from "./statement.js";
 import { renderStatement } from "./statementView.js";
 
@@ -36,7 +36,11 @@ export interface RangeViewModel {
   /** Kolumna Adres sklepu rejestru. Nie pinezki. */
   addresses: readonly string[];
   ratesShop: string;
+  ratesShopQuery: string;
+  ratesShopOpen: boolean;
   ratesContractor: string;
+  ratesContractorQuery: string;
+  ratesContractorOpen: boolean;
   ratesPickup: string;
   ratesBag: string;
   ratesFrom: string;
@@ -111,6 +115,96 @@ function contractorField(model: RangeViewModel): string {
   );
 }
 
+function renderOptionList(
+  listId: string,
+  action: string,
+  values: readonly string[],
+  empty: string,
+): string {
+  if (!values.length) {
+    return `<p class="note picker-empty">${empty}</p>`;
+  }
+  return (
+    `<ul class="picker-list" id="${listId}">` +
+    values
+      .map(
+        (value) =>
+          `<li><button type="button" class="picker-option" role="option" data-action="${action}" data-value="${escapeHtml(value)}">` +
+          `<span>${escapeHtml(value)}</span></button></li>`,
+      )
+      .join("") +
+    "</ul>"
+  );
+}
+
+function rateShopHits(model: RangeViewModel): string[] {
+  const browsing =
+    model.ratesShopOpen &&
+    model.ratesShop !== "" &&
+    foldPl(model.ratesShopQuery) === foldPl(model.ratesShop);
+  return matchingTexts(model.addresses, model.ratesShopQuery, browsing).slice(0, CONTRACTOR_LIST_LIMIT);
+}
+
+/** Adresy z rejestru. Najwyżej 80. Tekstu spoza listy nie ma. */
+export function renderRateShopList(model: RangeViewModel): string {
+  return renderOptionList(
+    "rate-shop-list",
+    "pick-rate-shop",
+    rateShopHits(model),
+    "Brak adresu o tym fragmencie.",
+  );
+}
+
+function rateContractorHits(model: RangeViewModel): string[] {
+  const browsing =
+    model.ratesContractorOpen &&
+    model.ratesContractor !== "" &&
+    foldPl(model.ratesContractorQuery) === foldPl(model.ratesContractor);
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const item of matchingContractors(model.contractors, model.ratesContractorQuery, browsing)) {
+    const name = item.nazwa.trim();
+    if (name === "" || seen.has(name)) {
+      continue;
+    }
+    seen.add(name);
+    names.push(name);
+    if (names.length >= CONTRACTOR_LIST_LIMIT) {
+      break;
+    }
+  }
+  return names;
+}
+
+/** Nazwa krótka. Dane do Worda tylko zawężają i nie wchodzą do listy. */
+export function renderRateContractorList(model: RangeViewModel): string {
+  return renderOptionList(
+    "rate-contractor-list",
+    "pick-rate-contractor",
+    rateContractorHits(model),
+    "Brak podwykonawcy o tej nazwie lub w danych do Worda.",
+  );
+}
+
+function rateCombo(
+  label: string,
+  field: "shop" | "contractor",
+  query: string,
+  open: boolean,
+  placeholder: string,
+  listHtml: string,
+): string {
+  return (
+    `<div class="field picker"><span>${label}</span>` +
+    '<div class="picker-wrap">' +
+    `<input type="text" data-rate="${field}" value="${escapeHtml(query)}" ` +
+    `placeholder="${placeholder}" autocomplete="off" role="combobox" aria-autocomplete="list" ` +
+    `aria-expanded="${open ? "true" : "false"}" aria-controls="rate-${field}-list">` +
+    `<div data-rate-list="${field}"${open ? "" : " hidden"}>${open ? listHtml : ""}</div>` +
+    "</div></div>"
+  );
+}
+
 function dateFields(model: RangeViewModel): string {
   const errEnd = model.error === "end";
   const errOrder = model.error === "order";
@@ -173,28 +267,29 @@ function renderStatementScreen(model: RangeViewModel): string {
   );
 }
 
-function selectOptions(values: readonly string[], selected: string, placeholder: string): string {
-  const head = `<option value="">${escapeHtml(placeholder)}</option>`;
-  const rest = values
-    .map((value) => {
-      const on = value === selected ? " selected" : "";
-      return `<option value="${escapeHtml(value)}"${on}>${escapeHtml(value)}</option>`;
-    })
-    .join("");
-  return head + rest;
-}
-
 export function renderRatesDialog(model: RangeViewModel): string {
-  const message = model.ratesMessage
-    ? `<p class="${model.ratesMessageOk ? "note" : "err"}">${escapeHtml(model.ratesMessage)}</p>`
-    : "";
+  const messageClass = model.ratesMessageOk ? "note" : "err";
   return (
     '<div class="modal" data-window="rates">' +
     '<div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="rates-title">' +
     '<h2 id="rates-title">Baza stawek</h2>' +
     '<p class="note">Zapis od razu, nie czeka na Zatwierdź. Nie zmienia Rozliczony, Numer faktury ani kolumn 16 i 17. Stawki trasy tu nie ma. Remis rozstrzyga się na zestawieniu, nie tutaj.</p>' +
-    `<label class="field"><span>Sklep</span><select data-rate="shop">${selectOptions(model.addresses, model.ratesShop, "— wybierz adres —")}</select></label>` +
-    `<label class="field"><span>Podwykonawca</span><select data-rate="contractor">${selectOptions(rateContractorNames(model.contractors), model.ratesContractor, "— wybierz podwykonawcę —")}</select></label>` +
+    rateCombo(
+      "Sklep",
+      "shop",
+      model.ratesShopQuery,
+      model.ratesShopOpen,
+      "— wybierz adres —",
+      renderRateShopList(model),
+    ) +
+    rateCombo(
+      "Podwykonawca",
+      "contractor",
+      model.ratesContractorQuery,
+      model.ratesContractorOpen,
+      "— wybierz podwykonawcę —",
+      renderRateContractorList(model),
+    ) +
     '<label class="field"><span>Kwota za podjazd</span>' +
     `<input type="text" inputmode="decimal" data-rate="pickup" data-keep="pickup" autocomplete="off" value="${escapeHtml(model.ratesPickup)}"></label>` +
     '<label class="field"><span>Kwota za worek</span>' +
@@ -203,7 +298,7 @@ export function renderRatesDialog(model: RangeViewModel): string {
     `<input type="text" data-rate="from" data-keep="from" autocomplete="off" placeholder="dd.mm.yyyy" value="${escapeHtml(model.ratesFrom)}">` +
     '<span class="note">Puste znaczy od zawsze.</span></label>' +
     '<p class="note">Adres z kolumny Adres sklepu rejestru. Podwykonawca to nazwa krótka z Listy podwykonawców. Nie pinezki mapy. Wpisu ręcznego nie ma.</p>' +
-    message +
+    `<p data-rates-message class="${messageClass}"${model.ratesMessage ? "" : " hidden"}>${escapeHtml(model.ratesMessage)}</p>` +
     '<div class="modal-actions">' +
     '<button type="button" class="btn-ghost" data-action="close-rates">Zamknij</button>' +
     '<button type="button" class="btn-teal" data-action="save-rates">Zapisz stawkę</button>' +

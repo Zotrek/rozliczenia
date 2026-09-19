@@ -141,8 +141,16 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   .dates { grid-template-columns: 1fr; }
 }
 .field.picker { position: relative; z-index: 4; }
+.field.picker:focus-within { z-index: 6; }
 .picker-wrap { position: relative; }
 .picker-wrap [data-picker-list] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  z-index: 5;
+}
+.picker-wrap [data-rate-list] {
   position: absolute;
   left: 0;
   right: 0;
@@ -448,6 +456,33 @@ function selectedContractor(list, text) {
     }
     return list.find((item) => foldPl(item.nazwa) === folded) ?? null;
 }
+/** Fragment tekstu. Pusty tekst albo przeglądanie zostawia całą listę. */
+function matchingTexts(values, query, browsingAll) {
+    if (browsingAll) {
+        return [...values];
+    }
+    const folded = foldPl(query);
+    if (folded === "") {
+        return [...values];
+    }
+    return values.filter((value) => foldPl(value).includes(folded));
+}
+/** Dokładny tekst albo jedyne trafienie. Inaczej brak wyboru. Zostaje pisownia z listy. */
+function resolveListText(values, text) {
+    const folded = foldPl(text);
+    if (folded === "") {
+        return { value: "", query: "" };
+    }
+    const exact = values.find((value) => foldPl(value) === folded);
+    if (exact) {
+        return { value: exact, query: exact };
+    }
+    const hits = matchingTexts(values, text, false);
+    if (hits.length === 1) {
+        return { value: hits[0], query: hits[0] };
+    }
+    return { value: "", query: text };
+}
 /** Jak combobox mapy: dokładna nazwa albo jedyne trafienie. Inaczej brak wyboru. */
 function resolveContractorText(list, text) {
     const exact = selectedContractor(list, text);
@@ -574,79 +609,6 @@ function readWebAppUrl(search, stored) {
         return { url: fromQuery, persist: fromQuery };
     }
     return { url: stored?.trim() ?? "", persist: null };
-}
-
-/** Pola `saveRate` jak na mapie. Listy wybiera widok, tu jest tylko body. */
-function saveRateBody(input) {
-    const shop = input.shop.trim();
-    const contractor = input.contractor.trim();
-    if (shop === "" || contractor === "") {
-        return { ok: false, error: "shop" };
-    }
-    return {
-        ok: true,
-        body: {
-            mode: "saveRate",
-            sklep: shop,
-            podwykonawca: contractor,
-            kwotaPodjazd: input.pickup,
-            kwotaWorek: input.bag,
-            odKiedy: input.from.trim(),
-        },
-    };
-}
-function rateSaveMessage(code) {
-    if (code === "tie") {
-        return "Więcej niż jeden wiersz tej daty. Zapisu nie ma.";
-    }
-    if (code === "date") {
-        return "Data w formacie dd.mm.yyyy albo puste.";
-    }
-    if (code === "amount") {
-        return "Nieprawidłowa kwota.";
-    }
-    if (code === "shop") {
-        return "Wybierz sklep i podwykonawcę.";
-    }
-    if (code === "addresses") {
-        return "Nie udało się wczytać adresów.";
-    }
-    return "Zapis nieudany.";
-}
-/** Odczyt `listStoreAddresses`. Obiekt pinezki nie przechodzi: to nie ta lista. */
-function readAddressList(body) {
-    if (!isRecord(body) || body.ok !== true || !Array.isArray(body.data)) {
-        return { ok: false };
-    }
-    const addresses = [];
-    for (const item of body.data) {
-        if (typeof item !== "string") {
-            return { ok: false };
-        }
-        const text = item.trim();
-        if (text !== "") {
-            addresses.push(text);
-        }
-    }
-    return { ok: true, addresses };
-}
-/** Nazwa krótka, nie Dane do Worda. Puste i powtórki odpadają. */
-function rateContractorNames(items) {
-    const seen = new Set();
-    const names = [];
-    for (const item of items) {
-        const name = item.nazwa.trim();
-        if (name === "" || seen.has(name)) {
-            continue;
-        }
-        seen.add(name);
-        names.push(name);
-    }
-    names.sort((a, b) => a.localeCompare(b, "pl"));
-    return names;
-}
-function isRecord(value) {
-    return typeof value === "object" && value !== null;
 }
 
 /**
@@ -1777,7 +1739,6 @@ function shopsWord(count) {
 
 
 
-
 function brand() {
     return ('<div class="brand"><img src="logo.png" alt="" width="36" height="36">' +
         "<div><strong>Rozliczenia</strong><em>Na zgłoszenie</em></div></div>");
@@ -1822,6 +1783,59 @@ function contractorField(model) {
         `<span class="note" data-contractor-note${picked && !model.contractorOpen ? "" : " hidden"}>${note}</span>` +
         (err ? `<span class="err" data-contractor-error>${RANGE_ERROR.contractor}</span>` : "") +
         "</div>");
+}
+function renderOptionList(listId, action, values, empty) {
+    if (!values.length) {
+        return `<p class="note picker-empty">${empty}</p>`;
+    }
+    return (`<ul class="picker-list" id="${listId}">` +
+        values
+            .map((value) => `<li><button type="button" class="picker-option" role="option" data-action="${action}" data-value="${escapeHtml(value)}">` +
+            `<span>${escapeHtml(value)}</span></button></li>`)
+            .join("") +
+        "</ul>");
+}
+function rateShopHits(model) {
+    const browsing = model.ratesShopOpen &&
+        model.ratesShop !== "" &&
+        foldPl(model.ratesShopQuery) === foldPl(model.ratesShop);
+    return matchingTexts(model.addresses, model.ratesShopQuery, browsing).slice(0, CONTRACTOR_LIST_LIMIT);
+}
+/** Adresy z rejestru. Najwyżej 80. Tekstu spoza listy nie ma. */
+function renderRateShopList(model) {
+    return renderOptionList("rate-shop-list", "pick-rate-shop", rateShopHits(model), "Brak adresu o tym fragmencie.");
+}
+function rateContractorHits(model) {
+    const browsing = model.ratesContractorOpen &&
+        model.ratesContractor !== "" &&
+        foldPl(model.ratesContractorQuery) === foldPl(model.ratesContractor);
+    const names = [];
+    const seen = new Set();
+    for (const item of matchingContractors(model.contractors, model.ratesContractorQuery, browsing)) {
+        const name = item.nazwa.trim();
+        if (name === "" || seen.has(name)) {
+            continue;
+        }
+        seen.add(name);
+        names.push(name);
+        if (names.length >= CONTRACTOR_LIST_LIMIT) {
+            break;
+        }
+    }
+    return names;
+}
+/** Nazwa krótka. Dane do Worda tylko zawężają i nie wchodzą do listy. */
+function renderRateContractorList(model) {
+    return renderOptionList("rate-contractor-list", "pick-rate-contractor", rateContractorHits(model), "Brak podwykonawcy o tej nazwie lub w danych do Worda.");
+}
+function rateCombo(label, field, query, open, placeholder, listHtml) {
+    return (`<div class="field picker"><span>${label}</span>` +
+        '<div class="picker-wrap">' +
+        `<input type="text" data-rate="${field}" value="${escapeHtml(query)}" ` +
+        `placeholder="${placeholder}" autocomplete="off" role="combobox" aria-autocomplete="list" ` +
+        `aria-expanded="${open ? "true" : "false"}" aria-controls="rate-${field}-list">` +
+        `<div data-rate-list="${field}"${open ? "" : " hidden"}>${open ? listHtml : ""}</div>` +
+        "</div></div>");
 }
 function dateFields(model) {
     const errEnd = model.error === "end";
@@ -1875,26 +1889,14 @@ function renderStatementScreen(model) {
         renderStatement(model.statement, model.status) +
         "</div>");
 }
-function selectOptions(values, selected, placeholder) {
-    const head = `<option value="">${escapeHtml(placeholder)}</option>`;
-    const rest = values
-        .map((value) => {
-        const on = value === selected ? " selected" : "";
-        return `<option value="${escapeHtml(value)}"${on}>${escapeHtml(value)}</option>`;
-    })
-        .join("");
-    return head + rest;
-}
 function renderRatesDialog(model) {
-    const message = model.ratesMessage
-        ? `<p class="${model.ratesMessageOk ? "note" : "err"}">${escapeHtml(model.ratesMessage)}</p>`
-        : "";
+    const messageClass = model.ratesMessageOk ? "note" : "err";
     return ('<div class="modal" data-window="rates">' +
         '<div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="rates-title">' +
         '<h2 id="rates-title">Baza stawek</h2>' +
         '<p class="note">Zapis od razu, nie czeka na Zatwierdź. Nie zmienia Rozliczony, Numer faktury ani kolumn 16 i 17. Stawki trasy tu nie ma. Remis rozstrzyga się na zestawieniu, nie tutaj.</p>' +
-        `<label class="field"><span>Sklep</span><select data-rate="shop">${selectOptions(model.addresses, model.ratesShop, "— wybierz adres —")}</select></label>` +
-        `<label class="field"><span>Podwykonawca</span><select data-rate="contractor">${selectOptions(rateContractorNames(model.contractors), model.ratesContractor, "— wybierz podwykonawcę —")}</select></label>` +
+        rateCombo("Sklep", "shop", model.ratesShopQuery, model.ratesShopOpen, "— wybierz adres —", renderRateShopList(model)) +
+        rateCombo("Podwykonawca", "contractor", model.ratesContractorQuery, model.ratesContractorOpen, "— wybierz podwykonawcę —", renderRateContractorList(model)) +
         '<label class="field"><span>Kwota za podjazd</span>' +
         `<input type="text" inputmode="decimal" data-rate="pickup" data-keep="pickup" autocomplete="off" value="${escapeHtml(model.ratesPickup)}"></label>` +
         '<label class="field"><span>Kwota za worek</span>' +
@@ -1903,7 +1905,7 @@ function renderRatesDialog(model) {
         `<input type="text" data-rate="from" data-keep="from" autocomplete="off" placeholder="dd.mm.yyyy" value="${escapeHtml(model.ratesFrom)}">` +
         '<span class="note">Puste znaczy od zawsze.</span></label>' +
         '<p class="note">Adres z kolumny Adres sklepu rejestru. Podwykonawca to nazwa krótka z Listy podwykonawców. Nie pinezki mapy. Wpisu ręcznego nie ma.</p>' +
-        message +
+        `<p data-rates-message class="${messageClass}"${model.ratesMessage ? "" : " hidden"}>${escapeHtml(model.ratesMessage)}</p>` +
         '<div class="modal-actions">' +
         '<button type="button" class="btn-ghost" data-action="close-rates">Zamknij</button>' +
         '<button type="button" class="btn-teal" data-action="save-rates">Zapisz stawkę</button>' +
@@ -1922,6 +1924,79 @@ function renderApp(model) {
     const dialog = model.ratesOpen ? renderRatesDialog(model) : "";
     const loading = model.loading ? renderLoading(model.loadMessage, model.loadKind === "unicorn") : "";
     return main + dialog + loading;
+}
+
+/** Pola `saveRate` jak na mapie. Listy wybiera widok, tu jest tylko body. */
+function saveRateBody(input) {
+    const shop = input.shop.trim();
+    const contractor = input.contractor.trim();
+    if (shop === "" || contractor === "") {
+        return { ok: false, error: "shop" };
+    }
+    return {
+        ok: true,
+        body: {
+            mode: "saveRate",
+            sklep: shop,
+            podwykonawca: contractor,
+            kwotaPodjazd: input.pickup,
+            kwotaWorek: input.bag,
+            odKiedy: input.from.trim(),
+        },
+    };
+}
+function rateSaveMessage(code) {
+    if (code === "tie") {
+        return "Więcej niż jeden wiersz tej daty. Zapisu nie ma.";
+    }
+    if (code === "date") {
+        return "Data w formacie dd.mm.yyyy albo puste.";
+    }
+    if (code === "amount") {
+        return "Nieprawidłowa kwota.";
+    }
+    if (code === "shop") {
+        return "Wybierz sklep i podwykonawcę.";
+    }
+    if (code === "addresses") {
+        return "Nie udało się wczytać adresów.";
+    }
+    return "Zapis nieudany.";
+}
+/** Odczyt `listStoreAddresses`. Obiekt pinezki nie przechodzi: to nie ta lista. */
+function readAddressList(body) {
+    if (!isRecord(body) || body.ok !== true || !Array.isArray(body.data)) {
+        return { ok: false };
+    }
+    const addresses = [];
+    for (const item of body.data) {
+        if (typeof item !== "string") {
+            return { ok: false };
+        }
+        const text = item.trim();
+        if (text !== "") {
+            addresses.push(text);
+        }
+    }
+    return { ok: true, addresses };
+}
+/** Nazwa krótka, nie Dane do Worda. Puste i powtórki odpadają. */
+function rateContractorNames(items) {
+    const seen = new Set();
+    const names = [];
+    for (const item of items) {
+        const name = item.nazwa.trim();
+        if (name === "" || seen.has(name)) {
+            continue;
+        }
+        seen.add(name);
+        names.push(name);
+    }
+    names.sort((a, b) => a.localeCompare(b, "pl"));
+    return names;
+}
+function isRecord(value) {
+    return typeof value === "object" && value !== null;
 }
 
 
@@ -1949,7 +2024,11 @@ const VIEW = {
     loadKind: "logo",
     addresses: [],
     ratesShop: "",
+    ratesShopQuery: "",
+    ratesShopOpen: false,
     ratesContractor: "",
+    ratesContractorQuery: "",
+    ratesContractorOpen: false,
     ratesPickup: "",
     ratesBag: "",
     ratesFrom: "",
@@ -2216,6 +2295,10 @@ function onInput(event) {
         paint(el.dataset.keep);
         return;
     }
+    if (el.dataset.rate === "shop" || el.dataset.rate === "contractor") {
+        typeRateField(el);
+        return;
+    }
     if (el.dataset.rate === "pickup" || el.dataset.rate === "bag" || el.dataset.rate === "from") {
         if (el.dataset.rate === "pickup") {
             VIEW.ratesPickup = el.value;
@@ -2261,18 +2344,6 @@ function syncDate(el) {
 }
 function onChange(event) {
     const el = event.target;
-    if (el instanceof HTMLSelectElement && (el.dataset.rate === "shop" || el.dataset.rate === "contractor")) {
-        if (el.dataset.rate === "shop") {
-            VIEW.ratesShop = el.value;
-        }
-        else {
-            VIEW.ratesContractor = el.value;
-        }
-        VIEW.ratesMessage = "";
-        VIEW.ratesMessageOk = false;
-        paint();
-        return;
-    }
     if (!(el instanceof HTMLInputElement)) {
         return;
     }
@@ -2342,33 +2413,127 @@ function pickContractor(nazwa) {
     }
     paint();
 }
-function onFocusIn(event) {
-    const el = event.target;
-    if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
+function typeRateField(el) {
+    const field = el.dataset.rate === "shop" ? "shop" : "contractor";
+    if (field === "shop") {
+        VIEW.ratesShopQuery = el.value;
+        const resolved = resolveListText(VIEW.addresses, el.value);
+        VIEW.ratesShop =
+            foldPl(el.value) !== "" && foldPl(resolved.query) === foldPl(el.value) ? resolved.value : "";
+        VIEW.ratesShopOpen = true;
+        VIEW.ratesContractorOpen = false;
+    }
+    else {
+        VIEW.ratesContractorQuery = el.value;
+        const picked = selectedContractor(VIEW.contractors, el.value);
+        VIEW.ratesContractor = picked ? picked.nazwa : "";
+        VIEW.ratesContractorOpen = true;
+        VIEW.ratesShopOpen = false;
+    }
+    VIEW.ratesMessage = "";
+    VIEW.ratesMessageOk = false;
+    syncRatesMessage();
+    syncRatePicker("shop");
+    syncRatePicker("contractor");
+}
+function commitRateField(field) {
+    if (field === "shop") {
+        const resolved = resolveListText(VIEW.addresses, VIEW.ratesShopQuery);
+        VIEW.ratesShop = resolved.value;
+        VIEW.ratesShopQuery = resolved.query;
+        VIEW.ratesShopOpen = false;
         return;
     }
-    VIEW.contractorOpen = true;
-    syncContractorPicker();
+    const resolved = resolveContractorText(VIEW.contractors, VIEW.ratesContractorQuery);
+    VIEW.ratesContractor = resolved.contractor;
+    VIEW.ratesContractorQuery = resolved.query;
+    VIEW.ratesContractorOpen = false;
+}
+function commitRateFields() {
+    commitRateField("shop");
+    commitRateField("contractor");
+}
+function pickRateValue(field, value) {
+    if (value === "") {
+        return;
+    }
+    if (field === "shop") {
+        VIEW.ratesShop = value;
+        VIEW.ratesShopQuery = value;
+        VIEW.ratesShopOpen = false;
+    }
+    else {
+        VIEW.ratesContractor = value;
+        VIEW.ratesContractorQuery = value;
+        VIEW.ratesContractorOpen = false;
+    }
+    VIEW.ratesMessage = "";
+    VIEW.ratesMessageOk = false;
+    paint();
+}
+function onFocusIn(event) {
+    const el = event.target;
+    if (!(el instanceof HTMLInputElement)) {
+        return;
+    }
+    if (el.dataset.filter === "contractor") {
+        VIEW.contractorOpen = true;
+        syncContractorPicker();
+        return;
+    }
+    if (el.dataset.rate !== "shop" && el.dataset.rate !== "contractor") {
+        return;
+    }
+    if (el.dataset.rate === "shop") {
+        VIEW.ratesShopOpen = true;
+        VIEW.ratesContractorOpen = false;
+    }
+    else {
+        VIEW.ratesContractorOpen = true;
+        VIEW.ratesShopOpen = false;
+    }
+    syncRatePicker("shop");
+    syncRatePicker("contractor");
 }
 function onFocusOut(event) {
     const el = event.target;
-    if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
+    if (!(el instanceof HTMLInputElement)) {
         return;
     }
+    if (el.dataset.filter === "contractor") {
+        window.setTimeout(() => {
+            const still = document.activeElement;
+            if (still instanceof HTMLInputElement && still.dataset.filter === "contractor") {
+                return;
+            }
+            const resolved = resolveContractorText(VIEW.contractors, VIEW.contractorQuery);
+            VIEW.contractor = resolved.contractor;
+            VIEW.contractorQuery = resolved.query;
+            VIEW.contractorOpen = false;
+            const input = document.querySelector('[data-filter="contractor"]');
+            if (input instanceof HTMLInputElement) {
+                input.value = VIEW.contractorQuery;
+            }
+            syncContractorPicker();
+        }, 150);
+        return;
+    }
+    if (el.dataset.rate !== "shop" && el.dataset.rate !== "contractor") {
+        return;
+    }
+    const field = el.dataset.rate === "shop" ? "shop" : "contractor";
     window.setTimeout(() => {
         const still = document.activeElement;
-        if (still instanceof HTMLInputElement && still.dataset.filter === "contractor") {
+        if (still instanceof HTMLInputElement && still.dataset.rate === field) {
             return;
         }
-        const resolved = resolveContractorText(VIEW.contractors, VIEW.contractorQuery);
-        VIEW.contractor = resolved.contractor;
-        VIEW.contractorQuery = resolved.query;
-        VIEW.contractorOpen = false;
-        const input = document.querySelector('[data-filter="contractor"]');
+        commitRateField(field);
+        const input = document.querySelector(`[data-window="rates"] [data-rate="${field}"]`);
         if (input instanceof HTMLInputElement) {
-            input.value = VIEW.contractorQuery;
+            input.value = field === "shop" ? VIEW.ratesShopQuery : VIEW.ratesContractorQuery;
         }
-        syncContractorPicker();
+        syncRatePicker("shop");
+        syncRatePicker("contractor");
     }, 150);
 }
 function contractorOptions() {
@@ -2398,29 +2563,95 @@ function moveContractorActive(delta) {
     }
     items[next].scrollIntoView({ block: "nearest" });
 }
-function onKeyDown(event) {
-    const el = event.target;
-    if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
+function rateOptions(field) {
+    const box = document.querySelector(`[data-rate-list="${field}"]`);
+    if (!(box instanceof HTMLElement)) {
+        return [];
+    }
+    return [...box.querySelectorAll("[role='option']")];
+}
+function moveRateActive(field, delta) {
+    if (field === "shop") {
+        VIEW.ratesShopOpen = true;
+        VIEW.ratesContractorOpen = false;
+    }
+    else {
+        VIEW.ratesContractorOpen = true;
+        VIEW.ratesShopOpen = false;
+    }
+    syncRatePicker("shop");
+    syncRatePicker("contractor");
+    const items = rateOptions(field);
+    if (!items.length) {
         return;
     }
+    const current = items.findIndex((item) => item.classList.contains("is-active"));
+    const next = current < 0
+        ? delta > 0
+            ? 0
+            : items.length - 1
+        : Math.min(items.length - 1, Math.max(0, current + delta));
+    for (let i = 0; i < items.length; i += 1) {
+        items[i].classList.toggle("is-active", i === next);
+    }
+    items[next].scrollIntoView({ block: "nearest" });
+}
+function onKeyDown(event) {
+    const el = event.target;
+    if (!(el instanceof HTMLInputElement)) {
+        return;
+    }
+    if (el.dataset.filter === "contractor") {
+        if (event.key === "Escape") {
+            VIEW.contractorOpen = false;
+            syncContractorPicker();
+            return;
+        }
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            moveContractorActive(event.key === "ArrowDown" ? 1 : -1);
+            return;
+        }
+        if (event.key === "Enter" && VIEW.contractorOpen) {
+            const active = contractorOptions().find((item) => item.classList.contains("is-active"));
+            const pick = active ?? contractorOptions()[0];
+            if (!pick) {
+                return;
+            }
+            event.preventDefault();
+            pickContractor(pick.dataset.nazwa ?? "");
+        }
+        return;
+    }
+    if (el.dataset.rate !== "shop" && el.dataset.rate !== "contractor") {
+        return;
+    }
+    const field = el.dataset.rate === "shop" ? "shop" : "contractor";
+    const open = field === "shop" ? VIEW.ratesShopOpen : VIEW.ratesContractorOpen;
     if (event.key === "Escape") {
-        VIEW.contractorOpen = false;
-        syncContractorPicker();
+        if (field === "shop") {
+            VIEW.ratesShopOpen = false;
+        }
+        else {
+            VIEW.ratesContractorOpen = false;
+        }
+        syncRatePicker(field);
         return;
     }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
-        moveContractorActive(event.key === "ArrowDown" ? 1 : -1);
+        moveRateActive(field, event.key === "ArrowDown" ? 1 : -1);
         return;
     }
-    if (event.key === "Enter" && VIEW.contractorOpen) {
-        const active = contractorOptions().find((item) => item.classList.contains("is-active"));
-        const pick = active ?? contractorOptions()[0];
+    if (event.key === "Enter" && open) {
+        const items = rateOptions(field);
+        const active = items.find((item) => item.classList.contains("is-active"));
+        const pick = active ?? items[0];
         if (!pick) {
             return;
         }
         event.preventDefault();
-        pickContractor(pick.dataset.nazwa ?? "");
+        pickRateValue(field, pick.dataset.value ?? "");
     }
 }
 function syncContractorPicker() {
@@ -2452,9 +2683,41 @@ function syncContractorPicker() {
     box.hidden = false;
     box.innerHTML = renderContractorList(VIEW);
 }
+function syncRatesMessage() {
+    const el = document.querySelector("[data-rates-message]");
+    if (!(el instanceof HTMLElement)) {
+        return;
+    }
+    el.hidden = VIEW.ratesMessage === "";
+    el.textContent = VIEW.ratesMessage;
+    el.className = VIEW.ratesMessageOk ? "note" : "err";
+}
+function syncRatePicker(field) {
+    const input = document.querySelector(`[data-window="rates"] [data-rate="${field}"]`);
+    const box = document.querySelector(`[data-rate-list="${field}"]`);
+    if (!(input instanceof HTMLInputElement) || !(box instanceof HTMLElement)) {
+        return;
+    }
+    const open = field === "shop" ? VIEW.ratesShopOpen : VIEW.ratesContractorOpen;
+    input.setAttribute("aria-expanded", open ? "true" : "false");
+    if (!open) {
+        box.hidden = true;
+        box.innerHTML = "";
+        return;
+    }
+    box.hidden = false;
+    box.innerHTML = field === "shop" ? renderRateShopList(VIEW) : renderRateContractorList(VIEW);
+}
 function onMouseDown(event) {
     const target = event.target;
     if (!(target instanceof Element)) {
+        return;
+    }
+    const ratePick = target.closest("[data-action='pick-rate-shop'], [data-action='pick-rate-contractor']");
+    if (ratePick instanceof HTMLElement) {
+        event.preventDefault();
+        const field = ratePick.dataset.action === "pick-rate-shop" ? "shop" : "contractor";
+        pickRateValue(field, ratePick.dataset.value ?? "");
         return;
     }
     const pick = target.closest("[data-action='pick-contractor']");
@@ -2482,6 +2745,10 @@ function decodeLine(value) {
 }
 async function openRates() {
     VIEW.ratesOpen = true;
+    VIEW.ratesShopOpen = false;
+    VIEW.ratesContractorOpen = false;
+    VIEW.ratesShopQuery = VIEW.ratesShop;
+    VIEW.ratesContractorQuery = VIEW.ratesContractor;
     VIEW.ratesMessage = "";
     VIEW.ratesMessageOk = false;
     if (webapp === "") {
@@ -2498,12 +2765,14 @@ async function openRates() {
         if (!read.ok) {
             VIEW.addresses = [];
             VIEW.ratesShop = "";
+            VIEW.ratesShopQuery = "";
             VIEW.ratesMessage = rateSaveMessage("addresses");
         }
         else {
             VIEW.addresses = read.addresses;
             if (!read.addresses.includes(VIEW.ratesShop)) {
                 VIEW.ratesShop = "";
+                VIEW.ratesShopQuery = "";
             }
         }
         if (VIEW.contractors.length === 0) {
@@ -2515,10 +2784,13 @@ async function openRates() {
         }
         if (!rateContractorNames(VIEW.contractors).includes(VIEW.ratesContractor)) {
             VIEW.ratesContractor = "";
+            VIEW.ratesContractorQuery = "";
         }
     }
     catch {
         VIEW.addresses = [];
+        VIEW.ratesShop = "";
+        VIEW.ratesShopQuery = "";
         VIEW.ratesMessage = rateSaveMessage("addresses");
     }
     finally {
@@ -2527,6 +2799,7 @@ async function openRates() {
     }
 }
 async function saveRates() {
+    commitRateFields();
     const built = saveRateBody({
         shop: VIEW.ratesShop,
         contractor: VIEW.ratesContractor,

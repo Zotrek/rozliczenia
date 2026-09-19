@@ -27,7 +27,11 @@ function model(over: Partial<RangeViewModel> = {}): RangeViewModel {
     statement: emptyStatement(),
     addresses: [],
     ratesShop: "",
+    ratesShopQuery: "",
+    ratesShopOpen: false,
     ratesContractor: "",
+    ratesContractorQuery: "",
+    ratesContractorOpen: false,
     ratesPickup: "",
     ratesBag: "",
     ratesFrom: "",
@@ -137,17 +141,20 @@ describe("renderApp", () => {
         addresses: ["ul. Hetmańska 90", "ul. Głogowska 12"],
         contractors: [{ nazwa: "GPW", dane: "DANE-WORD-XYZ" }],
         ratesShop: "ul. Głogowska 12",
+        ratesShopQuery: "ul. Głogowska 12",
+        ratesShopOpen: true,
         ratesContractor: "GPW",
+        ratesContractorQuery: "GPW",
       }),
     );
-    expect(html).toContain('<select data-rate="shop">');
-    expect(html).toContain('<select data-rate="contractor">');
+    expect(html).toContain('role="combobox"');
+    expect(html).toContain('data-rate="shop"');
+    expect(html).toContain('data-rate="contractor"');
     expect(html).toContain("ul. Głogowska 12");
-    expect(html).toContain(">GPW</option>");
+    expect(html).toContain("ul. Hetmańska 90");
+    expect(html).toContain('value="GPW"');
     expect(html).not.toContain("DANE-WORD-XYZ");
-    expect(html).not.toContain('data-rate="shop" type="text"');
-    expect(html).not.toMatch(/<input[^>]*data-rate="shop"/);
-    expect(html).not.toMatch(/<input[^>]*data-rate="contractor"/);
+    expect(html).not.toContain("<select");
     expect(html).toContain("Kwota za podjazd");
     expect(html).toContain("Kwota za worek");
     expect(html).toContain("Od kiedy obowiązuje");
@@ -156,6 +163,20 @@ describe("renderApp", () => {
     expect(html).not.toContain("resolveRateTie");
     expect(html).not.toContain("Stawka za trasę");
     expect(html).toContain("kolumn 16 i 17");
+  });
+
+  it("test_renderApp_rates_contractor_combobox_matches_word_data_but_shows_the_short_name", () => {
+    const html = renderApp(
+      model({
+        ratesOpen: true,
+        ratesContractorOpen: true,
+        ratesContractorQuery: "dane-word",
+        contractors: [{ nazwa: "GPW", dane: "DANE-WORD-XYZ" }],
+      }),
+    );
+    expect(html).toContain('data-action="pick-rate-contractor"');
+    expect(html).toContain('data-value="GPW"');
+    expect(html).not.toContain("DANE-WORD-XYZ");
   });
 
   it("test_renderApp_approve_from_10000_is_unicorn_not_logo", () => {

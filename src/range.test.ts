@@ -10,11 +10,13 @@ import {
   foldPl,
   isoToSheetDate,
   matchingContractors,
+  matchingTexts,
   openRatesWindow,
   rangeLabel,
   readWebAppUrl,
   reportMode,
   resolveContractorText,
+  resolveListText,
   screenAfterChangeRange,
   screenAfterSearch,
   searchParams,
@@ -50,6 +52,18 @@ describe("matchingContractors", () => {
     expect(resolveContractorText(LIST, "głogowska")).toEqual({ contractor: "GPW", query: "GPW" });
     expect(resolveContractorText(LIST, "a")).toEqual({ contractor: "", query: "a" });
     expect(resolveContractorText(LIST, "")).toEqual({ contractor: "", query: "" });
+  });
+
+  it("test_resolveListText_exact_or_single_fragment_keeps_list_spelling", () => {
+    const addresses = ["ul. Hetmańska 90", "ul. Głogowska 12"];
+    expect(matchingTexts(addresses, "HETM", false)).toEqual(["ul. Hetmańska 90"]);
+    expect(matchingTexts(addresses, "   ", false)).toEqual(addresses);
+    expect(resolveListText(addresses, "glogowska")).toEqual({
+      value: "ul. Głogowska 12",
+      query: "ul. Głogowska 12",
+    });
+    expect(resolveListText(addresses, "ul.")).toEqual({ value: "", query: "ul." });
+    expect(resolveListText(addresses, "")).toEqual({ value: "", query: "" });
   });
 
   it("test_foldPl_polish_letters_fold", () => {

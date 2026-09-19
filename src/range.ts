@@ -97,6 +97,42 @@ export function selectedContractor(
   return list.find((item) => foldPl(item.nazwa) === folded) ?? null;
 }
 
+/** Fragment tekstu. Pusty tekst albo przeglądanie zostawia całą listę. */
+export function matchingTexts(
+  values: readonly string[],
+  query: string,
+  browsingAll: boolean,
+): string[] {
+  if (browsingAll) {
+    return [...values];
+  }
+  const folded = foldPl(query);
+  if (folded === "") {
+    return [...values];
+  }
+  return values.filter((value) => foldPl(value).includes(folded));
+}
+
+/** Dokładny tekst albo jedyne trafienie. Inaczej brak wyboru. Zostaje pisownia z listy. */
+export function resolveListText(
+  values: readonly string[],
+  text: string,
+): { value: string; query: string } {
+  const folded = foldPl(text);
+  if (folded === "") {
+    return { value: "", query: "" };
+  }
+  const exact = values.find((value) => foldPl(value) === folded);
+  if (exact) {
+    return { value: exact, query: exact };
+  }
+  const hits = matchingTexts(values, text, false);
+  if (hits.length === 1) {
+    return { value: hits[0], query: hits[0] };
+  }
+  return { value: "", query: text };
+}
+
 /** Jak combobox mapy: dokładna nazwa albo jedyne trafienie. Inaczej brak wyboru. */
 export function resolveContractorText(
   list: readonly ContractorListItem[],

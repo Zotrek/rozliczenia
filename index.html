@@ -103,30 +103,41 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .setup-card h2 { margin: 14px 0 4px; font-size: 18px; }
 .setup-foot { display: flex; justify-content: flex-end; margin-top: 12px; }
+.field.picker { position: relative; z-index: 4; }
+.picker-wrap { position: relative; }
+.picker-wrap [data-picker-list] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  z-index: 5;
+}
 .picker-list {
   list-style: none;
-  margin: 4px 0 0;
+  margin: 0;
   padding: 4px;
-  max-height: 168px;
+  max-height: 220px;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
+  box-shadow: var(--shadow);
 }
 .picker-list button {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   width: 100%;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border: none;
   border-radius: 8px;
   background: transparent;
   text-align: left;
   font-weight: 700;
+  font-size: 13px;
 }
-.picker-list button small { font-weight: 550; color: var(--muted); }
-.picker-list button:hover { background: var(--teal-soft); }
+.picker-list button:hover,
+.picker-list button.is-active { background: var(--teal-soft); color: var(--teal-deep); }
 .picker-empty { margin: 4px 0 0; }
 .statement {
   height: 100%;
@@ -399,6 +410,18 @@ function selectedContractor(list, text) {
         return null;
     }
     return list.find((item) => foldPl(item.nazwa) === folded) ?? null;
+}
+/** Jak combobox mapy: dokładna nazwa albo jedyne trafienie. Inaczej brak wyboru. */
+function resolveContractorText(list, text) {
+    const exact = selectedContractor(list, text);
+    if (exact) {
+        return { contractor: exact.nazwa, query: exact.nazwa };
+    }
+    const hits = matchingContractors(list, text, false);
+    if (hits.length === 1) {
+        return { contractor: hits[0].nazwa, query: hits[0].nazwa };
+    }
+    return { contractor: "", query: text };
 }
 /** `yyyy-mm-dd` → `dd.mm.yyyy`. Zły dzień kalendarza daje null. Bez przesunięcia strefy. */
 function isoToSheetDate(iso) {
@@ -1743,7 +1766,7 @@ function renderContractorList(model) {
     }
     return ('<ul class="picker-list" id="contractor-list">' +
         hits
-            .map((item) => `<li><button type="button" data-action="pick-contractor" data-nazwa="${escapeHtml(item.nazwa)}">` +
+            .map((item) => `<li><button type="button" class="picker-option" role="option" data-action="pick-contractor" data-nazwa="${escapeHtml(item.nazwa)}">` +
             `<span>${escapeHtml(item.nazwa)}</span></button></li>`)
             .join("") +
         "</ul>");
@@ -1753,10 +1776,12 @@ function contractorField(model) {
     const err = model.error === "contractor";
     const note = picked ? escapeHtml(picked.dane) : "";
     return (`<div class="field picker${err ? " is-error" : ""}"><span>Podwykonawca</span>` +
+        '<div class="picker-wrap">' +
         `<input type="text" data-filter="contractor" value="${escapeHtml(model.contractorQuery)}" ` +
         'placeholder="Nazwa lub dane do Worda" autocomplete="off" role="combobox" aria-autocomplete="list" ' +
         `aria-expanded="${model.contractorOpen ? "true" : "false"}" aria-controls="contractor-list">` +
         `<div data-picker-list${model.contractorOpen ? "" : " hidden"}>${model.contractorOpen ? renderContractorList(model) : ""}</div>` +
+        "</div>" +
         `<span class="note" data-contractor-note${picked && !model.contractorOpen ? "" : " hidden"}>${note}</span>` +
         (err ? `<span class="err" data-contractor-error>${RANGE_ERROR.contractor}</span>` : "") +
         "</div>");
@@ -1936,6 +1961,7 @@ function boot() {
     root.addEventListener("focusin", onFocusIn);
     root.addEventListener("focusout", onFocusOut);
     root.addEventListener("mousedown", onMouseDown);
+    root.addEventListener("keydown", onKeyDown);
     paint();
     if (webapp !== "") {
         void loadContractors();
@@ -2027,14 +2053,7 @@ function onClick(event) {
     }
     const action = el.dataset.action;
     if (action === "pick-contractor") {
-        const nazwa = el.dataset.nazwa ?? "";
-        VIEW.contractor = nazwa;
-        VIEW.contractorQuery = nazwa;
-        VIEW.contractorOpen = false;
-        if (VIEW.error === "contractor") {
-            VIEW.error = "";
-        }
-        paint();
+        pickContractor(el.dataset.nazwa ?? "");
     }
     else if (action === "search") {
         void runSearch();
@@ -2272,6 +2291,18 @@ function onChange(event) {
         syncDate(el);
     }
 }
+function pickContractor(nazwa) {
+    if (nazwa === "") {
+        return;
+    }
+    VIEW.contractor = nazwa;
+    VIEW.contractorQuery = nazwa;
+    VIEW.contractorOpen = false;
+    if (VIEW.error === "contractor") {
+        VIEW.error = "";
+    }
+    paint();
+}
 function onFocusIn(event) {
     const el = event.target;
     if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
@@ -2285,8 +2316,73 @@ function onFocusOut(event) {
     if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
         return;
     }
-    VIEW.contractorOpen = false;
-    syncContractorPicker();
+    window.setTimeout(() => {
+        const still = document.activeElement;
+        if (still instanceof HTMLInputElement && still.dataset.filter === "contractor") {
+            return;
+        }
+        const resolved = resolveContractorText(VIEW.contractors, VIEW.contractorQuery);
+        VIEW.contractor = resolved.contractor;
+        VIEW.contractorQuery = resolved.query;
+        VIEW.contractorOpen = false;
+        const input = document.querySelector('[data-filter="contractor"]');
+        if (input instanceof HTMLInputElement) {
+            input.value = VIEW.contractorQuery;
+        }
+        syncContractorPicker();
+    }, 150);
+}
+function contractorOptions() {
+    const box = document.querySelector("[data-picker-list]");
+    if (!(box instanceof HTMLElement)) {
+        return [];
+    }
+    return [...box.querySelectorAll("[data-action='pick-contractor']")];
+}
+function moveContractorActive(delta) {
+    if (!VIEW.contractorOpen) {
+        VIEW.contractorOpen = true;
+        syncContractorPicker();
+    }
+    const items = contractorOptions();
+    if (!items.length) {
+        return;
+    }
+    const current = items.findIndex((item) => item.classList.contains("is-active"));
+    const next = current < 0
+        ? delta > 0
+            ? 0
+            : items.length - 1
+        : Math.min(items.length - 1, Math.max(0, current + delta));
+    for (let i = 0; i < items.length; i += 1) {
+        items[i].classList.toggle("is-active", i === next);
+    }
+    items[next].scrollIntoView({ block: "nearest" });
+}
+function onKeyDown(event) {
+    const el = event.target;
+    if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
+        return;
+    }
+    if (event.key === "Escape") {
+        VIEW.contractorOpen = false;
+        syncContractorPicker();
+        return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        moveContractorActive(event.key === "ArrowDown" ? 1 : -1);
+        return;
+    }
+    if (event.key === "Enter" && VIEW.contractorOpen) {
+        const active = contractorOptions().find((item) => item.classList.contains("is-active"));
+        const pick = active ?? contractorOptions()[0];
+        if (!pick) {
+            return;
+        }
+        event.preventDefault();
+        pickContractor(pick.dataset.nazwa ?? "");
+    }
 }
 function syncContractorPicker() {
     const input = document.querySelector('[data-filter="contractor"]');
@@ -2322,9 +2418,12 @@ function onMouseDown(event) {
     if (!(target instanceof Element)) {
         return;
     }
-    if (target.closest("[data-action='pick-contractor']")) {
-        event.preventDefault();
+    const pick = target.closest("[data-action='pick-contractor']");
+    if (!(pick instanceof HTMLElement)) {
+        return;
     }
+    event.preventDefault();
+    pickContractor(pick.dataset.nazwa ?? "");
 }
 function sheetRef(el) {
     const sheetRow = Number(el.dataset.sheetRow);

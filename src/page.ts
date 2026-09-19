@@ -7,6 +7,7 @@ import {
   screenAfterSearch,
   searchParams,
   selectedContractor,
+  resolveContractorText,
   startSearch,
   webAppUrl,
   blocksOnOrder,
@@ -123,6 +124,7 @@ function boot(): void {
   root.addEventListener("focusin", onFocusIn);
   root.addEventListener("focusout", onFocusOut);
   root.addEventListener("mousedown", onMouseDown);
+  root.addEventListener("keydown", onKeyDown);
   paint();
   if (webapp !== "") {
     void loadContractors();
@@ -220,14 +222,7 @@ function onClick(event: MouseEvent): void {
   }
   const action = el.dataset.action;
   if (action === "pick-contractor") {
-    const nazwa = el.dataset.nazwa ?? "";
-    VIEW.contractor = nazwa;
-    VIEW.contractorQuery = nazwa;
-    VIEW.contractorOpen = false;
-    if (VIEW.error === "contractor") {
-      VIEW.error = "";
-    }
-    paint();
+    pickContractor(el.dataset.nazwa ?? "");
   } else if (action === "search") {
     void runSearch();
   } else if (action === "back") {
@@ -465,6 +460,19 @@ function onChange(event: Event): void {
   }
 }
 
+function pickContractor(nazwa: string): void {
+  if (nazwa === "") {
+    return;
+  }
+  VIEW.contractor = nazwa;
+  VIEW.contractorQuery = nazwa;
+  VIEW.contractorOpen = false;
+  if (VIEW.error === "contractor") {
+    VIEW.error = "";
+  }
+  paint();
+}
+
 function onFocusIn(event: FocusEvent): void {
   const el = event.target;
   if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
@@ -479,8 +487,77 @@ function onFocusOut(event: FocusEvent): void {
   if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
     return;
   }
-  VIEW.contractorOpen = false;
-  syncContractorPicker();
+  window.setTimeout(() => {
+    const still = document.activeElement;
+    if (still instanceof HTMLInputElement && still.dataset.filter === "contractor") {
+      return;
+    }
+    const resolved = resolveContractorText(VIEW.contractors, VIEW.contractorQuery);
+    VIEW.contractor = resolved.contractor;
+    VIEW.contractorQuery = resolved.query;
+    VIEW.contractorOpen = false;
+    const input = document.querySelector('[data-filter="contractor"]');
+    if (input instanceof HTMLInputElement) {
+      input.value = VIEW.contractorQuery;
+    }
+    syncContractorPicker();
+  }, 150);
+}
+
+function contractorOptions(): HTMLElement[] {
+  const box = document.querySelector("[data-picker-list]");
+  if (!(box instanceof HTMLElement)) {
+    return [];
+  }
+  return [...box.querySelectorAll<HTMLElement>("[data-action='pick-contractor']")];
+}
+
+function moveContractorActive(delta: number): void {
+  if (!VIEW.contractorOpen) {
+    VIEW.contractorOpen = true;
+    syncContractorPicker();
+  }
+  const items = contractorOptions();
+  if (!items.length) {
+    return;
+  }
+  const current = items.findIndex((item) => item.classList.contains("is-active"));
+  const next =
+    current < 0
+      ? delta > 0
+        ? 0
+        : items.length - 1
+      : Math.min(items.length - 1, Math.max(0, current + delta));
+  for (let i = 0; i < items.length; i += 1) {
+    items[i].classList.toggle("is-active", i === next);
+  }
+  items[next].scrollIntoView({ block: "nearest" });
+}
+
+function onKeyDown(event: KeyboardEvent): void {
+  const el = event.target;
+  if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
+    return;
+  }
+  if (event.key === "Escape") {
+    VIEW.contractorOpen = false;
+    syncContractorPicker();
+    return;
+  }
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    moveContractorActive(event.key === "ArrowDown" ? 1 : -1);
+    return;
+  }
+  if (event.key === "Enter" && VIEW.contractorOpen) {
+    const active = contractorOptions().find((item) => item.classList.contains("is-active"));
+    const pick = active ?? contractorOptions()[0];
+    if (!pick) {
+      return;
+    }
+    event.preventDefault();
+    pickContractor(pick.dataset.nazwa ?? "");
+  }
 }
 
 function syncContractorPicker(): void {
@@ -518,9 +595,12 @@ function onMouseDown(event: MouseEvent): void {
   if (!(target instanceof Element)) {
     return;
   }
-  if (target.closest("[data-action='pick-contractor']")) {
-    event.preventDefault();
+  const pick = target.closest("[data-action='pick-contractor']");
+  if (!(pick instanceof HTMLElement)) {
+    return;
   }
+  event.preventDefault();
+  pickContractor(pick.dataset.nazwa ?? "");
 }
 
 function sheetRef(el: HTMLElement): { sheetRow: number; transportNumber: string } | null {

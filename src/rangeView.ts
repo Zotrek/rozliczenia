@@ -85,7 +85,7 @@ export function renderContractorList(model: RangeViewModel): string {
     hits
       .map(
         (item) =>
-          `<li><button type="button" data-action="pick-contractor" data-nazwa="${escapeHtml(item.nazwa)}">` +
+          `<li><button type="button" class="picker-option" role="option" data-action="pick-contractor" data-nazwa="${escapeHtml(item.nazwa)}">` +
           `<span>${escapeHtml(item.nazwa)}</span></button></li>`,
       )
       .join("") +
@@ -99,10 +99,12 @@ function contractorField(model: RangeViewModel): string {
   const note = picked ? escapeHtml(picked.dane) : "";
   return (
     `<div class="field picker${err ? " is-error" : ""}"><span>Podwykonawca</span>` +
+    '<div class="picker-wrap">' +
     `<input type="text" data-filter="contractor" value="${escapeHtml(model.contractorQuery)}" ` +
     'placeholder="Nazwa lub dane do Worda" autocomplete="off" role="combobox" aria-autocomplete="list" ' +
     `aria-expanded="${model.contractorOpen ? "true" : "false"}" aria-controls="contractor-list">` +
     `<div data-picker-list${model.contractorOpen ? "" : " hidden"}>${model.contractorOpen ? renderContractorList(model) : ""}</div>` +
+    "</div>" +
     `<span class="note" data-contractor-note${picked && !model.contractorOpen ? "" : " hidden"}>${note}</span>` +
     (err ? `<span class="err" data-contractor-error>${RANGE_ERROR.contractor}</span>` : "") +
     "</div>"

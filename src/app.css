@@ -96,30 +96,41 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .setup-card h2 { margin: 14px 0 4px; font-size: 18px; }
 .setup-foot { display: flex; justify-content: flex-end; margin-top: 12px; }
+.field.picker { position: relative; z-index: 4; }
+.picker-wrap { position: relative; }
+.picker-wrap [data-picker-list] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  z-index: 5;
+}
 .picker-list {
   list-style: none;
-  margin: 4px 0 0;
+  margin: 0;
   padding: 4px;
-  max-height: 168px;
+  max-height: 220px;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
+  box-shadow: var(--shadow);
 }
 .picker-list button {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   width: 100%;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border: none;
   border-radius: 8px;
   background: transparent;
   text-align: left;
   font-weight: 700;
+  font-size: 13px;
 }
-.picker-list button small { font-weight: 550; color: var(--muted); }
-.picker-list button:hover { background: var(--teal-soft); }
+.picker-list button:hover,
+.picker-list button.is-active { background: var(--teal-soft); color: var(--teal-deep); }
 .picker-empty { margin: 4px 0 0; }
 .statement {
   height: 100%;

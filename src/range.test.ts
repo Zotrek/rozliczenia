@@ -14,6 +14,7 @@ import {
   rangeLabel,
   readWebAppUrl,
   reportMode,
+  resolveContractorText,
   screenAfterChangeRange,
   screenAfterSearch,
   searchParams,
@@ -42,6 +43,13 @@ describe("matchingContractors", () => {
 
   it("test_matchingContractors_text_outside_list_returns_empty", () => {
     expect(matchingContractors(LIST, "nie ma takiego", false)).toEqual([]);
+  });
+
+  it("test_resolveContractorText_exact_name_or_single_hit", () => {
+    expect(resolveContractorText(LIST, "gpw")).toEqual({ contractor: "GPW", query: "GPW" });
+    expect(resolveContractorText(LIST, "głogowska")).toEqual({ contractor: "GPW", query: "GPW" });
+    expect(resolveContractorText(LIST, "a")).toEqual({ contractor: "", query: "a" });
+    expect(resolveContractorText(LIST, "")).toEqual({ contractor: "", query: "" });
   });
 
   it("test_foldPl_polish_letters_fold", () => {

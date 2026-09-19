@@ -114,6 +114,8 @@ describe("renderApp", () => {
     expect(html).toContain('data-nazwa="GPW"');
     expect(html).toContain(">GPW</span>");
     expect(html).not.toContain("Głogowska");
+    expect(html).toContain('class="picker-wrap"');
+    expect(html).toContain('role="option"');
   });
 
   it("test_renderApp_order_error_is_visible", () => {
@@ -192,5 +194,10 @@ describe("contractor picker", () => {
     const focus = source.slice(source.indexOf("function onFocusIn"), source.indexOf("function onFocusOut"));
     expect(focus).toContain("syncContractorPicker()");
     expect(focus).not.toContain("paint(");
+    const press = source.slice(source.indexOf("function onMouseDown"), source.indexOf("function sheetRef"));
+    expect(press).toContain("pickContractor(");
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "app.css"), "utf8");
+    expect(css).toContain(".picker-wrap { position: relative;");
+    expect(css).toMatch(/\[data-picker-list\] \{[^}]*position: absolute/);
   });
 });

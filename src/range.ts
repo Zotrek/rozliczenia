@@ -97,6 +97,22 @@ export function selectedContractor(
   return list.find((item) => foldPl(item.nazwa) === folded) ?? null;
 }
 
+/** Jak combobox mapy: dokładna nazwa albo jedyne trafienie. Inaczej brak wyboru. */
+export function resolveContractorText(
+  list: readonly ContractorListItem[],
+  text: string,
+): { contractor: string; query: string } {
+  const exact = selectedContractor(list, text);
+  if (exact) {
+    return { contractor: exact.nazwa, query: exact.nazwa };
+  }
+  const hits = matchingContractors(list, text, false);
+  if (hits.length === 1) {
+    return { contractor: hits[0].nazwa, query: hits[0].nazwa };
+  }
+  return { contractor: "", query: text };
+}
+
 /** `yyyy-mm-dd` → `dd.mm.yyyy`. Zły dzień kalendarza daje null. Bez przesunięcia strefy. */
 export function isoToSheetDate(iso: string): string | null {
   const match = ISO_DATE.exec(iso);

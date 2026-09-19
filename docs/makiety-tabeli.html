@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Makiety — wygląd tabeli rozliczeń</title>
+  <style>
+    :root {
+      --bg: #e7eeee;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: rgba(148, 163, 184, 0.45);
+      --teal: #0d9488;
+      --teal-deep: #0f766e;
+      --teal-soft: rgba(13, 148, 136, 0.12);
+      --orange: #ea580c;
+      --orange-deep: #c2410c;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.06);
+      --font: system-ui, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: var(--font);
+      color: var(--ink);
+      background: var(--bg);
+    }
+    button, input, select { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 2px;
+    }
+    .chrome {
+      flex: none;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      padding: 12px 18px 10px;
+    }
+    .kicker {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--teal-deep);
+    }
+    .chrome h1 { margin: 2px 0 4px; font-size: 18px; }
+    .chrome .lead { margin: 0 0 8px; max-width: 78rem; color: var(--muted); font-size: 13px; }
+    .chrome-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+    .chrome-row span { font-size: 12px; font-weight: 700; color: var(--muted); min-width: 3.2rem; }
+    .chrome button, .btn, .btn-teal, .btn-go, .btn-ghost {
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .chrome button.is-on { background: var(--teal); border-color: var(--teal); color: #fff; }
+    #layout-copy { margin: 0 0 4px; font-size: 13px; }
+    details { margin-top: 6px; font-size: 13px; color: #334155; }
+    details summary { cursor: pointer; color: var(--teal-deep); font-weight: 650; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 78rem; padding: 8px 0 2px; }
+    .split h2 { margin: 0 0 4px; font-size: 13px; }
+    .split ul { margin: 0; padding-left: 18px; }
+    .stage { flex: 1; min-height: 0; padding: 12px 16px 16px; }
+    .app {
+      position: relative;
+      height: 100%;
+      background: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .layout-b.app { display: grid; grid-template-columns: 272px minmax(0, 1fr) 300px; }
+    .top, .filters, .footer, .mix, .rail, .side { flex: none; }
+    .top {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+    .brand img { width: 36px; height: 36px; border-radius: 8px; }
+    .brand strong { display: block; font-size: 15px; }
+    .brand em { display: block; font-style: normal; font-size: 12px; color: var(--muted); font-weight: 600; }
+    .modes {
+      display: flex;
+      padding: 3px;
+      border-radius: 10px;
+      background: rgba(148, 163, 184, 0.16);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+    .mode {
+      position: relative;
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+    }
+    .mode input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+    .mode.is-on { background: var(--teal); color: #fff; }
+    .mode.is-off { color: #94a3b8; cursor: not-allowed; }
+    .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; padding: 12px 16px; }
+    .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+    .field input, .field select, .invoice, .modal input, .modal select {
+      font-weight: 550;
+      color: var(--ink);
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.55);
+      background: #fff;
+    }
+    .field.is-error input { border-color: #e11d48; }
+    .err { color: #e11d48; font-weight: 650; }
+    .dirty { font-size: 12px; font-weight: 650; color: var(--orange-deep); align-self: center; }
+    .btn-teal, .btn-go { border: none; color: #fff; padding: 9px 14px; }
+    .btn-teal { background: var(--teal); }
+    .btn-teal:hover { background: var(--teal-deep); }
+    .btn-go { background: var(--orange); }
+    .btn-go:hover:not(:disabled) { background: var(--orange-deep); }
+    .btn-go:disabled { opacity: 0.45; }
+    .btn-ghost { background: #fff; }
+    .table-wrap, .list-wrap { flex: 1; min-height: 0; overflow: auto; }
+    table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; background: #fff; }
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f8fafc;
+      font-size: 11px;
+      letter-spacing: 0.02em;
+      text-align: left;
+      color: var(--muted);
+    }
+    th.num, td.num { text-align: right; }
+    th.c, td.c { text-align: center; }
+    th.wrap { white-space: normal; min-width: 88px; line-height: 1.25; }
+    tr.is-route td { background: #f0fdfa; }
+    tr.is-child td { background: #f8fafc; }
+    tr.is-checked td { background: rgba(13, 148, 136, 0.08); }
+    tr.is-route.is-checked td { background: #d1fae5; }
+    tr.is-dead { color: #94a3b8; }
+    .strike { text-decoration: line-through; }
+    .who-line { display: flex; align-items: flex-start; gap: 4px; }
+    td.adres { font-weight: 700; }
+    .sub, .muted, .need, .proposal { color: var(--muted); font-weight: 550; }
+    .sub, .only, .trip, .checkline { font-size: 12px; font-weight: 550; }
+    .only, .trip, .checkline { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: #334155; }
+    td.sklep { white-space: normal; }
+    .trip-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+    .btn-detach, .btn-mini {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 3px 8px;
+      font-size: 12px;
+      font-weight: 650;
+      color: var(--teal-deep);
+    }
+    .btn-detach:hover, .btn-mini:hover { background: var(--teal-soft); }
+    .new-route { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 6px; max-width: 280px; }
+    .new-route .sub { flex-basis: 100%; }
+    td .new-route input[type="text"] {
+      width: 9.5rem;
+      text-align: left;
+      border: 1px solid rgba(148, 163, 184, 0.55);
+      font-size: 12px;
+    }
+    td .new-route input[data-draft="routeRate"] { width: 4.8rem; text-align: right; }
+    .new-route .err { flex-basis: 100%; font-size: 12px; }
+    tr.is-child td.adres { box-shadow: inset 3px 0 0 var(--teal); }
+    td input[type="text"] {
+      width: 76px;
+      padding: 4px 6px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.8);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    td input[data-edit="bags"], .mf input[data-edit="bags"] { width: 56px; }
+    td input[type="text"]:hover, .mf input:hover { border-color: var(--line); }
+    td input[type="text"]:focus, .mf input:focus { border-color: var(--teal); background: #fff; outline: none; }
+    .tag {
+      display: inline-block;
+      margin-right: 6px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--teal-soft);
+      color: var(--teal-deep);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .tag-route { background: #ffedd5; color: #9a3412; }
+    .chev {
+      border: none;
+      background: transparent;
+      color: var(--teal-deep);
+      font-size: 14px;
+      line-height: 1.2;
+      padding: 0 2px;
+    }
+    .money, .num, .stat b { font-variant-numeric: tabular-nums; }
+    .blank { padding: 48px 24px; color: var(--muted); text-align: center; }
+    .blank strong { display: block; color: var(--ink); margin-bottom: 6px; }
+    .footer {
+      display: flex;
+      align-items: flex-end;
+      gap: 22px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--line);
+      background: #fff;
+    }
+    .stat span, .side h2, .mf span {
+      display: block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .stat b { font-size: 20px; }
+    .stat.sel b { color: var(--teal-deep); }
+    .grow { margin-left: auto; display: flex; gap: 8px; align-items: flex-end; }
+    .invoice { width: 210px; }
+    .need { margin: 0; font-size: 12px; max-width: 220px; }
+    .mix { padding: 10px 16px 12px; border-bottom: 1px solid var(--line); background: #f8fafc; }
+    .proposal { margin: 0 0 6px; font-size: 11px; }
+    .mix-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: #e2e8f0; }
+    .mix-bar i { display: block; height: 100%; }
+    .c-drive { background: var(--teal); }
+    .c-bags { background: #64748b; }
+    .c-route { background: var(--orange); }
+    .mix-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 12px; }
+    .mix-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 99px; margin-right: 4px; }
+    .mix-slim { display: flex; align-items: center; gap: 16px; }
+    .mix-slim .mix-bar { flex: 1; }
+    .mix-slim .proposal { margin: 0; white-space: nowrap; }
+    .rail, .side { overflow: auto; padding: 14px; min-height: 0; }
+    .rail { border-right: 1px solid var(--line); }
+    .side { border-left: 1px solid var(--line); background: #f8fafc; }
+    .layout-b .filters { flex-direction: column; align-items: stretch; padding: 12px 0; }
+    .layout-b .field input, .layout-b .field select, .layout-b .btn-teal, .layout-b .btn-ghost { width: 100%; }
+    .layout-b .center { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+    .center-h { padding: 12px 14px 0; font-size: 13px; color: var(--muted); font-weight: 650; }
+    .side .stat { margin-bottom: 14px; }
+    .side .stat b { font-size: 26px; }
+    .side .mix { padding: 0; border: none; background: transparent; margin: 8px 0 16px; }
+    .side .invoice, .side .btn-go { width: 100%; }
+    .card {
+      margin: 0 12px 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+    .list-wrap .card:first-child { margin-top: 12px; }
+    .card.is-route { background: #f0fdfa; border-color: rgba(13, 148, 136, 0.35); }
+    .card.is-child { margin-left: 36px; background: #f8fafc; }
+    .card.is-checked { box-shadow: inset 3px 0 0 var(--teal); }
+    .card.is-dead { color: #94a3b8; }
+    .card-top, .card-money { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; }
+    .card-top { align-items: center; margin-bottom: 8px; }
+    .card-id { min-width: 220px; }
+    .card-id .sub { display: block; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .chip:has(input:checked) { background: var(--teal-soft); border-color: transparent; color: var(--teal-deep); }
+    .mf { min-width: 96px; }
+    .mf input {
+      width: 76px;
+      margin-top: 3px;
+      padding: 4px 6px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .overlay, .modal {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+    }
+    .overlay { background: rgba(244, 247, 246, 0.72); }
+    .modal { background: rgba(15, 23, 42, 0.35); z-index: 4; }
+    .overlay-panel, .modal-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 22px;
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .overlay-panel img.pulse {
+      width: 64px;
+      height: 64px;
+      border-radius: 12px;
+      animation: logo-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes logo-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.12); opacity: 0.55; }
+    }
+    .overlay-panel .msg { font-size: 13px; font-weight: 700; color: var(--muted); }
+    .uni { width: 220px; height: auto; }
+    .modal-panel { width: min(440px, calc(100% - 32px)); align-items: stretch; text-align: left; gap: 8px; }
+    .modal-panel h2 { margin: 0; font-size: 16px; }
+    .modal-panel .field input, .modal-panel .field select { width: 100%; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+    .note { margin: 0; font-size: 12px; color: var(--muted); }
+    .setup {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 16px;
+      background: #f4f7f6;
+    }
+    .setup-card {
+      width: min(440px, 100%);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 22px 22px 18px;
+      box-shadow: var(--shadow);
+    }
+    .setup-card h2 { margin: 14px 0 4px; font-size: 18px; }
+    .setup-card .modes { width: 100%; margin: 14px 0; }
+    .setup-card .mode { flex: 1; justify-content: center; text-align: center; }
+    .setup-fields { flex-direction: column; align-items: stretch; padding: 0; gap: 10px; }
+    .setup-fields .field input,
+    .setup-fields .field select,
+    .setup .btn-teal { width: 100%; }
+    .picker-list {
+      list-style: none;
+      margin: 4px 0 0;
+      padding: 4px;
+      max-height: 168px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+    .picker-list button {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      width: 100%;
+      padding: 6px 8px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      text-align: left;
+      font-weight: 700;
+    }
+    .picker-list button small { font-weight: 550; color: var(--muted); }
+    .picker-list button:hover { background: var(--teal-soft); }
+    .picker-empty { margin: 4px 0 0; }
+    .setup .btn-teal { margin-top: 8px; }
+    .setup-foot { display: flex; justify-content: flex-end; margin-top: 12px; }
+    .range { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin-right: auto; }
+    .range span { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+    .range strong { font-size: 14px; font-weight: 700; }
+    @media (max-width: 900px) {
+      .split { grid-template-columns: 1fr; }
+      .layout-b.app { grid-template-columns: 1fr; overflow: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header class="chrome">
+    <div class="kicker">Makieta, nie część aplikacji</div>
+    <h1>Wygląd tabeli rozliczeń</h1>
+    <p class="lead">Dwa osobne ekrany. Najpierw zakres: czego dotyczy rozliczenie. Po Szukaj osobny ekran z tabelą. Przełączniki w tym pasku nie wchodzą do aplikacji.</p>
+    <div class="chrome-row">
+      <span>Ekran</span>
+      <button type="button" data-screen="filter">1 · Zakres</button>
+      <button type="button" data-screen="data">2 · Zestawienie</button>
+      <button type="button" data-screen="loading">Ładowanie</button>
+      <button type="button" data-screen="save">Zapis</button>
+      <button type="button" data-screen="save-big">Zapis od 10 000 zł</button>
+    </div>
+    <details>
+      <summary>Co jest ustalone, a co jest tylko propozycją</summary>
+      <div class="split">
+        <div>
+          <h2>Ustalone — da się to klikać</h2>
+          <ul>
+            <li>Na zgłoszenie włączone, Harmonogram widać i nie da się go zaznaczyć.</li>
+            <li>Podwykonawcę znajduje się jak na mapie: fragment Nazwa albo Dane do Worda. Adres jest w Dane do Worda. Wybór jest z listy, do rozliczenia wchodzi Nazwa. Data początkowa ma opcję „bez daty początkowej”. Data końcowa jest wymagana. Obie daty są włącznie. Data początkowa późniejsza niż końcowa nie startuje Szukaj.</li>
+            <li>Wiersz sklepu i wiersz trasy, rozwinięcie sklepów, jedna Suma trasy.</li>
+            <li>Liczba worków zmienia się od razu. Stawka podjazdu i worka tylko na ekranie. Stawka za trasę zapisuje się od razu do Stawka za trasę. Koszt odbioru i Koszt odbioru per worek, kolumny 16 i 17, dopiero przy Zatwierdź.</li>
+            <li>Tylko za liczbę worków jest przy odbiorze zwykłym: w Podjazd/Trasa jest „—”. Na trasie tej opcji nie ma.</li>
+            <li>Transport się nie odbył przekreśla wiersz i wyjmuje go z kosztu. Przy Zatwierdź dostaje samo „nie”: bez Rozliczony, bez faktury, bez kolumn 16 i 17 i bez stawki trasy. W następnym wyszukaniu go nie ma.</li>
+            <li>Odepnij od trasy zabiera sklep z trasy od razu. Zostaje odbiorem za podjazd. Nowa nazwa i stawka robią osobną trasę. Stawka jest wymagana, pusta nie zapisuje trasy. Kwota 0 jest wpisana. Starej nazwy nie da się wpisać. Ta sama nowa nazwa łączy sklepy w jedną trasę.</li>
+            <li>Suma zestawienia liczy też niezaznaczone. Suma zaznaczonych reaguje od razu.</li>
+            <li>Zatwierdź chce numeru faktury i choć jednego wiersza. Przy zapisie poniżej 10 000 zł pulsuje logo. Od 10 000 zł zamiast logo jest jednorożec: co najmniej dwa cykle (około 3,4 s), a dłużej, gdy zapis trwa dłużej.</li>
+          </ul>
+        </div>
+        <div>
+          <h2>Układ tych dwóch ekranów</h2>
+          <ul>
+            <li>Ekran 1 ustala tryb, podwykonawcę i daty. Tabeli tam nie ma.</li>
+            <li>Ekran 2 pokazuje pozycje, sumy i zatwierdzenie. Zakres widać w nagłówku, zmiana wraca do ekranu 1.</li>
+            <li>Bez wykresu. „Tylko za liczbę worków” stoi pod nazwą sklepu, nie na trasie.</li>
+            <li>Baza stawek jest oknem. Sklep to lista adresów z rejestru, podwykonawca to nazwa krótka z Listy podwykonawców. Nie pinezki mapy.</li>
+            <li>Remis stawek jest na wierszu z błędem w zestawieniu, nie w tym oknie. Makieta tego nie rysuje.</li>
+          </ul>
+        </div>
+      </div>
+    </details>
+  </header>
+  <main class="stage" id="stage"><div id="app" class="app"></div></main>
+  <script>
+    const CONTRACTORS = [
+      { name: 'BLUECARGO', dane: 'BLUECARGO Sp. z o.o. Rajska 3, 54-028 Wrocław BDO 000710623 NIP 8943261149' },
+      { name: 'Papirus', dane: 'Papirus-Recykling Grzegorz Kołakowski ul. Szczawiowa 54a, 70-010 Szczecin NIP 8521124660 BDO 000003483' },
+      { name: 'Zagroda', dane: 'P.H.P.U. Zagroda Sp. z O. O. ul. 1-go Maja 38b, 38-100 Strzyżów NIP 8191559477 BDO 000015388' },
+      { name: 'EKO-RECYKLING POLSKA', dane: 'EKO-RECYKLING POLSKA SP. Z O.O. ul. Wyzwolenia 2, 41-103 Siemianowice Śląskie NIP 6431773477 BDO 000535999' },
+      { name: 'GPW', dane: 'GPW Logistics S.A. ul. Książęca 4, 00-498 Warszawa NIP 5272959044 BDO 000706795' },
+      { name: 'JEST', dane: 'JEST Cleaning System sp. z o.o. ul. Oświęcimska 51k, 41-109 Gliwice NIP 9691672326 BDO 000694943' },
+      { name: 'EKO-ART.', dane: 'EKO-ART. GOSPODARKA ODADAMI SP. Z O. O. ul. ASFALTOWA 1, 26-110 SKARŻYSKO – KAMIENNA NIP 6832126447 BDO 000583541' },
+      { name: 'ZK w Sokołowie Małopolskim', dane: 'Zakład Komunalny w Sokołowie Małopolskim Sp. z o.o. ul. Łazienna 7, 36-050 Sokołów Małopolski NIP 5170361538 BDO 000002391' },
+      { name: 'EFEKT-TRANS', dane: 'EFEKT-TRANS Marcin Ostapowicz C. K. Norwida 11, 16-100 Sokółka NIP 5451733339 BDO 000158350' },
+      { name: 'Czyżew magazyn', dane: 'Usługi Transportowe Dariusz Godlewski ul. Zambrowska 12, 18-220 Czyżew NIP 7231002304 BDO 000111915' },
+      { name: 'Traszkan', dane: 'Traszkan S.F.Z. Sroka Spółka Jawna Zegartowice 105, 32-415 Zegartowice NIP: 6811821834 BDO: 000011660' },
+      { name: 'RPM', dane: 'RPM Sp.z o.o. ul. Szubianki 8, 63-200 Jarocin NIP: PL6172195754 BDO: 000010785' },
+      { name: 'Selmet', dane: 'SELMET B. J. RUDNICCY ul. Traugutta 31, 82-300 Elbląg NIP: 5782865721 BDO: 000005241' },
+      { name: 'LUX BUS', dane: 'LUX BUS SP. Z O.O. ul. Wiejska 11L, 05-123 Olszewnica Stara NIP 5361987906 BDO 000666036' },
+      { name: 'Lubań', dane: 'ZGiUK Lubań Sp. z o.o. ul. Bazaltowa 1, 59-800 Lubań NIP: 6131425217, BDO: 000012296' },
+      { name: 'YOUR PARTNER Brzesko', dane: 'PW YOUR PARTNER Brzesko Dworcowa 2, 32-800 Brzesko NIP: 8691956922 BDO: 000053224' },
+      { name: 'Biosystem', dane: 'Zakład Przetwarzania ZSEiE: 32-540 Bolęcin, ul Fabryczna 5' },
+      { name: 'THOR', dane: 'THOR Recycle Sp. z o.o. NIP: 9452260589 BDO: 000575610' },
+      { name: 'TARGET SPEED', dane: 'TARGET SPEED SP. Z O.O., Braniborska 7/2, 53-680 Wrocław, NIP: 8971890822' },
+      { name: 'PMC Auto (PLOMAT)', dane: 'PLOMAT SP. z O.O. Lubuska 15, 09-408 Płock BDO: 000719289 NIP: 7743231982' },
+      { name: 'Wiślanka', dane: 'Wiślanka Sp. z O.O. ul.Malinka 41C, 43-460 Wisła BDO: 000577060 NIP: 5482668086' },
+      { name: 'Interzero', dane: 'Interzero Polska Spółka z o. o. Al. Jerozolimskie 146D, 02-305 Warszawa NIP: 9512367010 BDO: 000009153' },
+      { name: 'BIOCOLLECT', dane: 'Wschodnia 41 A, 87-100 Toruń NIP: 9571129660 BDO: 000605337' },
+      { name: 'Sanit-Trans', dane: 'Sanit-Trans sortownia Prusa 33, 43-502 Czechowice-Dziedzice' },
+      { name: 'Geodis', dane: 'GEODIS Poland Sp. z o.o., Wodna 38, 95-010 - Dobra' },
+      { name: 'ECOLUX', dane: 'ECOLUX ul. Handlowa 6a, 37-716 Orły NIP:7952458856 REGON:522494593' },
+      { name: 'EKO-MIX TYCHY', dane: 'EKO-MIX RECYKLING SP. Z O.O. UL. ZWIERZYNIECKA 10, 43-100 TYCHY' },
+      { name: 'Kat-Auto', dane: 'Recykling Rafał Baranowski NIP: 8442353381, BDO: 000008999' },
+      { name: 'BRAWO-TRANS Dariusz Walczak', dane: 'BRAWO-TRANS Dariusz Walczak BDO: 000017280' },
+      { name: 'PHU SUDOWSCY', dane: 'PHU SUDOWSCY D. SUDOWSKA W. SUDOWSKI S.C. BDO:000082474' },
+      { name: 'IWO SORTOWNIA ODPADÓW SEGREGOWANYCH', dane: 'IWO ul. Bielska 41, 17-120 Brańsk' }
+    ];
+    const SEED = [
+      { id: 's1', type: 'shop', contractor: 'GPW', name: 'Biedronka', address: 'ul. Głogowska 12, Poznań', date: '12.09.2026', protocol: '10421', drive: 20, bags: 4, bagRate: 2.5, bagsOnly: false, noTrip: false, checked: false },
+      { id: 's2', type: 'shop', contractor: 'GPW', name: 'Lidl', address: 'ul. Hetmańska 90, Poznań', date: '14.09.2026', protocol: '10488', drive: 35, bags: 8, bagRate: 2.5, bagsOnly: false, noTrip: false, checked: false },
+      { id: 's3', type: 'shop', contractor: 'GPW', name: 'Żabka', address: 'ul. Półwiejska 3, Poznań', date: '15.09.2026', protocol: '10502', drive: 20, bags: 4, bagRate: 2.5, bagsOnly: true, noTrip: false, checked: true },
+      { id: 's4', type: 'shop', contractor: 'GPW', name: 'Lewiatan', address: 'ul. Święty Marcin 40, Poznań', date: '16.09.2026', protocol: '10540', drive: 22, bags: 3, bagRate: null, bagsOnly: false, noTrip: false, checked: false },
+      { id: 's5', type: 'shop', contractor: 'GPW', name: 'Rossmann', address: 'ul. Półwiejska 42, Poznań', date: '16.09.2026', protocol: '10555', drive: 15, bags: 2, bagRate: 2.5, bagsOnly: false, noTrip: true, checked: false },
+      {
+        id: 't1', type: 'route', contractor: 'GPW', name: 'gpw-18.09.26-01', date: '18.09.2026', routeRate: 150, bagRate: 2, checked: true, open: true,
+        shops: [
+          { name: 'Carrefour', address: 'ul. Serbska 7, Poznań', date: '18.09.2026', protocol: '10601', bags: 8, noTrip: false, checked: false },
+          { name: 'Auchan', address: 'ul. Murawa 20, Poznań', date: '18.09.2026', protocol: '10602', bags: 12, bagRate: 2.5, noTrip: false, checked: false },
+          { name: 'Stokrotka', address: 'ul. Naramowicka 100, Poznań', date: '18.09.2026', protocol: '10603', bags: 5, noTrip: true, checked: false }
+        ]
+      }
+    ];
+
+    let timer = 0;
+    let uniTimer = 0;
+    const UNI_MIN_MS = 3400;
+    const state = {
+      screen: 'filter',
+      overlay: null,
+      loadMessage: 'Szukam nierozliczonych odbiorów…',
+      ratesOpen: false,
+      invoice: '',
+      error: '',
+      contractorQuery: 'GPW',
+      contractorOpen: false,
+      fromHeld: '2026-09-01',
+      filter: { contractor: 'GPW', from: '2026-09-01', to: '2026-09-18' },
+      applied: { contractor: 'GPW', from: '2026-09-01', to: '2026-09-18' },
+      rows: JSON.parse(JSON.stringify(SEED))
+    };
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function parsePL(s) {
+      const [d, m, y] = String(s).split('.').map(Number);
+      return new Date(y, m - 1, d).getTime();
+    }
+    function parseISO(s) {
+      if (!s) return null;
+      const [y, m, d] = String(s).split('-').map(Number);
+      return new Date(y, m - 1, d).getTime();
+    }
+    function parseNum(raw) {
+      const s = String(raw ?? '').trim().replace(/\s/g, '').replace(',', '.');
+      if (s === '') return null;
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    }
+    function pln(n) {
+      return (Number(n) || 0).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '\u00a0zł';
+    }
+    function formatInput(n) {
+      if (n == null || n === '') return '';
+      return Number(n).toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function shopsWord(n) {
+      if (n === 1) return '1 sklep';
+      const a = n % 10;
+      const b = n % 100;
+      if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return n + ' sklepy';
+      return n + ' sklepów';
+    }
+    function pozycji(n) {
+      if (n === 1) return '1 pozycja';
+      const a = n % 10;
+      const b = n % 100;
+      if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return n + ' pozycje';
+      return n + ' pozycji';
+    }
+    function bagMoney(bags, rate) {
+      const r = rate == null || rate === '' ? null : Number(rate);
+      if (r == null || Number.isNaN(r) || r === 0) return 0;
+      return (Number(bags) || 0) * r;
+    }
+    function shopEconomics(row) {
+      const bagsSum = row.noTrip ? 0 : bagMoney(row.bags, row.bagRate);
+      const drivePart = row.noTrip || row.bagsOnly ? 0 : (Number(row.drive) || 0);
+      return { bagsSum, cost: row.noTrip ? 0 : drivePart + bagsSum };
+    }
+    function shopBagRate(route, shop) {
+      if (shop && Object.prototype.hasOwnProperty.call(shop, 'bagRate')) return shop.bagRate;
+      return route.bagRate;
+    }
+    function sharedBagRate(row) {
+      const active = row.shops.filter((s) => !s.noTrip);
+      const pool = active.length ? active : row.shops;
+      if (!pool.length) return row.bagRate;
+      const first = shopBagRate(row, pool[0]);
+      return pool.every((s) => shopBagRate(row, s) === first) ? first : null;
+    }
+    function routeEconomics(row) {
+      const active = row.shops.filter((s) => !s.noTrip);
+      const bagsCount = active.reduce((s, sh) => s + (Number(sh.bags) || 0), 0);
+      const bagsSum = active.reduce((s, sh) => s + bagMoney(sh.bags, shopBagRate(row, sh)), 0);
+      const rate = Number(row.routeRate) || 0;
+      const routePart = active.length === 0 ? 0 : rate;
+      return { bagsCount, bagsSum, suma: routePart + bagsSum, active: active.length, shops: row.shops.length };
+    }
+    function visibleRows() {
+      const from = parseISO(state.applied.from);
+      const to = parseISO(state.applied.to);
+      return state.rows.filter((row) => {
+        if (row.contractor !== state.applied.contractor) return false;
+        const t = parsePL(row.date);
+        if (from != null && t < from) return false;
+        if (to != null && t > to) return false;
+        return true;
+      });
+    }
+    function items() {
+      const list = [];
+      visibleRows().forEach((row) => {
+        if (row.type === 'route') {
+          list.push({ kind: 'route', row });
+          if (row.open) row.shops.forEach((shop, index) => list.push({ kind: 'child', row, shop, index }));
+        } else {
+          list.push({ kind: 'shop', row });
+        }
+      });
+      return list;
+    }
+    function listingSum() {
+      let s = 0;
+      visibleRows().forEach((row) => {
+        if (row.type === 'shop') s += shopEconomics(row).cost;
+        else s += routeEconomics(row).suma;
+      });
+      return s;
+    }
+    function selectedSum() {
+      let s = 0;
+      visibleRows().forEach((row) => {
+        if (row.type === 'shop') { if (row.checked) s += shopEconomics(row).cost; }
+        else if (row.checked) s += routeEconomics(row).suma;
+      });
+      return s;
+    }
+    function selectedCount() {
+      let n = 0;
+      visibleRows().forEach((row) => {
+        if (row.type === 'shop') { if (row.checked) n += 1; }
+        else if (row.checked) n += 1;
+      });
+      return n;
+    }
+    function composition() {
+      let podjazd = 0;
+      let worki = 0;
+      let trasa = 0;
+      visibleRows().forEach((row) => {
+        if (row.type === 'shop') {
+          if (row.noTrip) return;
+          if (!row.bagsOnly) podjazd += Number(row.drive) || 0;
+          worki += bagMoney(row.bags, row.bagRate);
+        } else {
+          const eco = routeEconomics(row);
+          if (eco.active === 0) return;
+          trasa += Number(row.routeRate) || 0;
+          worki += eco.bagsSum;
+        }
+      });
+      return { podjazd, worki, trasa, total: podjazd + worki + trasa };
+    }
+    function canApprove() {
+      return state.invoice.trim() !== '' && selectedCount() > 0;
+    }
+    function findRow(id) {
+      return state.rows.find((r) => r.id === id);
+    }
+    function detachShop(routeId, index) {
+      const route = findRow(routeId);
+      if (!route || route.type !== 'route') return;
+      const shop = route.shops[index];
+      if (!shop) return;
+      const row = {
+        id: 'd-' + shop.protocol,
+        type: 'shop',
+        contractor: route.contractor,
+        name: shop.name,
+        address: shop.address,
+        date: shop.date,
+        protocol: shop.protocol,
+        drive: 0,
+        bags: shop.bags,
+        bagRate: shopBagRate(route, shop),
+        bagsOnly: false,
+        noTrip: false,
+        checked: false,
+        detached: true,
+        leftRoute: route.name,
+        routeDraft: '',
+        rateDraft: '',
+        routeError: ''
+      };
+      const at = state.rows.findIndex((r) => r.id === route.id);
+      route.shops.splice(index, 1);
+      if (!route.shops.length) state.rows.splice(at, 1, row);
+      else state.rows.splice(at + 1, 0, row);
+    }
+    function makeRoute(shopRow) {
+      if (!shopRow || !shopRow.detached) return;
+      const name = String(shopRow.routeDraft || '').trim();
+      if (!name) {
+        shopRow.routeError = 'Wpisz nazwę nowej trasy.';
+        return;
+      }
+      if (name === shopRow.leftRoute) {
+        shopRow.routeError = 'To nazwa trasy, z której sklep zszedł.';
+        return;
+      }
+      const rate = parseNum(shopRow.rateDraft);
+      if (rate == null) {
+        shopRow.routeError = 'Wpisz stawkę nowej trasy.';
+        return;
+      }
+      const shop = {
+        name: shopRow.name,
+        address: shopRow.address,
+        date: shopRow.date,
+        protocol: shopRow.protocol,
+        bags: shopRow.bags,
+        noTrip: false,
+        checked: false
+      };
+      const at = state.rows.findIndex((r) => r.id === shopRow.id);
+      let route = state.rows.find((r) => r.type === 'route' && r.contractor === shopRow.contractor && r.name === name);
+      if (route) {
+        route.shops.push(shop);
+        route.routeRate = rate;
+        route.open = true;
+      } else {
+        state.rows.splice(at, 0, {
+          id: 't-' + shopRow.protocol,
+          type: 'route',
+          contractor: shopRow.contractor,
+          name: name,
+          date: shopRow.date,
+          routeRate: rate,
+          bagRate: shopRow.bagRate,
+          checked: false,
+          open: true,
+          shops: [shop]
+        });
+      }
+      state.rows = state.rows.filter((r) => r.id !== shopRow.id);
+    }
+
+    function brand() {
+      return '<div class="brand"><img src="../logo.png" alt="" width="36" height="36"><div><strong>Rozliczenia</strong><em>Na zgłoszenie</em></div></div>';
+    }
+    function modes() {
+      return '<div class="modes" role="group" aria-label="Tryb"><label class="mode is-on"><input type="checkbox" id="mode-na" checked> Na zgłoszenie</label><label class="mode is-off" title="W tej wersji niedostępne"><input type="checkbox" id="mode-h" disabled> Harmonogram</label></div>';
+    }
+    function fold(s) {
+      return String(s ?? '')
+        .toLocaleLowerCase('pl')
+        .replace(/ą/g, 'a').replace(/ć/g, 'c').replace(/ę/g, 'e').replace(/ł/g, 'l')
+        .replace(/ń/g, 'n').replace(/ó/g, 'o').replace(/ś/g, 's').replace(/ź/g, 'z').replace(/ż/g, 'z')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    function contractorByName(name) {
+      const key = fold(name);
+      return CONTRACTORS.find((c) => fold(c.name) === key) || null;
+    }
+    function contractorHits() {
+      const q = fold(state.contractorQuery);
+      const browsing = state.contractorOpen && q === fold(state.filter.contractor);
+      return CONTRACTORS.filter((c) => browsing || !q || fold(c.name).includes(q) || fold(c.dane).includes(q));
+    }
+    function pickerListHtml() {
+      const hits = contractorHits();
+      if (!hits.length) return '<p class="note picker-empty">Brak podwykonawcy o tej nazwie lub w danych do Worda.</p>';
+      return '<ul class="picker-list" id="contractor-list">'
+        + hits.map((c) => '<li><button type="button" data-action="pick-contractor" data-id="' + esc(c.name) + '"><span>' + esc(c.name) + '</span><small>' + esc(c.dane) + '</small></button></li>').join('')
+        + '</ul>';
+    }
+    function filterFields() {
+      const f = state.filter;
+      const errTo = state.error === 'to';
+      const errRange = state.error === 'range';
+      const errWho = state.error === 'contractor';
+      const picked = contractorByName(f.contractor);
+      return ''
+        + '<div class="field picker' + (errWho ? ' is-error' : '') + '"><span>Podwykonawca</span>'
+        + '<input type="text" data-filter="contractor" value="' + esc(state.contractorQuery) + '" placeholder="Nazwa lub dane do Worda" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="' + (state.contractorOpen ? 'true' : 'false') + '" aria-controls="contractor-list">'
+        + '<div data-picker-list' + (state.contractorOpen ? '' : ' hidden') + '>' + pickerListHtml() + '</div>'
+        + (picked && !state.contractorOpen ? '<span class="note">' + esc(picked.dane) + '</span>' : '')
+        + (errWho ? '<span class="err">Wybierz podwykonawcę z listy.</span>' : '')
+        + '</div>'
+        + '<div class="field' + (errRange ? ' is-error' : '') + '"><span>Data początkowa</span><input type="date" data-filter="from" value="' + esc(f.from) + '"' + (f.from ? '' : ' disabled') + ' aria-invalid="' + (errRange ? 'true' : 'false') + '">'
+        + (errRange ? '<span class="err">Data początkowa nie może być późniejsza niż końcowa.</span>' : '')
+        + '<label class="checkline"><input type="checkbox" data-toggle="nofrom"' + (f.from ? '' : ' checked') + '> bez daty początkowej</label></div>'
+        + '<label class="field' + (errTo || errRange ? ' is-error' : '') + '"><span>Data końcowa</span><input type="date" data-filter="to" value="' + esc(f.to) + '" aria-invalid="' + (errTo || errRange ? 'true' : 'false') + '">'
+        + (errTo ? '<span class="err">Data końcowa jest wymagana.</span>' : '')
+        + '</label>';
+    }
+    function searchBtn() {
+      const dirty = JSON.stringify(state.filter) !== JSON.stringify(state.applied);
+      return '<button type="button" class="btn-teal" data-action="search">Szukaj</button><span class="dirty"' + (dirty ? '' : ' hidden') + '>Kliknij Szukaj, żeby odświeżyć zakres.</span>';
+    }
+    function ratesBtn() {
+      return '<button type="button" class="btn-ghost" data-action="rates">Baza stawek</button>';
+    }
+    function dash() {
+      return '<span class="muted">—</span>';
+    }
+    function tx(text, dead) {
+      return '<span class="' + (dead ? 'strike' : '') + '">' + esc(text) + '</span>';
+    }
+    function moneyOut(key, value, dead) {
+      return '<span class="val' + (dead ? ' strike' : '') + '" data-out="' + key + '">' + pln(value) + '</span>';
+    }
+    function checkBox(id, checked, shopIndex) {
+      const shop = shopIndex == null ? '' : ' data-shop="' + shopIndex + '"';
+      return '<input type="checkbox" data-toggle="checked" data-id="' + id + '"' + shop + (checked ? ' checked' : '') + ' aria-label="Rozliczone">';
+    }
+    function tripBox(id, noTrip, shopIndex) {
+      const shop = shopIndex == null ? '' : ' data-shop="' + shopIndex + '"';
+      return '<label class="trip"><input type="checkbox" data-toggle="notrip" data-id="' + id + '"' + shop + (noTrip ? ' checked' : '') + '> nie odbył się</label>';
+    }
+    function detachBtn(id, index) {
+      return '<button type="button" class="btn-detach" data-action="detach" data-id="' + id + '" data-shop="' + index + '" title="Zapis od razu. Sklep schodzi z trasy i zostaje odbiorem za podjazd.">odepnij od trasy</button>';
+    }
+    function newRouteBox(row) {
+      if (!row.detached) return '';
+      const err = row.routeError ? '<span class="err">' + esc(row.routeError) + '</span>' : '';
+      return '<div class="new-route"><span class="sub">odpięty od ' + esc(row.leftRoute) + '</span>'
+        + '<input type="text" data-draft="routeName" data-id="' + row.id + '" value="' + esc(row.routeDraft || '') + '" placeholder="nazwa nowej trasy" autocomplete="off" title="Inna nazwa niż trasa, z której sklep zszedł. Ta sama nazwa łączy sklepy.">'
+        + '<input type="text" inputmode="decimal" data-draft="routeRate" data-id="' + row.id + '" value="' + esc(row.rateDraft || '') + '" placeholder="stawka" title="Stawka tej nowej trasy, raz. Wymagana. Pusta nie zapisuje trasy. Kwota 0 jest wpisana.">'
+        + '<button type="button" class="btn-mini" data-action="make-route" data-id="' + row.id + '" title="Zapis od razu. Ta sama nazwa u tego podwykonawcy to jedna trasa.">Osobna trasa</button>'
+        + err + '</div>';
+    }
+    function bagsBox(id, on, labeled) {
+      const input = '<input type="checkbox" data-toggle="bags" data-id="' + id + '"' + (on ? ' checked' : '') + ' aria-label="tylko za liczbę worków">';
+      if (labeled === 'under') return '<label class="only">' + input + ' tylko za liczbę worków</label>';
+      if (labeled === 'chip') return '<label class="chip">' + input + ' tylko za liczbę worków</label>';
+      return input;
+    }
+    function numInput(id, field, value, shopIndex, title) {
+      const shop = shopIndex == null ? '' : ' data-shop="' + shopIndex + '"';
+      const shown = field === 'bags' ? (value == null ? '' : String(value)) : formatInput(value);
+      const ph = field === 'bagRate' ? ' placeholder="brak"' : '';
+      return '<input type="text" inputmode="decimal" spellcheck="false" data-edit="' + field + '" data-id="' + id + '"' + shop + ' value="' + esc(shown) + '"' + ph + ' title="' + esc(title) + '">';
+    }
+    function onlyPlace() {
+      return 'under';
+    }
+    function plDate(iso) {
+      if (!iso) return '';
+      const [y, m, d] = String(iso).split('-');
+      return d + '.' + m + '.' + y;
+    }
+    function rangeText() {
+      const from = state.applied.from ? 'od ' + plDate(state.applied.from) : 'bez daty początkowej';
+      const to = state.applied.to ? plDate(state.applied.to) : '—';
+      return state.applied.contractor + ', ' + from + ' do ' + to;
+    }
+
+    function blank(title, text) {
+      return '<div class="blank"><strong>' + esc(title) + '</strong><p>' + esc(text) + '</p></div>';
+    }
+
+    function mixBlock(slim) {
+      const c = composition();
+      const t = c.total || 1;
+      const w = (n) => (c.total ? (n / t * 100).toFixed(2) : '0') + '%';
+      return '<div class="mix' + (slim ? ' mix-slim' : '') + '">'
+        + '<p class="proposal">Propozycja wizualizacji — skład sumy zestawienia. W specyfikacji wykresu nie ma.</p>'
+        + '<div class="mix-bar" aria-hidden="true"><i class="c-drive" style="width:' + w(c.podjazd) + '"></i><i class="c-bags" style="width:' + w(c.worki) + '"></i><i class="c-route" style="width:' + w(c.trasa) + '"></i></div>'
+        + '<ul class="mix-legend"><li><i class="c-drive"></i>Podjazd <b data-out="mix-drive">' + pln(c.podjazd) + '</b></li><li><i class="c-bags"></i>Worki <b data-out="mix-bags">' + pln(c.worki) + '</b></li><li><i class="c-route"></i>Trasa <b data-out="mix-route">' + pln(c.trasa) + '</b></li></ul>'
+        + '</div>';
+    }
+
+    function footer() {
+      return '<footer class="footer"><div class="stat"><span>Suma zestawienia</span><b data-out="sum-all">' + pln(listingSum()) + '</b></div>'
+        + '<div class="stat sel"><span>Suma zaznaczonych · <span data-out="sel-count">' + selectedCount() + '</span></span><b data-out="sum-sel">' + pln(selectedSum()) + '</b></div>'
+        + '<div class="grow"><label class="field"><span>Numer faktury</span><input class="invoice" id="invoice" value="' + esc(state.invoice) + '" placeholder="FV/123/09/2026" autocomplete="off"></label>'
+        + '<button type="button" class="btn-go" data-action="approve"' + (canApprove() ? '' : ' disabled') + '>Zatwierdź</button></div></footer>';
+    }
+
+    function sidePanel() {
+      if (state.phase !== 'results') {
+        return '<aside class="side"><p class="note">Sumy pojawią się po wyszukaniu.</p></aside>';
+      }
+      return '<aside class="side"><div class="stat"><span>Suma zestawienia</span><b data-out="sum-all">' + pln(listingSum()) + '</b></div>'
+        + '<div class="stat sel"><span>Suma zaznaczonych · <span data-out="sel-count">' + selectedCount() + '</span></span><b data-out="sum-sel">' + pln(selectedSum()) + '</b></div>'
+        + mixBlock(false)
+        + '<label class="field"><span>Numer faktury</span><input class="invoice" id="invoice" value="' + esc(state.invoice) + '" placeholder="FV/123/09/2026" autocomplete="off"></label>'
+        + '<p class="need">Numer jest jeden na całe zatwierdzenie. Trafia tylko na zaznaczone wiersze.</p>'
+        + '<button type="button" class="btn-go" data-action="approve"' + (canApprove() ? '' : ' disabled') + '>Zatwierdź</button></aside>';
+    }
+
+    function overlayHtml() {
+      if (!state.overlay) return '';
+      const msg = state.overlay === 'loading' ? state.loadMessage : 'Zapisuję rozliczenie…';
+      const uni = state.overlay === 'save-big';
+      const mark = uni
+        ? '<img class="uni" src="../jednorozec-deba.gif" alt="Jednorożec staje dęba i rusza przednimi łapkami">'
+        : '<img class="pulse" src="../logo.png" alt="" width="64" height="64">';
+      return '<div class="overlay" role="status" aria-live="polite" aria-busy="true"><div class="overlay-panel">'
+        + mark
+        + '<div class="msg">' + esc(msg) + '</div>'
+        + '</div></div>';
+    }
+    function modalHtml() {
+      if (!state.ratesOpen) return '';
+      return '<div class="modal" data-action="close-rates"><div class="modal-panel" role="dialog" aria-labelledby="rates-title">'
+        + '<h2 id="rates-title">Baza stawek</h2>'
+        + '<p class="note">Zapis od razu, nie czeka na Zatwierdź. Nie zmienia Rozliczony, Numer faktury ani kolumn 16 i 17. W tym oknie stawki trasy nie ma. Na wierszu trasy da się ją zmienić: zapis idzie od razu do Stawka za trasę. Koszt odbioru czeka na Zatwierdź. Usuwania wiersza nie ma.</p>'
+        + '<label class="field"><span>Sklep</span><select><option>ul. Głogowska 12, Poznań</option><option>ul. Hetmańska 90, Poznań</option><option>ul. Serbska 7, Poznań</option></select></label>'
+        + '<label class="field"><span>Podwykonawca</span><select><option>GPW</option><option>BLUECARGO</option></select></label>'
+        + '<label class="field"><span>Kwota za podjazd</span><input type="text" inputmode="decimal" value="20,00"></label>'
+        + '<label class="field"><span>Kwota za worek</span><input type="text" inputmode="decimal" value="2,50"></label>'
+        + '<label class="field"><span>Od kiedy obowiązuje</span><input type="date"><span class="note">W arkuszu tekst dd.mm.yyyy, jak data odbioru. Puste znaczy od zawsze.</span></label>'
+        + '<p class="note">Sklep z listy adresów rejestru, podwykonawca z nazw krótkich Listy podwykonawców. Nie pinezki mapy. Wpisu ręcznego nie ma.</p>'
+        + '<div class="modal-actions"><button type="button" class="btn-ghost" data-action="close-rates">Zamknij</button><button type="button" class="btn-teal" data-action="save-rates">Zapisz</button></div>'
+        + '</div></div>';
+    }
+
+    function headRow() {
+      const extra = state.layout === 'b' ? '<th class="c wrap">tylko za liczbę worków</th>' : '';
+      return '<tr><th class="c">Rozliczone</th>' + extra + '<th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th><th>Podjazd/Trasa</th><th class="num">Liczba worków</th><th class="num">Kwota za worek</th><th class="num">Suma za worki</th><th class="num">Koszt odbioru</th><th class="num" title="Tylko na ekranie. Nie zapisuje się jako jedna kwota.">Suma trasy</th><th>transport się odbył</th></tr>';
+    }
+
+    function rowClass(dead, checked, kind) {
+      return [kind === 'route' ? 'is-route' : '', kind === 'child' ? 'is-child' : '', dead ? 'is-dead' : '', checked ? 'is-checked' : ''].filter(Boolean).join(' ');
+    }
+
+    function shopCells(row, dead) {
+      const eco = shopEconomics(row);
+      const place = onlyPlace();
+      const under = place === 'under' ? bagsBox(row.id, row.bagsOnly, 'under') : '';
+      const col = place === 'col' ? '<td class="c">' + bagsBox(row.id, row.bagsOnly, 'col') + '</td>' : '';
+      const drive = row.bagsOnly
+        ? dash()
+        : '<span class="tag">podjazd</span>' + numInput(row.id, 'drive', row.drive, null, 'Zmiana kwoty za podjazd tylko na tym ekranie, nie w Bazie stawek');
+      return '<td class="c">' + checkBox(row.id, row.checked) + '</td>' + col
+        + '<td>' + tx(row.protocol, dead) + '</td>'
+        + '<td class="adres">' + tx(row.address, dead) + '</td>'
+        + '<td class="sklep"><div>' + tx(row.name, dead) + under + newRouteBox(row) + '</div></td>'
+        + '<td>' + tx(row.date, dead) + '</td>'
+        + '<td>' + drive + '</td>'
+        + '<td class="num">' + numInput(row.id, 'bags', row.bags, null, 'Zapis od razu do Ilość worków') + '</td>'
+        + '<td class="num">' + numInput(row.id, 'bagRate', row.bagRate, null, 'Zmiana kwoty za worek tylko na tym ekranie, nie w Bazie stawek') + '</td>'
+        + '<td class="num">' + moneyOut(row.id + '-bagsum', eco.bagsSum, dead) + '</td>'
+        + '<td class="num">' + moneyOut(row.id + '-cost', eco.cost, dead) + '</td>'
+        + '<td class="num">' + dash() + '</td>'
+        + '<td>' + tripBox(row.id, row.noTrip) + '</td>';
+    }
+
+    function routeCells(row) {
+      const eco = routeEconomics(row);
+      const sub = eco.active === eco.shops
+        ? shopsWord(eco.active)
+        : eco.active + ' z ' + eco.shops + ' w koszcie';
+      const none = eco.active === 0 ? '<div class="sub">Żaden sklep się nie odbył — kosztu trasy nie ma.</div>' : '';
+      return '<td class="c">' + checkBox(row.id, row.checked) + '</td>'
+        + '<td>' + dash() + '</td>'
+        + '<td class="adres"><div class="who-line"><button type="button" class="chev" data-action="expand" data-id="' + row.id + '" aria-expanded="' + (row.open ? 'true' : 'false') + '" aria-label="Sklepy trasy">' + (row.open ? '▾' : '▸') + '</button><div><div>' + esc(row.name) + '</div><div class="sub">trasa · ' + esc(sub) + '</div>' + none + '</div></div></td>'
+        + '<td class="sklep">' + dash() + '</td>'
+        + '<td>' + esc(row.date) + '</td>'
+        + '<td><span class="tag tag-route">trasa</span>' + numInput(row.id, 'routeRate', row.routeRate, null, 'Zapis od razu do Stawka za trasę. Kolumny 16 i 17 dopiero przy Zatwierdź') + '</td>'
+        + '<td class="num"><span data-out="' + row.id + '-bags">' + eco.bagsCount + '</span></td>'
+        + '<td class="num">' + (sharedBagRate(row) == null ? dash() : numInput(row.id, 'bagRate', sharedBagRate(row), null, 'Jedna kwota, bo każdy adres, który się odbył, ma tę samą. Zmiana tylko na tym ekranie.')) + '</td>'
+        + '<td class="num">' + moneyOut(row.id + '-bagsum', eco.bagsSum, false) + '</td>'
+        + '<td class="num">' + dash() + '</td>'
+        + '<td class="num">' + moneyOut(row.id + '-suma', eco.suma, false) + '</td>'
+        + '<td>' + dash() + '</td>';
+    }
+
+    function childCells(row, shop, index) {
+      const dead = !!shop.noTrip;
+      const col = state.layout === 'b' ? '<td></td>' : '';
+      return '<td></td>' + col
+        + '<td>' + tx(shop.protocol, dead) + '</td>'
+        + '<td class="adres">' + tx(shop.address, dead) + '</td>'
+        + '<td class="sklep">' + tx(shop.name, dead) + '</td>'
+        + '<td>' + tx(shop.date, dead) + '</td>'
+        + '<td>' + dash() + '</td>'
+        + '<td class="num">' + numInput(row.id, 'bags', shop.bags, index, 'Zapis od razu do Ilość worków tego adresu') + '</td>'
+        + '<td class="num">' + (sharedBagRate(row) == null ? numInput(row.id, 'bagRate', shopBagRate(row, shop), index, 'Kwota tego adresu, tylko ten ekran. Nie w Bazie stawek.') : dash()) + '</td><td>' + dash() + '</td><td>' + dash() + '</td><td>' + dash() + '</td>'
+        + '<td><div class="trip-stack">' + tripBox(row.id, shop.noTrip, index) + detachBtn(row.id, index) + '</div></td>';
+    }
+
+    function tableHtml() {
+      const list = items();
+      if (!list.length) return blank('Brak pozycji.', 'Brak nierozliczonych odbiorów tego podwykonawcy w podanym zakresie.');
+      const body = list.map((item) => {
+        if (item.kind === 'route') return '<tr class="' + rowClass(false, item.row.checked, 'route') + '">' + routeCells(item.row) + '</tr>';
+        if (item.kind === 'child') return '<tr class="' + rowClass(item.shop.noTrip, false, 'child') + '">' + childCells(item.row, item.shop, item.index) + '</tr>';
+        return '<tr class="' + rowClass(item.row.noTrip, item.row.checked, 'shop') + '">' + shopCells(item.row, item.row.noTrip) + '</tr>';
+      }).join('');
+      return '<div class="table-wrap"><table><thead>' + headRow() + '</thead><tbody>' + body + '</tbody></table></div>';
+    }
+
+    function cardMoney(label, inner) {
+      return '<label class="mf"><span>' + label + '</span>' + inner + '</label>';
+    }
+    function cardsHtml() {
+      if (state.phase !== 'results') {
+        return blank('Wybierz podwykonawcę i datę końcową.', 'Data początkowa może zostać pusta. Po Szukaj widać tylko nierozliczone odbiory.');
+      }
+      const list = items();
+      if (!list.length) return blank('Brak pozycji.', 'Brak nierozliczonych odbiorów tego podwykonawcy w podanym zakresie.');
+      return '<div class="list-wrap">' + list.map((item) => {
+        if (item.kind === 'child') {
+          const shop = item.shop;
+          const dead = !!shop.noTrip;
+          return '<article class="card is-child' + (dead ? ' is-dead' : '') + '"><div class="card-top"><div class="card-id"><div class="who">' + tx(shop.name, dead) + '</div><span class="sub">' + tx(shop.address, dead) + '</span></div><div class="card-meta">' + tx(shop.date, dead) + ' · ' + tx(shop.protocol, dead) + '</div>'
+            + cardMoney('Liczba worków', numInput(item.row.id, 'bags', shop.bags, item.index, 'Zapis od razu do Ilość worków tego adresu'))
+            + (sharedBagRate(item.row) == null ? cardMoney('Kwota za worek', numInput(item.row.id, 'bagRate', shopBagRate(item.row, shop), item.index, 'Kwota tego adresu, tylko ten ekran')) : '')
+            + tripBox(item.row.id, shop.noTrip, item.index)
+            + '</div></article>';
+        }
+        if (item.kind === 'route') {
+          const row = item.row;
+          const eco = routeEconomics(row);
+          const sub = eco.active === eco.shops ? shopsWord(eco.active) : eco.active + ' z ' + eco.shops + ' w koszcie';
+          return '<article class="card is-route' + (row.checked ? ' is-checked' : '') + '"><div class="card-top">'
+            + checkBox(row.id, row.checked)
+            + '<button type="button" class="chev" data-action="expand" data-id="' + row.id + '" aria-expanded="' + (row.open ? 'true' : 'false') + '">' + (row.open ? '▾' : '▸') + '</button>'
+            + '<div class="card-id"><div class="who">' + esc(row.name) + '</div><span class="sub">trasa · ' + esc(sub) + '</span></div>'
+            + '<div>' + esc(row.date) + '</div>'
+            + '</div><div class="card-money">'
+            + cardMoney('Podjazd/Trasa', '<span class="tag tag-route">trasa</span>' + numInput(row.id, 'routeRate', row.routeRate, null, 'Zapis od razu do Stawka za trasę. Kolumny 16 i 17 dopiero przy Zatwierdź'))
+            + cardMoney('Liczba worków', '<span data-out="' + row.id + '-bags">' + eco.bagsCount + '</span>')
+            + cardMoney('Kwota za worek', sharedBagRate(row) == null ? dash() : numInput(row.id, 'bagRate', sharedBagRate(row), null, 'Jedna kwota, bo adresy mają tę samą. Tylko ten ekran'))
+            + cardMoney('Suma za worki', moneyOut(row.id + '-bagsum', eco.bagsSum, false))
+            + cardMoney('Koszt odbioru', dash())
+            + cardMoney('Suma trasy', moneyOut(row.id + '-suma', eco.suma, false))
+            + '</div>' + (eco.active === 0 ? '<p class="sub">Żaden sklep się nie odbył — kosztu trasy nie ma.</p>' : '') + '</article>';
+        }
+        const row = item.row;
+        const dead = !!row.noTrip;
+        const bagsSum = dead ? 0 : bagMoney(row.bags, row.bagRate);
+        const cost = shopEconomics(row).cost;
+        const drive = row.bagsOnly
+          ? dash()
+          : '<span class="tag">podjazd</span>' + numInput(row.id, 'drive', row.drive, null, 'Tylko ten ekran');
+        return '<article class="card' + (dead ? ' is-dead' : '') + (row.checked ? ' is-checked' : '') + '"><div class="card-top">'
+          + checkBox(row.id, row.checked)
+          + '<div class="card-id"><div class="who">' + tx(row.name, dead) + '</div><span class="sub">' + tx(row.address, dead) + '</span></div>'
+          + '<div>' + tx(row.date, dead) + ' · ' + tx(row.protocol, dead) + '</div>'
+          + bagsBox(row.id, row.bagsOnly, 'chip')
+          + tripBox(row.id, row.noTrip)
+          + '</div><div class="card-money">'
+          + cardMoney('Podjazd/Trasa', drive)
+          + cardMoney('Liczba worków', numInput(row.id, 'bags', row.bags, null, 'Zapis od razu do Ilość worków'))
+          + cardMoney('Kwota za worek', numInput(row.id, 'bagRate', row.bagRate, null, 'Tylko ten ekran'))
+          + cardMoney('Suma za worki', moneyOut(row.id + '-bagsum', bagsSum, dead))
+          + cardMoney('Koszt odbioru', moneyOut(row.id + '-cost', cost, dead))
+          + cardMoney('Suma trasy', dash())
+          + '</div></article>';
+      }).join('') + '</div>';
+    }
+
+    function countLine() {
+      const n = items().filter((item) => item.kind !== 'child').length;
+      return '<div class="center-h">' + pozycji(n) + ' w zestawieniu</div>';
+    }
+
+    function screenFilter() {
+      return '<div class="setup"><div class="setup-card">'
+        + brand()
+        + '<h2>Zakres rozliczenia</h2>'
+        + '<p class="note">Ustal, czego dotyczy to rozliczenie. Pozycje pojawią się na następnym ekranie.</p>'
+        + modes()
+        + '<div class="filters setup-fields">' + filterFields() + '</div>'
+        + '<button type="button" class="btn-teal" data-action="search">Szukaj</button>'
+        + '<div class="setup-foot">' + ratesBtn() + '</div>'
+        + '</div></div>';
+    }
+    function screenData() {
+      return '<div class="top">' + brand()
+        + '<div class="range"><span>Na zgłoszenie</span><strong>' + esc(rangeText()) + '</strong></div>'
+        + '<button type="button" class="btn-ghost" data-action="back">Zmień zakres</button>'
+        + ratesBtn()
+        + '</div>'
+        + countLine()
+        + tableHtml()
+        + footer();
+    }
+
+    function syncChrome() {
+      const current = state.overlay || state.screen;
+      document.querySelectorAll('[data-screen]').forEach((b) => b.classList.toggle('is-on', b.dataset.screen === current));
+    }
+    function patch() {
+      const setOut = (key, text) => {
+        document.querySelectorAll('[data-out="' + key + '"]').forEach((el) => { el.textContent = text; });
+      };
+      setOut('sum-all', pln(listingSum()));
+      setOut('sum-sel', pln(selectedSum()));
+      setOut('sel-count', String(selectedCount()));
+      state.rows.forEach((row) => {
+        if (row.type === 'shop') {
+          const eco = shopEconomics(row);
+          setOut(row.id + '-bagsum', pln(eco.bagsSum));
+          setOut(row.id + '-cost', pln(eco.cost));
+        } else {
+          const eco = routeEconomics(row);
+          setOut(row.id + '-bags', String(eco.bagsCount));
+          setOut(row.id + '-bagsum', pln(eco.bagsSum));
+          setOut(row.id + '-suma', pln(eco.suma));
+        }
+      });
+      const c = composition();
+      setOut('mix-drive', pln(c.podjazd));
+      setOut('mix-bags', pln(c.worki));
+      setOut('mix-route', pln(c.trasa));
+      const bar = document.querySelector('.mix-bar');
+      if (bar) {
+        const parts = [c.podjazd, c.worki, c.trasa];
+        bar.querySelectorAll('i').forEach((el, i) => {
+          el.style.width = (c.total ? parts[i] / c.total * 100 : 0).toFixed(2) + '%';
+        });
+      }
+      document.querySelectorAll('[data-action="approve"]').forEach((btn) => {
+        btn.disabled = !canApprove();
+        btn.title = canApprove() ? 'Zapisz rozliczenie' : 'Wpisz numer faktury i zaznacz co najmniej jeden wiersz';
+      });
+    }
+    function syncPicker() {
+      const input = document.querySelector('[data-filter="contractor"]');
+      const box = document.querySelector('[data-picker-list]');
+      if (input) input.setAttribute('aria-expanded', state.contractorOpen ? 'true' : 'false');
+      if (!box) return;
+      box.hidden = !state.contractorOpen;
+      box.innerHTML = state.contractorOpen ? pickerListHtml() : '';
+      const field = input && input.closest('.field');
+      if (!field) return;
+      const note = field.querySelector(':scope > .note');
+      const picked = contractorByName(state.filter.contractor);
+      if (picked && !state.contractorOpen) {
+        if (note) note.textContent = picked.dane;
+        else {
+          const span = document.createElement('span');
+          span.className = 'note';
+          span.textContent = picked.dane;
+          field.appendChild(span);
+        }
+      } else if (note) {
+        note.remove();
+      }
+    }
+    function paint() {
+      const app = document.getElementById('app');
+      app.className = 'app';
+      const main = state.screen === 'data' ? screenData() : screenFilter();
+      app.innerHTML = main + modalHtml() + overlayHtml();
+      syncChrome();
+      patch();
+    }
+
+    function clearHold() {
+      clearTimeout(timer);
+      clearTimeout(uniTimer);
+    }
+    function endSave() {
+      if (state.overlay !== 'save' && state.overlay !== 'save-big') return;
+      state.overlay = null;
+      paint();
+    }
+    function beginSave(big) {
+      clearHold();
+      state.overlay = big ? 'save-big' : 'save';
+      const started = Date.now();
+      paint();
+      timer = setTimeout(() => {
+        const left = big ? Math.max(0, UNI_MIN_MS - (Date.now() - started)) : 0;
+        if (left) uniTimer = setTimeout(endSave, left);
+        else endSave();
+      }, 5200);
+    }
+    function applyScreen(name) {
+      clearHold();
+      if (name === 'filter') {
+        state.screen = 'filter';
+        state.overlay = null;
+      } else if (name === 'data') {
+        state.screen = 'data';
+        state.overlay = null;
+      } else if (name === 'loading') {
+        state.overlay = 'loading';
+        state.loadMessage = 'Szukam nierozliczonych odbiorów…';
+      } else {
+        state.overlay = name;
+      }
+      paint();
+    }
+
+    document.querySelector('.chrome').addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.screen) applyScreen(b.dataset.screen);
+      else paint();
+    });
+
+    document.getElementById('stage').addEventListener('click', (e) => {
+      if (e.target.closest('.modal-panel') && !e.target.closest('[data-action="save-rates"], [data-action="close-rates"]')) return;
+      const el = e.target.closest('[data-action]');
+      if (!el) return;
+      const action = el.dataset.action;
+      if (action === 'expand') {
+        const row = findRow(el.dataset.id);
+        row.open = !row.open;
+        paint();
+      } else if (action === 'rates') {
+        state.ratesOpen = true;
+        paint();
+      } else if (action === 'close-rates') {
+        state.ratesOpen = false;
+        paint();
+      } else if (action === 'save-rates') {
+        state.ratesOpen = false;
+        state.overlay = 'loading';
+        state.loadMessage = 'Zapisuję stawkę…';
+        paint();
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          state.overlay = null;
+          paint();
+        }, 1600);
+      } else if (action === 'pick-contractor') {
+        state.filter.contractor = el.dataset.id;
+        state.contractorQuery = el.dataset.id;
+        state.contractorOpen = false;
+        if (state.error === 'contractor') state.error = '';
+        paint();
+      } else if (action === 'back') {
+        clearTimeout(timer);
+        state.screen = 'filter';
+        state.overlay = null;
+        paint();
+      } else if (action === 'search') {
+        if (!state.filter.contractor) {
+          state.error = 'contractor';
+          state.contractorOpen = false;
+          paint();
+          return;
+        }
+        if (!state.filter.to) {
+          state.error = 'to';
+          paint();
+          return;
+        }
+        if (state.filter.from && state.filter.from > state.filter.to) {
+          state.error = 'range';
+          paint();
+          return;
+        }
+        state.error = '';
+        state.applied = { contractor: state.filter.contractor, from: state.filter.from, to: state.filter.to };
+        state.overlay = 'loading';
+        state.loadMessage = 'Szukam nierozliczonych odbiorów…';
+        paint();
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          state.overlay = null;
+          state.screen = 'data';
+          paint();
+        }, 1600);
+      } else if (action === 'detach') {
+        detachShop(el.dataset.id, Number(el.dataset.shop));
+        paint();
+      } else if (action === 'make-route') {
+        makeRoute(findRow(el.dataset.id));
+        paint();
+      } else if (action === 'approve') {
+        if (!canApprove()) return;
+        beginSave(selectedSum() >= 10000);
+      }
+    });
+
+    document.getElementById('stage').addEventListener('input', (e) => {
+      const el = e.target;
+      if (el.id === 'invoice') {
+        state.invoice = el.value;
+        patch();
+        return;
+      }
+      if (el.dataset.filter === 'contractor') {
+        state.contractorQuery = el.value;
+        const hit = contractorByName(el.value);
+        state.filter.contractor = hit ? hit.name : '';
+        state.contractorOpen = true;
+        if (state.error === 'contractor') {
+          state.error = '';
+          const field = el.closest('.field');
+          if (field) field.classList.remove('is-error');
+          const err = field && field.querySelector('.err');
+          if (err) err.remove();
+        }
+        syncPicker();
+        return;
+      }
+      if (el.dataset.filter) {
+        state.filter[el.dataset.filter] = el.value;
+        if ((el.dataset.filter === 'to' && el.value && state.error === 'to')
+          || (state.error === 'range' && !(state.filter.from && state.filter.to && state.filter.from > state.filter.to))) {
+          state.error = '';
+          paint();
+          return;
+        }
+        const dirty = JSON.stringify(state.filter) !== JSON.stringify(state.applied);
+        document.querySelectorAll('.dirty').forEach((node) => { node.hidden = !dirty; });
+        return;
+      }
+      if (el.dataset.draft) {
+        const row = findRow(el.dataset.id);
+        if (!row) return;
+        if (el.dataset.draft === 'routeName') row.routeDraft = el.value;
+        if (el.dataset.draft === 'routeRate') row.rateDraft = el.value;
+        return;
+      }
+      if (!el.dataset.edit) return;
+      const row = findRow(el.dataset.id);
+      let value = parseNum(el.value);
+      if (el.dataset.edit === 'bags') value = value == null ? 0 : value;
+      const shopIndex = el.dataset.shop != null && el.dataset.shop !== '' ? Number(el.dataset.shop) : null;
+      if (row.type === 'route' && el.dataset.edit === 'bagRate') {
+        if (shopIndex != null) row.shops[shopIndex].bagRate = value;
+        else {
+          row.bagRate = value;
+          row.shops.forEach((shop) => { delete shop.bagRate; });
+        }
+        paint();
+        return;
+      }
+      if (shopIndex != null) row.shops[shopIndex][el.dataset.edit] = value;
+      else row[el.dataset.edit] = value;
+      patch();
+    });
+
+    document.getElementById('stage').addEventListener('change', (e) => {
+      const el = e.target;
+      if (el.id === 'mode-na') {
+        el.checked = true;
+        return;
+      }
+      if (el.dataset.toggle === 'nofrom') {
+        if (el.checked) {
+          if (state.filter.from) state.fromHeld = state.filter.from;
+          state.filter.from = '';
+          if (state.error === 'range') state.error = '';
+        } else {
+          state.filter.from = state.fromHeld || '';
+        }
+        paint();
+        return;
+      }
+      if (el.dataset.filter) {
+        state.filter[el.dataset.filter] = el.value;
+        const dirty = JSON.stringify(state.filter) !== JSON.stringify(state.applied);
+        document.querySelectorAll('.dirty').forEach((node) => { node.hidden = !dirty; });
+        return;
+      }
+      if (!el.dataset.toggle) return;
+      const row = findRow(el.dataset.id);
+      const shopIndex = el.dataset.shop != null && el.dataset.shop !== '' ? Number(el.dataset.shop) : null;
+      if (el.dataset.toggle === 'checked') {
+        if (shopIndex != null) row.shops[shopIndex].checked = el.checked;
+        else row.checked = el.checked;
+        const tr = el.closest('tr, article');
+        if (tr) tr.classList.toggle('is-checked', el.checked);
+        patch();
+        return;
+      }
+      if (el.dataset.toggle === 'notrip') {
+        if (shopIndex != null) row.shops[shopIndex].noTrip = el.checked;
+        else row.noTrip = el.checked;
+        paint();
+        return;
+      }
+      if (el.dataset.toggle === 'bags') {
+        if (row.type === 'route') return;
+        row.bagsOnly = el.checked;
+        paint();
+      }
+    });
+
+    document.getElementById('stage').addEventListener('focusout', (e) => {
+      const el = e.target;
+      if (!el.dataset || !el.dataset.edit || el.dataset.edit === 'bags') return;
+      const n = parseNum(el.value);
+      el.value = n == null ? '' : formatInput(n);
+    });
+
+    document.getElementById('stage').addEventListener('mousedown', (e) => {
+      if (e.target.closest('[data-action="pick-contractor"]')) e.preventDefault();
+    });
+    document.getElementById('stage').addEventListener('focusin', (e) => {
+      if (e.target.dataset.filter !== 'contractor') return;
+      state.contractorOpen = true;
+      syncPicker();
+    });
+    document.getElementById('stage').addEventListener('focusout', (e) => {
+      if (e.target.dataset.filter !== 'contractor') return;
+      state.contractorOpen = false;
+      syncPicker();
+    });
+
+    paint();
+  </script>
+</body>
+</html>

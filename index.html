@@ -1,0 +1,2568 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rozliczenia</title>
+  <style>
+:root {
+  --bg: #e7eeee;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: rgba(148, 163, 184, 0.45);
+  --teal: #0d9488;
+  --teal-deep: #0f766e;
+  --teal-soft: rgba(13, 148, 136, 0.12);
+  --shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --font: system-ui, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--ink);
+  background: var(--bg);
+}
+#app { position: relative; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand img { width: 36px; height: 36px; border-radius: 8px; }
+.brand strong { display: block; font-size: 15px; }
+.brand em { display: block; font-style: normal; font-size: 12px; color: var(--muted); font-weight: 600; }
+.modes {
+  display: flex;
+  width: 100%;
+  margin: 14px 0;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.16);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+.mode {
+  position: relative;
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  text-align: center;
+}
+.mode input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.mode.is-on { background: var(--teal); color: #fff; }
+.mode.is-off { color: #94a3b8; cursor: not-allowed; }
+.filters { display: flex; flex-direction: column; gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.field input, .field select {
+  font-weight: 550;
+  color: var(--ink);
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: #fff;
+  width: 100%;
+}
+.field.is-error input { border-color: #e11d48; }
+.err { color: #e11d48; font-weight: 650; font-size: 12px; }
+.btn-teal, .btn-ghost {
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.btn-teal { border: none; color: #fff; background: var(--teal); width: 100%; margin-top: 8px; }
+.btn-teal:hover { background: var(--teal-deep); }
+.btn-ghost {
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.note { margin: 8px 0 0; font-size: 12px; color: var(--muted); font-weight: 550; }
+.checkline { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: #334155; font-size: 12px; font-weight: 550; }
+.setup {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 16px;
+  background: #f4f7f6;
+}
+.setup-card {
+  width: min(440px, 100%);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 22px 22px 18px;
+  box-shadow: var(--shadow);
+}
+.setup-card h2 { margin: 14px 0 4px; font-size: 18px; }
+.setup-foot { display: flex; justify-content: flex-end; margin-top: 12px; }
+.picker-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px;
+  max-height: 168px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.picker-list button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font-weight: 700;
+}
+.picker-list button small { font-weight: 550; color: var(--muted); }
+.picker-list button:hover { background: var(--teal-soft); }
+.picker-empty { margin: 4px 0 0; }
+.statement {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+.top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.range { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin-right: auto; }
+.range span { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.range strong { font-size: 14px; font-weight: 700; }
+.blank { padding: 48px 24px; color: var(--muted); text-align: center; }
+.blank strong { display: block; color: var(--ink); margin-bottom: 6px; }
+.overlay, .modal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.overlay { background: rgba(244, 247, 246, 0.72); z-index: 5; }
+.modal { background: rgba(15, 23, 42, 0.35); z-index: 4; }
+.overlay-panel, .modal-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 22px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.overlay-panel img.pulse {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  animation: logo-pulse 1.2s ease-in-out infinite;
+}
+@keyframes logo-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.12); opacity: 0.55; }
+}
+.overlay-panel .msg { font-size: 13px; font-weight: 700; color: var(--muted); }
+.modal-panel {
+  width: min(440px, calc(100% - 32px));
+  align-items: stretch;
+  text-align: left;
+  gap: 8px;
+}
+.modal-panel h2 { margin: 0; font-size: 16px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+.modal-actions .btn-ghost, .modal-actions .btn-teal { width: auto; margin-top: 0; }
+:root { --orange: #ea580c; --orange-deep: #c2410c; }
+.center-h { padding: 12px 14px 0; font-size: 13px; color: var(--muted); font-weight: 650; }
+.table-wrap { flex: 1; min-height: 0; overflow: auto; }
+table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; white-space: nowrap; background: #fff; }
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-align: left;
+  color: var(--muted);
+}
+th.num, td.num { text-align: right; }
+th.c, td.c { text-align: center; }
+tr.is-route td { background: #f0fdfa; }
+tr.is-child td { background: #f8fafc; }
+tr.is-checked td { background: rgba(13, 148, 136, 0.08); }
+tr.is-route.is-checked td { background: #d1fae5; }
+tr.is-dead { color: #94a3b8; }
+.strike { text-decoration: line-through; }
+.who-line { display: flex; align-items: flex-start; gap: 4px; }
+td.adres { font-weight: 700; }
+td.sklep { font-weight: 450; white-space: normal; }
+.sub { color: var(--muted); font-weight: 550; font-size: 12px; }
+.only, .trip { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: #334155; font-size: 12px; font-weight: 550; }
+.trip-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.btn-detach, .btn-mini {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--teal-deep);
+}
+.btn-detach:hover, .btn-mini:hover { background: var(--teal-soft); }
+.new-route { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 6px; max-width: 280px; }
+.new-route .sub { flex-basis: 100%; }
+td .new-route input[type="text"] { width: 9.5rem; text-align: left; font-size: 12px; }
+td .new-route input[data-draft="route-rate"] { width: 4.8rem; text-align: right; }
+.new-route .err { flex-basis: 100%; }
+tr.is-child td.adres { box-shadow: inset 3px 0 0 var(--teal); }
+td input[type="text"] {
+  width: 76px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+td input[data-edit="bags"] { width: 56px; }
+td input[type="text"]:hover { border-color: var(--line); }
+td input[type="text"]:focus { border-color: var(--teal); background: #fff; outline: none; }
+.tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal-deep);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.tag-route { background: #ffedd5; color: #9a3412; }
+.chev { border: none; background: transparent; color: var(--teal-deep); font-size: 14px; padding: 0 2px; }
+.money, .stat b { font-variant-numeric: tabular-nums; }
+.footer {
+  display: flex;
+  align-items: flex-end;
+  gap: 22px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+  background: #fff;
+}
+.stat span {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.stat b { font-size: 20px; }
+.stat.sel b { color: var(--teal-deep); }
+.grow { margin-left: auto; display: flex; gap: 8px; align-items: flex-end; }
+.invoice { width: 210px; font-weight: 550; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(148, 163, 184, 0.55); }
+.btn-go { border: none; color: #fff; background: var(--orange); border-radius: 10px; padding: 9px 14px; font-size: 13px; font-weight: 650; }
+.btn-go:hover:not(:disabled) { background: var(--orange-deep); }
+.btn-go:disabled { opacity: 0.45; }
+.tie { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 6px; }
+.overlay-panel img.uni { width: 220px; height: auto; }
+.statement .top .btn-ghost, .statement .top .btn-teal { width: auto; margin-top: 0; }
+
+
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+(function () {
+function escapeHtml(text) {
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+{};
+
+{};
+
+/**
+ * Data odbioru i data w Bazie stawek to tekst `dd.mm.yyyy`.
+ * Porównanie jest po dacie kalendarzowej. Pusty tekst jest starszy niż każda wpisana data.
+ */
+const SHEET_DATE = /^(\d{2})\.(\d{2})\.(\d{4})$/;
+function parseSheetDate(text) {
+    const match = SHEET_DATE.exec(text);
+    if (!match) {
+        throw new Error(`Data nie jest tekstem dd.mm.yyyy: ${JSON.stringify(text)}`);
+    }
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+    const check = new Date(Date.UTC(year, month - 1, day));
+    if (check.getUTCFullYear() !== year ||
+        check.getUTCMonth() !== month - 1 ||
+        check.getUTCDate() !== day) {
+        throw new Error(`Data kalendarzowa nie istnieje: ${text}`);
+    }
+    return { year, month, day };
+}
+/** Pusty `a` jest starszy niż każda wpisana data. */
+function compareSheetDate(a, b) {
+    if (a === "" && b === "") {
+        return 0;
+    }
+    if (a === "") {
+        return -1;
+    }
+    if (b === "") {
+        return 1;
+    }
+    const left = parseSheetDate(a);
+    const right = parseSheetDate(b);
+    if (left.year !== right.year) {
+        return left.year - right.year;
+    }
+    if (left.month !== right.month) {
+        return left.month - right.month;
+    }
+    return left.day - right.day;
+}
+/** `validFrom` pusta albo nie późniejsza niż data odbioru. */
+function isOnOrBefore(validFrom, pickupDate) {
+    parseSheetDate(pickupDate);
+    if (validFrom === "") {
+        return true;
+    }
+    return compareSheetDate(validFrom, pickupDate) <= 0;
+}
+
+
+const PL_FOLD = {
+    ą: "a",
+    ć: "c",
+    ę: "e",
+    ł: "l",
+    ń: "n",
+    ó: "o",
+    ś: "s",
+    ź: "z",
+    ż: "z",
+};
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const RANGE_ERROR = {
+    contractor: "Wybierz podwykonawcę z listy.",
+    end: "Data końcowa jest wymagana.",
+    order: "Data początkowa nie może być późniejsza niż końcowa.",
+};
+function foldPl(text) {
+    return text
+        .toLocaleLowerCase("pl")
+        .replace(/[ąćęłńóśźż]/g, (ch) => PL_FOLD[ch] ?? ch)
+        .replace(/\s+/g, " ")
+        .trim();
+}
+/** Fragment Nazwa albo Dane do Worda. Pusty tekst zostawia całą listę. */
+function matchingContractors(list, query, browsingAll) {
+    if (browsingAll) {
+        return [...list];
+    }
+    const folded = foldPl(query);
+    if (folded === "") {
+        return [...list];
+    }
+    return list.filter((item) => foldPl(item.nazwa).includes(folded) || foldPl(item.dane).includes(folded));
+}
+/** Wybór jest z listy. Do rozliczenia wchodzi Nazwa, nie Dane do Worda. */
+function selectedContractor(list, text) {
+    const folded = foldPl(text);
+    if (folded === "") {
+        return null;
+    }
+    return list.find((item) => foldPl(item.nazwa) === folded) ?? null;
+}
+/** `yyyy-mm-dd` → `dd.mm.yyyy`. Zły dzień kalendarza daje null. Bez przesunięcia strefy. */
+function isoToSheetDate(iso) {
+    const match = ISO_DATE.exec(iso);
+    if (!match) {
+        return null;
+    }
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const sheet = `${String(day).padStart(2, "0")}.${String(month).padStart(2, "0")}.${String(year)}`;
+    try {
+        parseSheetDate(sheet);
+    }
+    catch {
+        return null;
+    }
+    return sheet;
+}
+function fieldsForSearch(draft) {
+    return {
+        contractor: draft.contractor,
+        from: draft.noFrom ? "" : draft.from,
+        to: draft.to,
+    };
+}
+/**
+ * Szukaj nie startuje bez podwykonawcy z listy, bez daty końcowej
+ * ani gdy data początkowa jest późniejsza niż końcowa.
+ * Obie granice wychodzą jako ten sam dzień kalendarzowy, włącznie.
+ */
+function startSearch(fields, list) {
+    const picked = selectedContractor(list, fields.contractor);
+    if (!picked) {
+        return { ok: false, error: "contractor" };
+    }
+    const dataDo = isoToSheetDate(fields.to);
+    if (!dataDo) {
+        return { ok: false, error: "end" };
+    }
+    if (fields.from !== "") {
+        const dataOd = isoToSheetDate(fields.from);
+        if (!dataOd || compareSheetDate(dataOd, dataDo) > 0) {
+            return { ok: false, error: "order" };
+        }
+        return { ok: true, podwykonawca: picked.nazwa, dataOd, dataDo };
+    }
+    return { ok: true, podwykonawca: picked.nazwa, dataDo };
+}
+/** Czy para dat sama z siebie blokuje Szukaj. Pusta data końcowa to inny błąd. */
+function blocksOnOrder(from, to, noFrom) {
+    if (noFrom || from === "") {
+        return false;
+    }
+    const dataDo = isoToSheetDate(to);
+    if (!dataDo) {
+        return false;
+    }
+    const dataOd = isoToSheetDate(from);
+    if (!dataOd) {
+        return true;
+    }
+    return compareSheetDate(dataOd, dataDo) > 0;
+}
+/** Zaznaczenie czyści datę. Zdjęcie przywraca ostatnią wpisaną. */
+function applyNoStartDate(state, checked) {
+    if (checked) {
+        return {
+            from: "",
+            held: state.from !== "" ? state.from : state.held,
+        };
+    }
+    return { from: state.held, held: state.held };
+}
+function screenAfterSearch() {
+    return "statement";
+}
+function screenAfterChangeRange() {
+    return "range";
+}
+/** Baza stawek jest oknem na bieżącym ekranie, nie trzecim ekranem. */
+function openRatesWindow(screen) {
+    return { screen, window: "rates" };
+}
+function reportMode() {
+    return { report: true, schedule: false };
+}
+function rangeLabel(query) {
+    const from = query.dataOd ? `od ${query.dataOd}` : "bez daty początkowej";
+    return `${query.podwykonawca}, ${from} do ${query.dataDo}`;
+}
+function searchParams(query) {
+    const params = {
+        action: "settlementSearch",
+        podwykonawca: query.podwykonawca,
+        dataDo: query.dataDo,
+    };
+    if (query.dataOd) {
+        params.dataOd = query.dataOd;
+    }
+    return params;
+}
+function webAppUrl(base, params) {
+    const trimmed = base.trim();
+    const sep = trimmed.includes("?") ? "&" : "?";
+    return trimmed + sep + new URLSearchParams(params).toString();
+}
+/** Adres odczytu z `?webapp=`, inaczej z pamięci strony. */
+function readWebAppUrl(search, stored) {
+    const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+    const fromQuery = params.get("webapp")?.trim() ?? "";
+    if (fromQuery !== "") {
+        return { url: fromQuery, persist: fromQuery };
+    }
+    return { url: stored?.trim() ?? "", persist: null };
+}
+
+/** Pola `saveRate` jak na mapie. Listy wybiera widok, tu jest tylko body. */
+function saveRateBody(input) {
+    const shop = input.shop.trim();
+    const contractor = input.contractor.trim();
+    if (shop === "" || contractor === "") {
+        return { ok: false, error: "shop" };
+    }
+    return {
+        ok: true,
+        body: {
+            mode: "saveRate",
+            sklep: shop,
+            podwykonawca: contractor,
+            kwotaPodjazd: input.pickup,
+            kwotaWorek: input.bag,
+            odKiedy: input.from.trim(),
+        },
+    };
+}
+function rateSaveMessage(code) {
+    if (code === "tie") {
+        return "Więcej niż jeden wiersz tej daty. Zapisu nie ma.";
+    }
+    if (code === "date") {
+        return "Data w formacie dd.mm.yyyy albo puste.";
+    }
+    if (code === "amount") {
+        return "Nieprawidłowa kwota.";
+    }
+    if (code === "shop") {
+        return "Wybierz sklep i podwykonawcę.";
+    }
+    if (code === "addresses") {
+        return "Nie udało się wczytać adresów.";
+    }
+    return "Zapis nieudany.";
+}
+/** Odczyt `listStoreAddresses`. Obiekt pinezki nie przechodzi: to nie ta lista. */
+function readAddressList(body) {
+    if (!isRecord(body) || body.ok !== true || !Array.isArray(body.data)) {
+        return { ok: false };
+    }
+    const addresses = [];
+    for (const item of body.data) {
+        if (typeof item !== "string") {
+            return { ok: false };
+        }
+        const text = item.trim();
+        if (text !== "") {
+            addresses.push(text);
+        }
+    }
+    return { ok: true, addresses };
+}
+/** Nazwa krótka, nie Dane do Worda. Puste i powtórki odpadają. */
+function rateContractorNames(items) {
+    const seen = new Set();
+    const names = [];
+    for (const item of items) {
+        const name = item.nazwa.trim();
+        if (name === "" || seen.has(name)) {
+            continue;
+        }
+        seen.add(name);
+        names.push(name);
+    }
+    names.sort((a, b) => a.localeCompare(b, "pl"));
+    return names;
+}
+function isRecord(value) {
+    return typeof value === "object" && value !== null;
+}
+
+/**
+ * Złote z arkusza albo z pola na grosze.
+ * Połówki w górę. Wejście silnika i tak jest już w groszach — to brama dla odczytu.
+ */
+function toGrosze(zloty) {
+    if (!Number.isFinite(zloty)) {
+        throw new Error("kwota nie jest liczbą");
+    }
+    const negative = zloty < 0;
+    const [whole, frac = "0"] = Math.abs(zloty).toFixed(2).split(".");
+    const grosze = Number(whole) * 100 + Number(frac);
+    return negative ? -grosze : grosze;
+}
+/** Dzielenie kwoty. Cyfra 5 i wyższa w górę. Reszta grosza nie jest nigdzie dopisywana. */
+function divRoundHalfUp(amount, divisor) {
+    if (!(divisor > 0) || !Number.isFinite(divisor)) {
+        throw new Error("dzielnik musi być większy od zera");
+    }
+    const negative = amount < 0;
+    const numerator = Math.abs(amount);
+    const rounded = Number.isInteger(divisor)
+        ? roundInteger(numerator, divisor)
+        : roundReal(numerator / divisor);
+    return negative ? -rounded : rounded;
+}
+function mulGrosze(count, unit) {
+    if (count === 0 || unit === 0) {
+        return 0;
+    }
+    if (Number.isInteger(count)) {
+        return count * unit;
+    }
+    const negative = count < 0 !== unit < 0;
+    const rounded = roundReal(Math.abs(count) * Math.abs(unit));
+    return negative ? -rounded : rounded;
+}
+/** Koszt odbioru / ilość worków. Pusta ilość albo 0 dzieli przez 1. */
+function costPerBag(cost, bagCount) {
+    const divisor = bagCount !== null && bagCount > 0 ? bagCount : 1;
+    return divRoundHalfUp(cost, divisor);
+}
+function roundInteger(numerator, divisor) {
+    const quotient = Math.floor(numerator / divisor);
+    const remainder = numerator % divisor;
+    return remainder * 2 >= divisor ? quotient + 1 : quotient;
+}
+function roundReal(value) {
+    const floored = Math.floor(value + 1e-10);
+    const fraction = value - floored;
+    return fraction >= 0.5 - 1e-10 ? floored + 1 : floored;
+}
+
+
+/**
+ * Który wiersz Bazy stawek obowiązuje w dniu odbioru.
+ * Pusta data jest starsza niż każda wpisana. Wygrywa najpóźniejsza data nie późniejsza niż odbiór.
+ * Dwa wiersze tej daty to remis, nie 0 zł. Starszy dublet, który przegrywa z późniejszą datą, nie blokuje.
+ */
+function resolveRate(rates, shop, contractor, pickupDate) {
+    parseSheetDate(pickupDate);
+    const matching = rates
+        .map((rate, index) => ({ rate, index }))
+        .filter((entry) => entry.rate.shop === shop &&
+        entry.rate.contractor === contractor &&
+        isOnOrBefore(entry.rate.validFrom, pickupDate));
+    if (matching.length === 0) {
+        return { kind: "none" };
+    }
+    let bestFrom = matching[0].rate.validFrom;
+    for (const entry of matching) {
+        if (compareSheetDate(entry.rate.validFrom, bestFrom) > 0) {
+            bestFrom = entry.rate.validFrom;
+        }
+    }
+    const winners = matching.filter((entry) => entry.rate.validFrom === bestFrom);
+    if (winners.length > 1) {
+        const candidates = winners.map((entry) => ({
+            index: entry.index,
+            validFrom: entry.rate.validFrom,
+            pickupAmount: entry.rate.pickupAmount,
+            bagAmount: entry.rate.bagAmount,
+        }));
+        return {
+            kind: "tie",
+            tie: { shop, contractor, validFrom: bestFrom, candidates },
+        };
+    }
+    return {
+        kind: "ok",
+        pickupAmount: winners[0].rate.pickupAmount,
+        bagAmount: winners[0].rate.bagAmount,
+    };
+}
+
+
+
+
+/**
+ * Silnik kosztów. Czyste funkcje, bez arkusza i bez DOM.
+ * Kwoty w groszach. Daty tekstem `dd.mm.yyyy`.
+ * Reguły: docs/SPECIFICATION.md — Koszt odbioru, Baza stawek.
+ */
+function rowKey(sheetRow, transportNumber) {
+    return `${sheetRow}\t${transportNumber}`;
+}
+function lineKey(line) {
+    if (line.kind === "plain") {
+        return rowKey(line.shop.sheetRow, line.shop.transportNumber);
+    }
+    return `route\t${line.routeName}`;
+}
+function settle(input) {
+    for (const row of input.rows) {
+        parseSheetDate(row.pickupDate);
+    }
+    const routeRows = new Map();
+    const order = [];
+    for (const row of input.rows) {
+        if (row.routeName === "") {
+            order.push({ kind: "plain", row });
+            continue;
+        }
+        const group = routeRows.get(row.routeName);
+        if (group) {
+            group.push(row);
+        }
+        else {
+            routeRows.set(row.routeName, [row]);
+            order.push({ kind: "route", name: row.routeName });
+        }
+    }
+    const lines = [];
+    const ties = [];
+    for (const item of order) {
+        if (item.kind === "plain") {
+            const shop = buildShop(item.row, input, { kind: "plain" });
+            if (shop.tie) {
+                ties.push(shop.tie);
+            }
+            const line = { kind: "plain", shop };
+            lines.push(line);
+        }
+        else {
+            const line = buildRoute(routeRows.get(item.name) ?? [], input);
+            for (const shop of line.shops) {
+                if (shop.tie) {
+                    ties.push(shop.tie);
+                }
+            }
+            lines.push(line);
+        }
+    }
+    return { lines, total: sumLines(lines), ties };
+}
+/** Suma zaznaczonych wierszy tabeli. Trasa raz. Klucz sklepu z rozwinięcia nic nie dodaje. */
+function sumSelected(statement, selectedLineKeys) {
+    let total = 0;
+    for (const line of statement.lines) {
+        if (!selectedLineKeys.has(lineKey(line))) {
+            continue;
+        }
+        total += lineAmount(line);
+    }
+    return total;
+}
+function buildRoute(rows, input) {
+    const happenedCount = rows.filter((row) => !screenOf(input, row).didNotHappen).length;
+    const routeRate = firstRouteRate(rows);
+    const routeCostApplies = happenedCount > 0;
+    const share = routeCostApplies ? shareOf(routeRate, happenedCount) : 0;
+    const shops = rows.map((row) => buildShop(row, input, { kind: "route", share }));
+    const happened = shops.filter((shop) => shop.happened);
+    const bagSum = sumBagFees(happened);
+    const dates = new Set(rows.map((row) => row.pickupDate));
+    return {
+        kind: "route",
+        routeName: rows[0]?.routeName ?? "",
+        date: dates.size === 1 ? rows[0].pickupDate : null,
+        routeRate,
+        routeCostApplies,
+        bagCount: happened.reduce((sum, shop) => sum + (shop.bagCount ?? 0), 0),
+        bagRate: commonBagRate(happened),
+        bagSum,
+        routeSum: routeTotal(routeCostApplies, routeRate, bagSum),
+        shops,
+    };
+}
+function buildShop(row, input, mode) {
+    const screen = screenOf(input, row);
+    const happened = !screen.didNotHappen;
+    const bagsOnly = mode.kind === "plain" && screen.bagsOnly === true;
+    const priced = price(row, input.rates, screen);
+    let legAmount;
+    let bagSum;
+    let receptionCost;
+    let perBag;
+    if (!happened) {
+        legAmount = 0;
+        bagSum = 0;
+        receptionCost = 0;
+        perBag = null;
+    }
+    else if (priced.tie) {
+        legAmount = mode.kind === "route" ? mode.share : null;
+        bagSum = null;
+        receptionCost = null;
+        perBag = null;
+    }
+    else if (mode.kind === "route") {
+        legAmount = mode.share;
+        bagSum = priced.bagSum;
+        receptionCost = mode.share + priced.bagSum;
+        perBag = costPerBag(receptionCost, row.bagCount);
+    }
+    else if (bagsOnly) {
+        legAmount = null;
+        bagSum = priced.bagSum;
+        receptionCost = priced.bagSum;
+        perBag = costPerBag(receptionCost, row.bagCount);
+    }
+    else {
+        legAmount = priced.pickup;
+        bagSum = priced.bagSum;
+        receptionCost = priced.pickup + priced.bagSum;
+        perBag = costPerBag(receptionCost, row.bagCount);
+    }
+    return {
+        sheetRow: row.sheetRow,
+        transportNumber: row.transportNumber,
+        address: row.address,
+        shopName: row.shopName,
+        pickupDate: row.pickupDate,
+        bagCount: row.bagCount,
+        happened,
+        bagsOnly,
+        legAmount,
+        bagRate: priced.tie ? null : priced.bagRate,
+        bagSum,
+        receptionCost,
+        costPerBag: perBag,
+        tie: priced.tie,
+    };
+}
+function price(row, rates, screen) {
+    const resolved = resolveRate(rates, row.address, row.contractor, row.pickupDate);
+    if (resolved.kind === "tie") {
+        return { tie: resolved.tie, pickup: 0, bagRate: null, bagSum: 0 };
+    }
+    const basePickup = resolved.kind === "ok" ? resolved.pickupAmount : null;
+    const baseBag = resolved.kind === "ok" ? resolved.bagAmount : null;
+    const pickupAmount = screen.pickupAmount !== undefined ? screen.pickupAmount : basePickup;
+    const bagAmount = screen.bagAmount !== undefined ? screen.bagAmount : baseBag;
+    const pickup = pickupAmount ?? 0;
+    const bagRate = bagAmount;
+    const bagSum = bagRate === null || bagRate === 0 ? 0 : mulGrosze(row.bagCount ?? 0, bagRate);
+    return { tie: null, pickup, bagRate, bagSum };
+}
+function screenOf(input, row) {
+    return input.screenByRow[rowKey(row.sheetRow, row.transportNumber)] ?? {};
+}
+function firstRouteRate(rows) {
+    for (const row of rows) {
+        if (row.routeRate !== null) {
+            return row.routeRate;
+        }
+    }
+    return null;
+}
+/** Pusta albo zerowa stawka: udział 0. Wywołanie tylko, gdy ktoś się odbył — nie dzielimy przez 1. */
+function shareOf(routeRate, happenedCount) {
+    if (routeRate === null || routeRate === 0) {
+        return 0;
+    }
+    return divRoundHalfUp(routeRate, happenedCount);
+}
+function sumBagFees(shops) {
+    if (shops.some((shop) => shop.bagSum === null)) {
+        return null;
+    }
+    return shops.reduce((sum, shop) => sum + (shop.bagSum ?? 0), 0);
+}
+function commonBagRate(happened) {
+    if (happened.length === 0 || happened.some((shop) => shop.tie !== null)) {
+        return null;
+    }
+    const first = happened[0].bagRate;
+    return happened.every((shop) => shop.bagRate === first) ? first : null;
+}
+function routeTotal(routeCostApplies, routeRate, bagSum) {
+    if (bagSum === null) {
+        return null;
+    }
+    if (!routeCostApplies) {
+        return 0;
+    }
+    return (routeRate ?? 0) + bagSum;
+}
+function lineAmount(line) {
+    if (line.kind === "plain") {
+        return line.shop.receptionCost ?? 0;
+    }
+    return line.routeSum ?? 0;
+}
+function sumLines(lines) {
+    return lines.reduce((sum, line) => sum + lineAmount(line), 0);
+}
+
+
+
+/**
+ * Zestawienie. Kwoty liczy `settle`. Ten plik trzyma stan ekranu i body zapisów.
+ * Drugiego wzoru kosztu tu nie ma.
+ */
+const UNICORN_FROM_GROSZE = 1_000_000;
+const UNICORN_HOLD_MS = 3_400;
+const STATEMENT_ERROR = {
+    invoice: "Wpisz numer faktury.",
+    selection: "Zaznacz co najmniej jeden wiersz.",
+    tie: "Wiersz z remisem nie wchodzi, dopóki nie wskażesz stawki.",
+    routeName: "Wpisz inną nazwę trasy.",
+    sameRoute: "Nazwa nie jest tą, z której sklep właśnie zszedł.",
+    emptyRate: "Pusta stawka nie zapisuje trasy.",
+    badRate: "Stawka jest niepoprawna.",
+    badBags: "Liczba worków jest niepoprawna.",
+    write: "Zapis nie doszedł.",
+    stale: "Wiersz się zmienił. Szukaj jeszcze raz.",
+    refresh: "Zapisano, ale nie udało się odświeżyć listy.",
+    partial: "Część wierszy nie weszła w zapis.",
+};
+function emptyStatement() {
+    return {
+        rows: [],
+        rates: [],
+        screenByRow: {},
+        selected: {},
+        openRoutes: {},
+        invoice: "",
+        leftRoute: {},
+        routeDraft: {},
+        routeDraftError: {},
+    };
+}
+function freshStatement(rows, rates) {
+    return { ...emptyStatement(), rows, rates };
+}
+function currentStatement(screen) {
+    return settle({
+        rows: screen.rows,
+        rates: screen.rates,
+        screenByRow: screen.screenByRow,
+    });
+}
+function selectedKeys(selected) {
+    return new Set(Object.keys(selected));
+}
+function positionLabel(count) {
+    const n = Math.abs(count);
+    const last = n % 10;
+    const lastTwo = n % 100;
+    let word = "pozycji";
+    if (n === 1) {
+        word = "pozycja";
+    }
+    else if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) {
+        word = "pozycje";
+    }
+    return `${count} ${word} w zestawieniu`;
+}
+function formatPln(grosze) {
+    return `${signedAmount(grosze, ",")}\u00a0zł`;
+}
+function formatAmountInput(grosze) {
+    return signedAmount(grosze, ",");
+}
+function groszeToZlotyText(grosze) {
+    return signedAmount(grosze, ".");
+}
+/** Tekst z pola kwoty. Puste zostaje puste. Zero jest zerem. Ujemne odpadają. */
+function parseAmountText(text) {
+    const raw = text.trim().replace(/\s/g, "").replace(",", ".");
+    if (raw === "") {
+        return { kind: "empty" };
+    }
+    if (raw.startsWith("-")) {
+        return { kind: "bad" };
+    }
+    const dot = raw.indexOf(".");
+    if (dot >= 0 && raw.indexOf(".", dot + 1) >= 0) {
+        return { kind: "bad" };
+    }
+    const whole = dot < 0 ? raw : raw.slice(0, dot);
+    const frac = dot < 0 ? "" : raw.slice(dot + 1);
+    if (whole === "" || !/^\d+$/.test(whole)) {
+        return { kind: "bad" };
+    }
+    if (dot >= 0 && (frac.length === 0 || !/^\d+$/.test(frac) || frac.length > 2)) {
+        return { kind: "bad" };
+    }
+    const grosze = Number(whole) * 100 + Number(frac.padEnd(2, "0"));
+    if (!Number.isSafeInteger(grosze)) {
+        return { kind: "bad" };
+    }
+    return { kind: "grosze", value: grosze };
+}
+function parseBagText(text) {
+    const raw = text.trim().replace(/\s/g, "").replace(",", ".");
+    if (raw === "") {
+        return { kind: "empty" };
+    }
+    if (!/^\d+(\.\d+)?$/.test(raw)) {
+        return { kind: "bad" };
+    }
+    const value = Number(raw);
+    if (!Number.isFinite(value)) {
+        return { kind: "bad" };
+    }
+    return { kind: "count", value };
+}
+function approveShow(selectedGrosze) {
+    return selectedGrosze >= UNICORN_FROM_GROSZE ? "unicorn" : "logo";
+}
+function canPressApprove(invoice, selectedCount) {
+    return invoice.trim() !== "" && selectedCount > 0;
+}
+function lineHasTie(line) {
+    if (line.kind === "plain") {
+        return line.shop.tie !== null;
+    }
+    return line.shops.some((shop) => shop.tie !== null);
+}
+function routeSelectionKey(routeName) {
+    return `route\t${routeName}`;
+}
+function readSettlement(body) {
+    if (!isRecord(body) || body.ok !== true || !Array.isArray(body.rows) || !Array.isArray(body.rates)) {
+        const error = isRecord(body) && typeof body.error === "string" ? body.error : "Wyszukanie nie doszło.";
+        return { ok: false, error };
+    }
+    const rows = [];
+    for (const item of body.rows) {
+        const row = readRegisterRow(item);
+        if (!row) {
+            return { ok: false, error: "Wyszukanie nie doszło." };
+        }
+        rows.push(row);
+    }
+    const rates = [];
+    for (const item of body.rates) {
+        const rate = readRateRow(item);
+        if (!rate) {
+            return { ok: false, error: "Wyszukanie nie doszło." };
+        }
+        rates.push(rate);
+    }
+    return { ok: true, rows, rates };
+}
+function findRow(rows, sheetRow, transportNumber) {
+    return rows.find((row) => row.sheetRow === sheetRow && row.transportNumber === transportNumber) ?? null;
+}
+function toggleSelected(screen, key) {
+    const selected = { ...screen.selected };
+    if (selected[key]) {
+        delete selected[key];
+    }
+    else {
+        selected[key] = true;
+    }
+    return { ...screen, selected };
+}
+function toggleOpen(screen, routeName) {
+    const openRoutes = { ...screen.openRoutes };
+    if (openRoutes[routeName]) {
+        delete openRoutes[routeName];
+    }
+    else {
+        openRoutes[routeName] = true;
+    }
+    return { ...screen, openRoutes };
+}
+function setBagsOnly(screen, sheetRow, transportNumber, on) {
+    return patchScreen(screen, rowKey(sheetRow, transportNumber), { bagsOnly: on });
+}
+function setDidNotHappen(screen, sheetRow, transportNumber, on) {
+    return patchScreen(screen, rowKey(sheetRow, transportNumber), { didNotHappen: on });
+}
+function setPickup(screen, sheetRow, transportNumber, amount) {
+    return patchScreen(screen, rowKey(sheetRow, transportNumber), { pickupAmount: amount });
+}
+function setBagRate(screen, sheetRow, transportNumber, amount) {
+    return patchScreen(screen, rowKey(sheetRow, transportNumber), { bagAmount: amount });
+}
+/** Wspólna kwota worka na ekranie, tylko sklepy trasy, które się odbyły. Do Bazy stawek nie idzie. */
+function setRouteBagRate(screen, routeName, amount) {
+    const screenByRow = { ...screen.screenByRow };
+    for (const row of screen.rows) {
+        if (row.routeName !== routeName) {
+            continue;
+        }
+        const key = rowKey(row.sheetRow, row.transportNumber);
+        if (screenByRow[key]?.didNotHappen) {
+            continue;
+        }
+        screenByRow[key] = { ...screenByRow[key], bagAmount: amount };
+    }
+    return { ...screen, screenByRow };
+}
+function commitBags(screen, sheetRow, transportNumber, bagCount) {
+    return {
+        ...screen,
+        rows: screen.rows.map((row) => row.sheetRow === sheetRow && row.transportNumber === transportNumber ? { ...row, bagCount } : row),
+    };
+}
+function commitRouteRate(screen, routeName, routeRate) {
+    return {
+        ...screen,
+        rows: screen.rows.map((row) => (row.routeName === routeName ? { ...row, routeRate } : row)),
+    };
+}
+function commitDetach(screen, sheetRow, transportNumber) {
+    const row = findRow(screen.rows, sheetRow, transportNumber);
+    if (!row || row.routeName === "") {
+        return null;
+    }
+    const left = row.routeName;
+    const rows = screen.rows.map((item) => item.sheetRow === sheetRow && item.transportNumber === transportNumber
+        ? { ...item, routeName: "", routeRate: null }
+        : item);
+    const selected = { ...screen.selected };
+    if (!rows.some((item) => item.routeName === left)) {
+        delete selected[routeSelectionKey(left)];
+    }
+    return {
+        ...screen,
+        rows,
+        selected,
+        leftRoute: { ...screen.leftRoute, [rowKey(sheetRow, transportNumber)]: left },
+    };
+}
+function commitAttach(screen, sheetRow, transportNumber, name, routeRate) {
+    if (!findRow(screen.rows, sheetRow, transportNumber)) {
+        return null;
+    }
+    const rows = screen.rows.map((item) => {
+        if (item.sheetRow === sheetRow && item.transportNumber === transportNumber) {
+            return { ...item, routeName: name, routeRate };
+        }
+        if (item.routeName === name) {
+            return { ...item, routeRate };
+        }
+        return item;
+    });
+    const key = rowKey(sheetRow, transportNumber);
+    const leftRoute = { ...screen.leftRoute };
+    delete leftRoute[key];
+    const routeDraft = { ...screen.routeDraft };
+    delete routeDraft[key];
+    const routeDraftError = { ...screen.routeDraftError };
+    delete routeDraftError[key];
+    return { ...screen, rows, leftRoute, routeDraft, routeDraftError };
+}
+function withoutTiedRates(rates, keptSheetRow) {
+    const kept = rates.find((rate) => rate.sheetRow === keptSheetRow);
+    if (!kept) {
+        return [...rates];
+    }
+    return rates.filter((rate) => rate.sheetRow === kept.sheetRow ||
+        rate.shop !== kept.shop ||
+        rate.contractor !== kept.contractor ||
+        rate.validFrom !== kept.validFrom);
+}
+/** Po odświeżeniu odczytu zostaje stan ekranu wierszy, które nadal są. */
+function adoptRows(prev, rows, rates) {
+    const keys = new Set(rows.map((row) => rowKey(row.sheetRow, row.transportNumber)));
+    const routeNames = new Set(rows.map((row) => row.routeName).filter((name) => name !== ""));
+    return {
+        rows,
+        rates,
+        screenByRow: pick(prev.screenByRow, keys),
+        selected: pickLines(prev.selected, keys, routeNames),
+        openRoutes: pickNames(prev.openRoutes, routeNames),
+        invoice: prev.invoice,
+        leftRoute: pick(prev.leftRoute, keys),
+        routeDraft: pick(prev.routeDraft, keys),
+        routeDraftError: pick(prev.routeDraftError, keys),
+    };
+}
+function bagsBody(row, text) {
+    const parsed = parseBagText(text);
+    if (parsed.kind === "bad") {
+        return { ok: false, error: STATEMENT_ERROR.badBags };
+    }
+    return {
+        ok: true,
+        bagCount: parsed.kind === "empty" ? null : parsed.value,
+        body: {
+            action: "patchBags",
+            sheetRow: row.sheetRow,
+            transportNumber: row.transportNumber,
+            iloscWorkow: parsed.kind === "empty" ? "" : parsed.value,
+        },
+    };
+}
+function routeRateBody(row, routeName, text) {
+    const parsed = parseAmountText(text);
+    if (parsed.kind === "bad") {
+        return { ok: false, error: STATEMENT_ERROR.badRate };
+    }
+    const grosze = parsed.kind === "empty" ? null : parsed.value;
+    return {
+        ok: true,
+        grosze,
+        body: {
+            action: "patchRouteRate",
+            sheetRow: row.sheetRow,
+            transportNumber: row.transportNumber,
+            trasa: routeName,
+            stawkaTrasy: grosze === null ? "" : groszeToZlotyText(grosze),
+        },
+    };
+}
+function detachBody(row) {
+    return {
+        action: "detachRoute",
+        sheetRow: row.sheetRow,
+        transportNumber: row.transportNumber,
+    };
+}
+function attachDecision(row, nameText, rateText, leftName) {
+    const name = nameText.trim();
+    if (name === "") {
+        return { ok: false, error: STATEMENT_ERROR.routeName };
+    }
+    if (name === leftName.trim()) {
+        return { ok: false, error: STATEMENT_ERROR.sameRoute };
+    }
+    const parsed = parseAmountText(rateText);
+    if (parsed.kind === "empty") {
+        return { ok: false, error: STATEMENT_ERROR.emptyRate };
+    }
+    if (parsed.kind === "bad") {
+        return { ok: false, error: STATEMENT_ERROR.badRate };
+    }
+    return {
+        ok: true,
+        name,
+        grosze: parsed.value,
+        body: {
+            action: "attachRoute",
+            sheetRow: row.sheetRow,
+            transportNumber: row.transportNumber,
+            trasa: name,
+            stawkaTrasy: groszeToZlotyText(parsed.value),
+        },
+    };
+}
+function tieBody(rateSheetRow) {
+    return { action: "resolveRateTie", sheetRow: rateSheetRow };
+}
+function buildApprove(invoice, statement, selected) {
+    const numerFaktury = invoice.trim();
+    if (numerFaktury === "") {
+        return { ok: false, error: "invoice" };
+    }
+    const chosen = statement.lines.filter((line) => selected[lineKey(line)]);
+    if (chosen.length === 0) {
+        return { ok: false, error: "selection" };
+    }
+    const wiersze = [];
+    let blocked = false;
+    for (const line of chosen) {
+        if (lineHasTie(line)) {
+            blocked = true;
+            continue;
+        }
+        const shops = line.kind === "plain" ? [line.shop] : line.shops;
+        for (const shop of shops) {
+            const item = shopItem(shop);
+            if (!item) {
+                blocked = true;
+                continue;
+            }
+            wiersze.push(item);
+        }
+    }
+    if (wiersze.length === 0) {
+        return { ok: false, error: blocked ? "tie" : "selection" };
+    }
+    return { ok: true, body: { action: "approve", numerFaktury, wiersze } };
+}
+function skippedCount(body) {
+    if (!isRecord(body) || !Array.isArray(body.pominiete)) {
+        return 0;
+    }
+    return body.pominiete.length;
+}
+function writeError(code) {
+    if (code === "key" || code === "settled" || code === "nie") {
+        return STATEMENT_ERROR.stale;
+    }
+    if (code === "bags") {
+        return STATEMENT_ERROR.badBags;
+    }
+    if (code === "rate") {
+        return STATEMENT_ERROR.badRate;
+    }
+    if (code === "name") {
+        return STATEMENT_ERROR.routeName;
+    }
+    if (code === "invoice") {
+        return STATEMENT_ERROR.invoice;
+    }
+    if (code === "selection") {
+        return STATEMENT_ERROR.selection;
+    }
+    return STATEMENT_ERROR.write;
+}
+function selectedLineCount(statement, selected) {
+    return statement.lines.filter((line) => selected[lineKey(line)]).length;
+}
+function statementSums(screen) {
+    const statement = currentStatement(screen);
+    return {
+        total: statement.total,
+        selected: sumSelected(statement, selectedKeys(screen.selected)),
+    };
+}
+function shopItem(shop) {
+    if (!shop.happened) {
+        return {
+            sheetRow: shop.sheetRow,
+            transportNumber: shop.transportNumber,
+            nieOdbył: true,
+        };
+    }
+    if (shop.receptionCost === null) {
+        return null;
+    }
+    const item = {
+        sheetRow: shop.sheetRow,
+        transportNumber: shop.transportNumber,
+        koszt: shop.receptionCost,
+    };
+    if (shop.bagsOnly) {
+        item.tylkoWorki = true;
+    }
+    return item;
+}
+function patchScreen(screen, key, patch) {
+    return {
+        ...screen,
+        screenByRow: {
+            ...screen.screenByRow,
+            [key]: { ...screen.screenByRow[key], ...patch },
+        },
+    };
+}
+function pick(source, keys) {
+    const next = {};
+    for (const [key, value] of Object.entries(source)) {
+        if (keys.has(key)) {
+            next[key] = value;
+        }
+    }
+    return next;
+}
+function pickNames(source, names) {
+    const next = {};
+    for (const name of Object.keys(source)) {
+        if (names.has(name)) {
+            next[name] = true;
+        }
+    }
+    return next;
+}
+function pickLines(selected, keys, routeNames) {
+    const next = {};
+    for (const key of Object.keys(selected)) {
+        if (key.startsWith("route\t")) {
+            if (routeNames.has(key.slice("route\t".length))) {
+                next[key] = true;
+            }
+        }
+        else if (keys.has(key)) {
+            next[key] = true;
+        }
+    }
+    return next;
+}
+function signedAmount(grosze, sep) {
+    const negative = grosze < 0;
+    const abs = Math.abs(grosze);
+    const text = `${Math.floor(abs / 100)}${sep}${String(abs % 100).padStart(2, "0")}`;
+    return negative ? `-${text}` : text;
+}
+function isRecord(value) {
+    return typeof value === "object" && value !== null;
+}
+function readText(value) {
+    if (typeof value === "string") {
+        return value;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return String(value);
+    }
+    return null;
+}
+function readGrosze(value) {
+    if (value === null) {
+        return null;
+    }
+    if (typeof value === "number" && Number.isInteger(value)) {
+        return value;
+    }
+    return undefined;
+}
+function readRegisterRow(value) {
+    if (!isRecord(value)) {
+        return null;
+    }
+    const sheetRow = value.sheetRow;
+    const transportNumber = readText(value.transportNumber);
+    const address = readText(value.address);
+    const shopName = readText(value.shopName);
+    const pickupDate = readText(value.pickupDate);
+    const contractor = readText(value.contractor);
+    const routeName = readText(value.routeName);
+    const routeRate = readGrosze(value.routeRate);
+    if (typeof sheetRow !== "number" ||
+        !Number.isInteger(sheetRow) ||
+        sheetRow < 2 ||
+        transportNumber === null ||
+        address === null ||
+        shopName === null ||
+        pickupDate === null ||
+        contractor === null ||
+        routeName === null ||
+        routeRate === undefined) {
+        return null;
+    }
+    let bagCount;
+    if (value.bagCount === null) {
+        bagCount = null;
+    }
+    else if (typeof value.bagCount === "number" && Number.isFinite(value.bagCount) && value.bagCount >= 0) {
+        bagCount = value.bagCount;
+    }
+    else {
+        return null;
+    }
+    try {
+        parseSheetDate(pickupDate);
+    }
+    catch {
+        return null;
+    }
+    return {
+        sheetRow,
+        transportNumber,
+        address,
+        shopName,
+        pickupDate,
+        contractor,
+        bagCount,
+        routeName,
+        routeRate,
+    };
+}
+function readRateRow(value) {
+    if (!isRecord(value)) {
+        return null;
+    }
+    const sheetRow = value.sheetRow;
+    const shop = readText(value.shop);
+    const contractor = readText(value.contractor);
+    const validFrom = readText(value.validFrom);
+    const pickupAmount = readGrosze(value.pickupAmount);
+    const bagAmount = readGrosze(value.bagAmount);
+    if (typeof sheetRow !== "number" ||
+        !Number.isInteger(sheetRow) ||
+        sheetRow < 2 ||
+        shop === null ||
+        contractor === null ||
+        validFrom === null ||
+        pickupAmount === undefined ||
+        bagAmount === undefined) {
+        return null;
+    }
+    if (validFrom !== "") {
+        try {
+            parseSheetDate(validFrom);
+        }
+        catch {
+            return null;
+        }
+    }
+    return { sheetRow, shop, contractor, pickupAmount, bagAmount, validFrom };
+}
+
+
+
+
+const DASH = '<span class="muted">—</span>';
+function renderStatement(screen, status = "") {
+    const statement = currentStatement(screen);
+    const selectedSum = sumSelected(statement, selectedKeys(screen.selected));
+    const count = selectedLineCount(statement, screen.selected);
+    const note = status ? `<p class="err">${escapeHtml(status)}</p>` : "";
+    const body = statement.lines.length === 0
+        ? '<div class="blank"><strong>Brak pozycji.</strong><p>Brak nierozliczonych odbiorów tego podwykonawcy w podanym zakresie.</p></div>'
+        : table(screen, statement.lines);
+    return (`<div class="center-h">${escapeHtml(positionLabel(statement.lines.length))}</div>` +
+        note +
+        body +
+        footer(screen.invoice, statement.total, selectedSum, count));
+}
+function table(screen, lines) {
+    const rows = [];
+    for (const line of lines) {
+        if (line.kind === "plain") {
+            rows.push(plainRow(screen, line.shop));
+            continue;
+        }
+        rows.push(routeRow(screen, line));
+        if (!screen.openRoutes[line.routeName]) {
+            continue;
+        }
+        const shared = line.bagRate !== null;
+        for (const shop of line.shops) {
+            rows.push(childRow(screen, shop, shared));
+        }
+    }
+    return ('<div class="table-wrap"><table><thead><tr>' +
+        "<th class=\"c\">Rozliczone</th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>" +
+        "<th>Podjazd/Trasa</th><th class=\"num\">Liczba worków</th><th class=\"num\">Kwota za worek</th>" +
+        "<th class=\"num\">Suma za worki</th><th class=\"num\">Koszt odbioru</th>" +
+        "<th class=\"num\" title=\"Tylko na ekranie. Nie zapisuje się jako jedna kwota.\">Suma trasy</th>" +
+        "<th>transport się odbył</th>" +
+        `</tr></thead><tbody>${rows.join("")}</tbody></table></div>`);
+}
+function plainRow(screen, shop) {
+    const key = rowKey(shop.sheetRow, shop.transportNumber);
+    const line = encodeURIComponent(key);
+    const dead = !shop.happened;
+    const checked = screen.selected[key] === true;
+    const state = screen.screenByRow[key] ?? {};
+    const leg = shop.bagsOnly || shop.tie
+        ? DASH
+        : dead
+            ? money(shop.legAmount, true)
+            : `<span class="tag">podjazd</span>${amountInput(shop, "pickup", state.pickupAmount, shop.legAmount, "Zmiana kwoty za podjazd tylko na tym ekranie, nie w Bazie stawek")}`;
+    const bagCell = shop.tie
+        ? DASH
+        : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie, nie w Bazie stawek");
+    return (`<tr class="${rowClass(dead, checked, "plain")}" data-kind="plain">` +
+        `<td class="c">${lineBox(line, checked)}</td>` +
+        `<td>${text(shop.transportNumber, dead)}</td>` +
+        `<td class="adres">${text(shop.address, dead)}</td>` +
+        `<td class="sklep"><div>${text(shop.shopName, dead)}${bagsOnlyBox(shop, shop.bagsOnly)}${tieBox(shop.tie, screen.rates)}${newRouteBox(screen, shop)}</div></td>` +
+        `<td>${text(shop.pickupDate, dead)}</td>` +
+        `<td>${leg}</td>` +
+        `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków")}</td>` +
+        `<td class="num">${bagCell}</td>` +
+        `<td class="num">${money(shop.bagSum, dead)}</td>` +
+        `<td class="num">${money(shop.receptionCost, dead)}</td>` +
+        `<td class="num">${DASH}</td>` +
+        `<td>${tripBox(shop)}</td>` +
+        "</tr>");
+}
+function routeRow(screen, line) {
+    const key = routeSelectionKey(line.routeName);
+    const checked = screen.selected[key] === true;
+    const open = screen.openRoutes[line.routeName] === true;
+    const anchor = line.shops[0];
+    const happened = line.shops.filter((shop) => shop.happened).length;
+    const sub = happened === line.shops.length ? shopsWord(line.shops.length) : `${happened} z ${line.shops.length} w koszcie`;
+    const none = happened === 0 ? '<div class="sub">Żaden sklep się nie odbył — kosztu trasy nie ma.</div>' : "";
+    const tie = line.shops.some((shop) => shop.tie) ? '<div class="err">Remis stawek. Rozwiń i wskaż wiersz.</div>' : "";
+    const date = line.date === null ? DASH : escapeHtml(line.date);
+    const bagRate = line.bagRate === null || !anchor
+        ? DASH
+        : amountInput(anchor, "bag-rate-route", undefined, line.bagRate, "Jedna kwota, bo każdy adres, który się odbył, ma tę samą. Zmiana tylko na tym ekranie.", line.routeName);
+    const rateInput = anchor
+        ? amountInput(anchor, "route-rate", undefined, line.routeRate, "Zapis od razu do Stawka za trasę. Kolumny 16 i 17 dopiero przy Zatwierdź", line.routeName)
+        : DASH;
+    return (`<tr class="${rowClass(false, checked, "route")}" data-kind="route">` +
+        `<td class="c">${lineBox(encodeURIComponent(key), checked)}</td>` +
+        `<td>${DASH}</td>` +
+        `<td class="adres"><div class="who-line"><button type="button" class="chev" data-action="expand" data-route="${escapeHtml(line.routeName)}" aria-expanded="${open ? "true" : "false"}" aria-label="Sklepy trasy">${open ? "▾" : "▸"}</button>` +
+        `<div><div>${escapeHtml(line.routeName)}</div><div class="sub">trasa · ${escapeHtml(sub)}</div>${none}${tie}</div></div></td>` +
+        `<td class="sklep">${DASH}</td>` +
+        `<td data-out="route-date">${date}</td>` +
+        `<td><span class="tag tag-route">trasa</span>${rateInput}</td>` +
+        `<td class="num"><span>${line.bagCount}</span></td>` +
+        `<td class="num">${bagRate}</td>` +
+        `<td class="num">${money(line.bagSum, false)}</td>` +
+        `<td class="num">${DASH}</td>` +
+        `<td class="num">${money(line.routeSum, false)}</td>` +
+        `<td>${DASH}</td>` +
+        "</tr>");
+}
+function childRow(screen, shop, sharedBagRate) {
+    const dead = !shop.happened;
+    const state = screen.screenByRow[rowKey(shop.sheetRow, shop.transportNumber)] ?? {};
+    const bagCell = shop.tie || sharedBagRate
+        ? DASH
+        : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie w Bazie stawek.");
+    return (`<tr class="${rowClass(dead, false, "child")}" data-kind="child">` +
+        "<td></td>" +
+        `<td>${text(shop.transportNumber, dead)}</td>` +
+        `<td class="adres">${text(shop.address, dead)}</td>` +
+        `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}</div></td>` +
+        `<td>${text(shop.pickupDate, dead)}</td>` +
+        `<td>${DASH}</td>` +
+        `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków tego adresu")}</td>` +
+        `<td class="num">${bagCell}</td>` +
+        `<td class="num">${DASH}</td>` +
+        `<td class="num">${DASH}</td>` +
+        `<td class="num">${DASH}</td>` +
+        `<td><div class="trip-stack">${tripBox(shop)}${detachButton(shop)}</div></td>` +
+        "</tr>");
+}
+function footer(invoice, total, selected, count) {
+    const enabled = canPressApprove(invoice, count);
+    return ('<footer class="footer">' +
+        `<div class="stat"><span>Suma zestawienia</span><b data-out="sum-all">${formatPln(total)}</b></div>` +
+        `<div class="stat sel"><span>Suma zaznaczonych · <span data-out="sel-count">${count}</span></span><b data-out="sum-sel">${formatPln(selected)}</b></div>` +
+        '<div class="grow"><label class="field"><span>Numer faktury</span>' +
+        `<input class="invoice" id="invoice" data-edit="invoice" data-keep="invoice" value="${escapeHtml(invoice)}" placeholder="FV/123/09/2026" autocomplete="off"></label>` +
+        `<button type="button" class="btn-go" data-action="approve"${enabled ? "" : " disabled"}>Zatwierdź</button></div></footer>`);
+}
+function rowClass(dead, checked, kind) {
+    return [
+        kind === "route" ? "is-route" : "",
+        kind === "child" ? "is-child" : "",
+        dead ? "is-dead" : "",
+        checked ? "is-checked" : "",
+    ]
+        .filter(Boolean)
+        .join(" ");
+}
+function lineBox(line, checked) {
+    return `<input type="checkbox" data-toggle="checked" data-line="${escapeHtml(line)}"${checked ? " checked" : ""} aria-label="Rozliczone">`;
+}
+function bagsOnlyBox(shop, on) {
+    return (`<label class="only"><input type="checkbox" data-toggle="bags-only" ${ref(shop)}${on ? " checked" : ""} aria-label="tylko za liczbę worków"> tylko za liczbę worków</label>`);
+}
+function tripBox(shop) {
+    const on = !shop.happened;
+    return `<label class="trip"><input type="checkbox" data-toggle="notrip" ${ref(shop)}${on ? " checked" : ""}> nie odbył się</label>`;
+}
+function detachButton(shop) {
+    return `<button type="button" class="btn-detach" data-action="detach" ${ref(shop)} title="Zapis od razu. Sklep schodzi z trasy i zostaje odbiorem za podjazd.">odepnij od trasy</button>`;
+}
+function newRouteBox(screen, shop) {
+    const key = rowKey(shop.sheetRow, shop.transportNumber);
+    const left = screen.leftRoute[key];
+    if (!left) {
+        return "";
+    }
+    const draft = screen.routeDraft[key] ?? { name: "", rate: "" };
+    const error = screen.routeDraftError[key];
+    return ('<div class="new-route">' +
+        `<span class="sub">odpięty od ${escapeHtml(left)}</span>` +
+        `<input type="text" data-draft="route-name" data-keep="draft-name-${shop.sheetRow}" ${ref(shop)} value="${escapeHtml(draft.name)}" placeholder="nazwa nowej trasy" autocomplete="off" title="Inna nazwa niż trasa, z której sklep zszedł.">` +
+        `<input type="text" inputmode="decimal" data-draft="route-rate" data-keep="draft-rate-${shop.sheetRow}" ${ref(shop)} value="${escapeHtml(draft.rate)}" placeholder="stawka" title="Pusta nie zapisuje trasy. Kwota 0 jest wpisana.">` +
+        `<button type="button" class="btn-mini" data-action="attach" ${ref(shop)}>Osobna trasa</button>` +
+        (error ? `<span class="err">${escapeHtml(error)}</span>` : "") +
+        "</div>");
+}
+function tieBox(tie, rates) {
+    if (!tie) {
+        return "";
+    }
+    const buttons = tie.candidates
+        .map((candidate) => {
+        const rate = rates[candidate.index];
+        if (!rate) {
+            return "";
+        }
+        const from = candidate.validFrom === "" ? "od zawsze" : candidate.validFrom;
+        const pickup = candidate.pickupAmount === null ? "—" : formatPln(candidate.pickupAmount);
+        const bag = candidate.bagAmount === null ? "—" : formatPln(candidate.bagAmount);
+        return `<button type="button" class="btn-mini" data-action="resolve-tie" data-rate-row="${rate.sheetRow}">${escapeHtml(from)} · podjazd ${pickup} · worek ${bag}</button>`;
+    })
+        .join("");
+    return `<div class="tie"><span class="err">Dwie stawki na ten dzień. Wskaż, która obowiązuje.</span>${buttons}</div>`;
+}
+function bagCountInput(shop, title) {
+    const shown = shop.bagCount === null ? "" : String(shop.bagCount);
+    return `<input type="text" inputmode="numeric" data-edit="bags" ${ref(shop)} value="${escapeHtml(shown)}" title="${escapeHtml(title)}" autocomplete="off">`;
+}
+function amountInput(shop, edit, override, shown, title, routeName) {
+    const value = override === null ? "" : override !== undefined ? formatAmountInput(override) : shown === null ? "" : formatAmountInput(shown);
+    const route = routeName ? ` data-route="${escapeHtml(routeName)}"` : "";
+    return `<input type="text" inputmode="decimal" data-edit="${edit}" ${ref(shop)}${route} value="${escapeHtml(value)}" title="${escapeHtml(title)}" autocomplete="off">`;
+}
+function money(value, dead) {
+    if (value === null) {
+        return DASH;
+    }
+    const text = formatPln(value);
+    return dead ? `<span class="strike">${text}</span>` : `<span class="money">${text}</span>`;
+}
+function text(value, dead) {
+    if (value === "") {
+        return DASH;
+    }
+    const safe = escapeHtml(value);
+    return dead ? `<span class="strike">${safe}</span>` : safe;
+}
+function ref(shop) {
+    return `data-sheet-row="${shop.sheetRow}" data-transport="${escapeHtml(shop.transportNumber)}"`;
+}
+function shopsWord(count) {
+    if (count === 1) {
+        return "1 sklep";
+    }
+    const last = count % 10;
+    const lastTwo = count % 100;
+    if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) {
+        return `${count} sklepy`;
+    }
+    return `${count} sklepów`;
+}
+
+
+
+
+
+function brand() {
+    return ('<div class="brand"><img src="logo.png" alt="" width="36" height="36">' +
+        "<div><strong>Rozliczenia</strong><em>Na zgłoszenie</em></div></div>");
+}
+function renderModes() {
+    return ('<div class="modes" role="group" aria-label="Tryb">' +
+        '<label class="mode is-on"><input type="checkbox" id="mode-na" checked> Na zgłoszenie</label>' +
+        '<label class="mode is-off" title="W tej wersji niedostępne">' +
+        '<input type="checkbox" id="mode-h" disabled> Harmonogram</label></div>');
+}
+function contractorField(model) {
+    const browsing = model.contractorOpen &&
+        model.contractor !== "" &&
+        foldPl(model.contractorQuery) === foldPl(model.contractor);
+    const hits = matchingContractors(model.contractors, model.contractorQuery, browsing);
+    const list = hits.length
+        ? '<ul class="picker-list" id="contractor-list">' +
+            hits
+                .map((item) => `<li><button type="button" data-action="pick-contractor" data-nazwa="${escapeHtml(item.nazwa)}">` +
+                `<span>${escapeHtml(item.nazwa)}</span><small>${escapeHtml(item.dane)}</small></button></li>`)
+                .join("") +
+            "</ul>"
+        : '<p class="note picker-empty">Brak podwykonawcy o tej nazwie lub w danych do Worda.</p>';
+    const picked = selectedContractor(model.contractors, model.contractor);
+    const err = model.error === "contractor";
+    return (`<div class="field picker${err ? " is-error" : ""}"><span>Podwykonawca</span>` +
+        `<input type="text" data-filter="contractor" value="${escapeHtml(model.contractorQuery)}" ` +
+        'placeholder="Nazwa lub dane do Worda" autocomplete="off" role="combobox" aria-autocomplete="list" ' +
+        `aria-expanded="${model.contractorOpen ? "true" : "false"}" aria-controls="contractor-list">` +
+        `<div data-picker-list${model.contractorOpen ? "" : " hidden"}>${model.contractorOpen ? list : ""}</div>` +
+        (picked && !model.contractorOpen ? `<span class="note">${escapeHtml(picked.dane)}</span>` : "") +
+        (err ? `<span class="err">${RANGE_ERROR.contractor}</span>` : "") +
+        "</div>");
+}
+function dateFields(model) {
+    const errEnd = model.error === "end";
+    const errOrder = model.error === "order";
+    return (`<div class="field${errOrder ? " is-error" : ""}"><span>Data początkowa</span>` +
+        `<input type="date" data-filter="from" value="${escapeHtml(model.from)}"${model.noFrom ? " disabled" : ""} ` +
+        `aria-invalid="${errOrder ? "true" : "false"}">` +
+        (errOrder ? `<span class="err">${RANGE_ERROR.order}</span>` : "") +
+        `<label class="checkline"><input type="checkbox" data-toggle="nofrom"${model.noFrom ? " checked" : ""}> ` +
+        "bez daty początkowej</label></div>" +
+        `<label class="field${errEnd || errOrder ? " is-error" : ""}"><span>Data końcowa</span>` +
+        `<input type="date" data-filter="to" value="${escapeHtml(model.to)}" ` +
+        `aria-invalid="${errEnd || errOrder ? "true" : "false"}">` +
+        (errEnd ? `<span class="err">${RANGE_ERROR.end}</span>` : "") +
+        "</label>");
+}
+function ratesButton() {
+    return '<button type="button" class="btn-ghost" data-action="rates">Baza stawek</button>';
+}
+function renderRangeScreen(model) {
+    const note = model.webappMissing
+        ? '<p class="note">Brak adresu Web App. Dopisz ?webapp= do adresu tej strony.</p>'
+        : "";
+    const status = model.status ? `<p class="err">${escapeHtml(model.status)}</p>` : "";
+    return ('<div class="setup" data-screen="range"><div class="setup-card">' +
+        brand() +
+        "<h2>Zakres rozliczenia</h2>" +
+        '<p class="note">Ustal, czego dotyczy to rozliczenie. Pozycje pojawią się na następnym ekranie.</p>' +
+        renderModes() +
+        '<div class="filters setup-fields">' +
+        contractorField(model) +
+        dateFields(model) +
+        "</div>" +
+        '<button type="button" class="btn-teal" data-action="search">Szukaj</button>' +
+        status +
+        note +
+        '<div class="setup-foot">' +
+        ratesButton() +
+        "</div></div></div>");
+}
+function renderStatementScreen(model) {
+    const label = model.applied ? rangeLabel(model.applied) : "";
+    return ('<div class="statement" data-screen="statement"><div class="top">' +
+        brand() +
+        `<div class="range"><span>Na zgłoszenie</span><strong>${escapeHtml(label)}</strong></div>` +
+        '<button type="button" class="btn-ghost" data-action="back">Zmień zakres</button>' +
+        ratesButton() +
+        "</div>" +
+        renderStatement(model.statement, model.status) +
+        "</div>");
+}
+function selectOptions(values, selected, placeholder) {
+    const head = `<option value="">${escapeHtml(placeholder)}</option>`;
+    const rest = values
+        .map((value) => {
+        const on = value === selected ? " selected" : "";
+        return `<option value="${escapeHtml(value)}"${on}>${escapeHtml(value)}</option>`;
+    })
+        .join("");
+    return head + rest;
+}
+function renderRatesDialog(model) {
+    const message = model.ratesMessage
+        ? `<p class="${model.ratesMessageOk ? "note" : "err"}">${escapeHtml(model.ratesMessage)}</p>`
+        : "";
+    return ('<div class="modal" data-window="rates">' +
+        '<div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="rates-title">' +
+        '<h2 id="rates-title">Baza stawek</h2>' +
+        '<p class="note">Zapis od razu, nie czeka na Zatwierdź. Nie zmienia Rozliczony, Numer faktury ani kolumn 16 i 17. Stawki trasy tu nie ma. Remis rozstrzyga się na zestawieniu, nie tutaj.</p>' +
+        `<label class="field"><span>Sklep</span><select data-rate="shop">${selectOptions(model.addresses, model.ratesShop, "— wybierz adres —")}</select></label>` +
+        `<label class="field"><span>Podwykonawca</span><select data-rate="contractor">${selectOptions(rateContractorNames(model.contractors), model.ratesContractor, "— wybierz podwykonawcę —")}</select></label>` +
+        '<label class="field"><span>Kwota za podjazd</span>' +
+        `<input type="text" inputmode="decimal" data-rate="pickup" data-keep="pickup" autocomplete="off" value="${escapeHtml(model.ratesPickup)}"></label>` +
+        '<label class="field"><span>Kwota za worek</span>' +
+        `<input type="text" inputmode="decimal" data-rate="bag" data-keep="bag" autocomplete="off" value="${escapeHtml(model.ratesBag)}"></label>` +
+        '<label class="field"><span>Od kiedy obowiązuje</span>' +
+        `<input type="text" data-rate="from" data-keep="from" autocomplete="off" placeholder="dd.mm.yyyy" value="${escapeHtml(model.ratesFrom)}">` +
+        '<span class="note">Puste znaczy od zawsze.</span></label>' +
+        '<p class="note">Adres z kolumny Adres sklepu rejestru. Podwykonawca to nazwa krótka z Listy podwykonawców. Nie pinezki mapy. Wpisu ręcznego nie ma.</p>' +
+        message +
+        '<div class="modal-actions">' +
+        '<button type="button" class="btn-ghost" data-action="close-rates">Zamknij</button>' +
+        '<button type="button" class="btn-teal" data-action="save-rates">Zapisz stawkę</button>' +
+        "</div></div></div>");
+}
+function renderLoading(message, unicorn) {
+    const mark = unicorn
+        ? '<img class="uni" src="jednorozec-deba.gif" alt="Jednorożec staje dęba i rusza przednimi łapkami">'
+        : '<img class="pulse" src="logo.png" alt="" width="64" height="64">';
+    return ('<div class="overlay" role="status" aria-live="polite" aria-busy="true"><div class="overlay-panel">' +
+        mark +
+        `<div class="msg">${escapeHtml(message)}</div></div></div>`);
+}
+function renderApp(model) {
+    const main = model.screen === "statement" ? renderStatementScreen(model) : renderRangeScreen(model);
+    const dialog = model.ratesOpen ? renderRatesDialog(model) : "";
+    const loading = model.loading ? renderLoading(model.loadMessage, model.loadKind === "unicorn") : "";
+    return main + dialog + loading;
+}
+
+
+
+
+
+
+const VIEW = {
+    contractorQuery: "",
+    contractorOpen: false,
+    contractor: "",
+    contractors: [],
+    from: "",
+    to: "",
+    noFrom: false,
+    error: "",
+    screen: "range",
+    ratesOpen: false,
+    loading: false,
+    loadMessage: "",
+    applied: null,
+    status: "",
+    webappMissing: false,
+    statement: emptyStatement(),
+    loadKind: "logo",
+    addresses: [],
+    ratesShop: "",
+    ratesContractor: "",
+    ratesPickup: "",
+    ratesBag: "",
+    ratesFrom: "",
+    ratesMessage: "",
+    ratesMessageOk: false,
+};
+let heldFrom = "";
+let webapp = "";
+function fieldByKeep(root, keep) {
+    return (root.querySelector(`[data-keep="${keep}"]`) ??
+        root.querySelector(`[data-filter="${keep}"]`));
+}
+function paint(keep) {
+    const root = document.getElementById("app");
+    if (!root) {
+        return;
+    }
+    const current = keep ? fieldByKeep(document, keep) : null;
+    const start = current?.selectionStart ?? null;
+    const end = current?.selectionEnd ?? null;
+    root.innerHTML = renderApp(VIEW);
+    if (!keep) {
+        return;
+    }
+    const next = fieldByKeep(root, keep);
+    if (!next) {
+        return;
+    }
+    next.focus();
+    if (start != null && end != null) {
+        next.setSelectionRange(start, end);
+    }
+}
+function boot() {
+    const read = readWebAppUrl(location.search, localStorage.getItem("rozliczenia.webapp"));
+    if (read.persist) {
+        localStorage.setItem("rozliczenia.webapp", read.persist);
+    }
+    webapp = read.url;
+    VIEW.webappMissing = webapp === "";
+    const root = document.getElementById("app");
+    if (!root) {
+        return;
+    }
+    root.addEventListener("click", onClick);
+    root.addEventListener("input", onInput);
+    root.addEventListener("change", onChange);
+    root.addEventListener("focusin", onFocusIn);
+    root.addEventListener("focusout", onFocusOut);
+    root.addEventListener("mousedown", onMouseDown);
+    paint();
+    if (webapp !== "") {
+        void loadContractors();
+    }
+}
+async function loadContractors() {
+    VIEW.loading = true;
+    VIEW.loadKind = "logo";
+    VIEW.loadMessage = "Wczytuję listę podwykonawców…";
+    paint();
+    try {
+        const response = await fetch(webAppUrl(webapp, { action: "listContractors" }));
+        const body = (await response.json());
+        if (!body.ok || !Array.isArray(body.data)) {
+            VIEW.contractors = [];
+            VIEW.status = "Nie udało się wczytać listy podwykonawców.";
+        }
+        else {
+            VIEW.contractors = body.data;
+            VIEW.status = "";
+        }
+    }
+    catch {
+        VIEW.contractors = [];
+        VIEW.status = "Nie udało się wczytać listy podwykonawców.";
+    }
+    finally {
+        VIEW.loading = false;
+        paint();
+    }
+}
+async function runSearch() {
+    const started = startSearch(fieldsForSearch({
+        contractor: VIEW.contractor,
+        from: VIEW.from,
+        to: VIEW.to,
+        noFrom: VIEW.noFrom,
+    }), VIEW.contractors);
+    if (!started.ok) {
+        VIEW.error = started.error;
+        VIEW.contractorOpen = false;
+        paint();
+        return;
+    }
+    if (webapp === "") {
+        VIEW.webappMissing = true;
+        paint();
+        return;
+    }
+    VIEW.error = "";
+    VIEW.loading = true;
+    VIEW.loadKind = "logo";
+    VIEW.loadMessage = "Szukam nierozliczonych odbiorów…";
+    paint();
+    try {
+        const response = await fetch(webAppUrl(webapp, searchParams(started)));
+        const read = readSettlement(await response.json());
+        if (!read.ok) {
+            VIEW.status = read.error;
+            return;
+        }
+        VIEW.applied = started;
+        VIEW.screen = screenAfterSearch();
+        VIEW.statement = freshStatement(read.rows, read.rates);
+        VIEW.status = "";
+        VIEW.ratesOpen = false;
+    }
+    catch {
+        VIEW.status = "Wyszukanie nie doszło.";
+    }
+    finally {
+        VIEW.loading = false;
+        paint();
+    }
+}
+function onClick(event) {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+        return;
+    }
+    if (target.closest(".modal-panel") &&
+        !target.closest("[data-action='close-rates']") &&
+        !target.closest("[data-action='save-rates']")) {
+        return;
+    }
+    const el = target.closest("[data-action]");
+    if (!(el instanceof HTMLElement)) {
+        return;
+    }
+    const action = el.dataset.action;
+    if (action === "pick-contractor") {
+        const nazwa = el.dataset.nazwa ?? "";
+        VIEW.contractor = nazwa;
+        VIEW.contractorQuery = nazwa;
+        VIEW.contractorOpen = false;
+        if (VIEW.error === "contractor") {
+            VIEW.error = "";
+        }
+        paint();
+    }
+    else if (action === "search") {
+        void runSearch();
+    }
+    else if (action === "back") {
+        VIEW.screen = screenAfterChangeRange();
+        VIEW.loading = false;
+        VIEW.ratesOpen = false;
+        paint();
+    }
+    else if (action === "rates") {
+        void openRates();
+    }
+    else if (action === "close-rates") {
+        VIEW.ratesOpen = false;
+        VIEW.ratesMessage = "";
+        VIEW.ratesMessageOk = false;
+        paint();
+    }
+    else if (action === "save-rates") {
+        void saveRates();
+    }
+    else if (action === "expand") {
+        const routeName = el.dataset.route ?? "";
+        if (routeName === "") {
+            return;
+        }
+        VIEW.statement = toggleOpen(VIEW.statement, routeName);
+        paint();
+    }
+    else if (action === "detach") {
+        const ref = sheetRef(el);
+        if (!ref) {
+            return;
+        }
+        const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber);
+        if (!row) {
+            return;
+        }
+        void writeNow("Odpinam sklep od trasy…", detachBody(row), () => {
+            const next = commitDetach(VIEW.statement, ref.sheetRow, ref.transportNumber);
+            if (next) {
+                VIEW.statement = next;
+            }
+            VIEW.status = "";
+        });
+    }
+    else if (action === "attach") {
+        const ref = sheetRef(el);
+        if (!ref) {
+            return;
+        }
+        const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber);
+        if (!row) {
+            return;
+        }
+        const key = rowKey(ref.sheetRow, ref.transportNumber);
+        const draft = VIEW.statement.routeDraft[key] ?? { name: "", rate: "" };
+        const decision = attachDecision(row, draft.name, draft.rate, VIEW.statement.leftRoute[key] ?? "");
+        if (!decision.ok) {
+            VIEW.statement = {
+                ...VIEW.statement,
+                routeDraftError: { ...VIEW.statement.routeDraftError, [key]: decision.error },
+            };
+            paint();
+            return;
+        }
+        void writeNow("Zapisuję nową trasę…", decision.body, () => {
+            const next = commitAttach(VIEW.statement, ref.sheetRow, ref.transportNumber, decision.name, decision.grosze);
+            if (next) {
+                VIEW.statement = next;
+            }
+            VIEW.status = "";
+        });
+    }
+    else if (action === "resolve-tie") {
+        const rateRow = Number(el.dataset.rateRow);
+        if (!Number.isInteger(rateRow)) {
+            return;
+        }
+        void writeNow("Rozstrzygam remis stawek…", tieBody(rateRow), async () => {
+            const refreshed = await reloadStatement();
+            if (!refreshed) {
+                VIEW.statement = { ...VIEW.statement, rates: withoutTiedRates(VIEW.statement.rates, rateRow) };
+                VIEW.status = STATEMENT_ERROR.refresh;
+                return;
+            }
+            VIEW.status = "";
+        });
+    }
+    else if (action === "approve") {
+        void runApprove();
+    }
+}
+function onInput(event) {
+    const el = event.target;
+    if (!(el instanceof HTMLInputElement)) {
+        return;
+    }
+    if (el.dataset.edit === "invoice") {
+        VIEW.statement = { ...VIEW.statement, invoice: el.value };
+        VIEW.status = "";
+        paint("invoice");
+        return;
+    }
+    if (el.dataset.draft === "route-name" || el.dataset.draft === "route-rate") {
+        const ref = sheetRef(el);
+        if (!ref) {
+            return;
+        }
+        const key = rowKey(ref.sheetRow, ref.transportNumber);
+        const prev = VIEW.statement.routeDraft[key] ?? { name: "", rate: "" };
+        const draft = el.dataset.draft === "route-name" ? { ...prev, name: el.value } : { ...prev, rate: el.value };
+        const routeDraftError = { ...VIEW.statement.routeDraftError };
+        delete routeDraftError[key];
+        VIEW.statement = {
+            ...VIEW.statement,
+            routeDraft: { ...VIEW.statement.routeDraft, [key]: draft },
+            routeDraftError,
+        };
+        paint(el.dataset.keep);
+        return;
+    }
+    if (el.dataset.rate === "pickup" || el.dataset.rate === "bag" || el.dataset.rate === "from") {
+        if (el.dataset.rate === "pickup") {
+            VIEW.ratesPickup = el.value;
+        }
+        else if (el.dataset.rate === "bag") {
+            VIEW.ratesBag = el.value;
+        }
+        else {
+            VIEW.ratesFrom = el.value;
+        }
+        paint(el.dataset.keep);
+        return;
+    }
+    if (el.dataset.filter === "contractor") {
+        VIEW.contractorQuery = el.value;
+        const picked = selectedContractor(VIEW.contractors, el.value);
+        VIEW.contractor = picked ? picked.nazwa : "";
+        VIEW.contractorOpen = true;
+        if (VIEW.error === "contractor") {
+            VIEW.error = "";
+        }
+        paint("contractor");
+        return;
+    }
+    if (el.dataset.filter === "from" || el.dataset.filter === "to") {
+        syncDate(el);
+    }
+}
+function syncDate(el) {
+    if (el.dataset.filter === "from") {
+        VIEW.from = el.value;
+    }
+    if (el.dataset.filter === "to") {
+        VIEW.to = el.value;
+    }
+    if (VIEW.error === "end" && VIEW.to !== "") {
+        VIEW.error = "";
+    }
+    if (VIEW.error === "order" && !blocksOnOrder(VIEW.from, VIEW.to, VIEW.noFrom)) {
+        VIEW.error = "";
+    }
+    paint(el.dataset.filter);
+}
+function onChange(event) {
+    const el = event.target;
+    if (el instanceof HTMLSelectElement && (el.dataset.rate === "shop" || el.dataset.rate === "contractor")) {
+        if (el.dataset.rate === "shop") {
+            VIEW.ratesShop = el.value;
+        }
+        else {
+            VIEW.ratesContractor = el.value;
+        }
+        VIEW.ratesMessage = "";
+        VIEW.ratesMessageOk = false;
+        paint();
+        return;
+    }
+    if (!(el instanceof HTMLInputElement)) {
+        return;
+    }
+    if (el.dataset.toggle === "checked") {
+        const key = decodeLine(el.dataset.line ?? "");
+        if (key === "") {
+            return;
+        }
+        VIEW.statement = toggleSelected(VIEW.statement, key);
+        VIEW.status = "";
+        paint();
+        return;
+    }
+    if (el.dataset.toggle === "bags-only" || el.dataset.toggle === "notrip") {
+        const ref = sheetRef(el);
+        if (!ref) {
+            return;
+        }
+        VIEW.statement =
+            el.dataset.toggle === "bags-only"
+                ? setBagsOnly(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked)
+                : setDidNotHappen(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked);
+        VIEW.status = "";
+        paint();
+        return;
+    }
+    if (el.dataset.edit === "bags" ||
+        el.dataset.edit === "pickup" ||
+        el.dataset.edit === "bag-rate" ||
+        el.dataset.edit === "bag-rate-route" ||
+        el.dataset.edit === "route-rate") {
+        void commitEdit(el);
+        return;
+    }
+    if (el.id === "mode-na") {
+        el.checked = true;
+        return;
+    }
+    if (el.id === "mode-h") {
+        el.checked = false;
+        return;
+    }
+    if (el.dataset.toggle === "nofrom") {
+        const next = applyNoStartDate({ from: VIEW.from, held: heldFrom }, el.checked);
+        VIEW.from = next.from;
+        heldFrom = next.held;
+        VIEW.noFrom = el.checked;
+        if (el.checked && VIEW.error === "order") {
+            VIEW.error = "";
+        }
+        paint();
+        return;
+    }
+    if (el.dataset.filter === "from" || el.dataset.filter === "to") {
+        syncDate(el);
+    }
+}
+function onFocusIn(event) {
+    const el = event.target;
+    if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
+        return;
+    }
+    VIEW.contractorOpen = true;
+    paint("contractor");
+}
+function onFocusOut(event) {
+    const el = event.target;
+    if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
+        return;
+    }
+    VIEW.contractorOpen = false;
+    paint();
+}
+function onMouseDown(event) {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+        return;
+    }
+    if (target.closest("[data-action='pick-contractor']")) {
+        event.preventDefault();
+    }
+}
+function sheetRef(el) {
+    const sheetRow = Number(el.dataset.sheetRow);
+    const transportNumber = el.dataset.transport ?? "";
+    if (!Number.isInteger(sheetRow) || sheetRow < 2 || transportNumber === "") {
+        return null;
+    }
+    return { sheetRow, transportNumber };
+}
+function decodeLine(value) {
+    try {
+        return decodeURIComponent(value);
+    }
+    catch {
+        return "";
+    }
+}
+async function openRates() {
+    VIEW.ratesOpen = true;
+    VIEW.ratesMessage = "";
+    VIEW.ratesMessageOk = false;
+    if (webapp === "") {
+        paint();
+        return;
+    }
+    VIEW.loading = true;
+    VIEW.loadKind = "logo";
+    VIEW.loadMessage = "Wczytuję adresy sklepów…";
+    paint();
+    try {
+        const response = await fetch(webAppUrl(webapp, { action: "listStoreAddresses" }));
+        const read = readAddressList(await response.json());
+        if (!read.ok) {
+            VIEW.addresses = [];
+            VIEW.ratesShop = "";
+            VIEW.ratesMessage = rateSaveMessage("addresses");
+        }
+        else {
+            VIEW.addresses = read.addresses;
+            if (!read.addresses.includes(VIEW.ratesShop)) {
+                VIEW.ratesShop = "";
+            }
+        }
+        if (VIEW.contractors.length === 0) {
+            const listed = await fetch(webAppUrl(webapp, { action: "listContractors" }));
+            const body = (await listed.json());
+            if (body.ok && Array.isArray(body.data)) {
+                VIEW.contractors = body.data;
+            }
+        }
+        if (!rateContractorNames(VIEW.contractors).includes(VIEW.ratesContractor)) {
+            VIEW.ratesContractor = "";
+        }
+    }
+    catch {
+        VIEW.addresses = [];
+        VIEW.ratesMessage = rateSaveMessage("addresses");
+    }
+    finally {
+        VIEW.loading = false;
+        paint();
+    }
+}
+async function saveRates() {
+    const built = saveRateBody({
+        shop: VIEW.ratesShop,
+        contractor: VIEW.ratesContractor,
+        pickup: VIEW.ratesPickup,
+        bag: VIEW.ratesBag,
+        from: VIEW.ratesFrom,
+    });
+    if (!built.ok) {
+        VIEW.ratesMessage = rateSaveMessage(built.error);
+        VIEW.ratesMessageOk = false;
+        paint();
+        return;
+    }
+    if (webapp === "") {
+        VIEW.ratesMessage = "Brak adresu Web App.";
+        VIEW.ratesMessageOk = false;
+        paint();
+        return;
+    }
+    VIEW.loading = true;
+    VIEW.loadKind = "logo";
+    VIEW.loadMessage = "Zapisuję stawkę…";
+    paint();
+    try {
+        const result = await postSheet(built.body);
+        if (result.ok !== true) {
+            VIEW.ratesMessage = rateSaveMessage(result.error);
+            VIEW.ratesMessageOk = false;
+            return;
+        }
+        VIEW.ratesPickup = "";
+        VIEW.ratesBag = "";
+        VIEW.ratesFrom = "";
+        VIEW.ratesMessage = "Zapisano stawkę.";
+        VIEW.ratesMessageOk = true;
+        if (VIEW.screen === "statement") {
+            const refreshed = await reloadStatement();
+            if (!refreshed) {
+                VIEW.status = STATEMENT_ERROR.refresh;
+            }
+        }
+    }
+    catch {
+        VIEW.ratesMessage = rateSaveMessage("write");
+        VIEW.ratesMessageOk = false;
+    }
+    finally {
+        VIEW.loading = false;
+        paint();
+    }
+}
+async function postSheet(body) {
+    const response = await fetch(webapp, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(body),
+    });
+    return (await response.json());
+}
+async function writeNow(message, body, apply) {
+    if (webapp === "") {
+        VIEW.status = "Brak adresu Web App.";
+        paint();
+        return;
+    }
+    VIEW.loading = true;
+    VIEW.loadKind = "logo";
+    VIEW.loadMessage = message;
+    paint();
+    try {
+        const result = await postSheet(body);
+        if (result.ok !== true) {
+            VIEW.status = writeError(result.error);
+            return;
+        }
+        await apply();
+    }
+    catch {
+        VIEW.status = STATEMENT_ERROR.write;
+    }
+    finally {
+        VIEW.loading = false;
+        VIEW.loadKind = "logo";
+        paint();
+    }
+}
+async function reloadStatement() {
+    if (!VIEW.applied || webapp === "") {
+        return false;
+    }
+    const response = await fetch(webAppUrl(webapp, searchParams(VIEW.applied)));
+    const read = readSettlement(await response.json());
+    if (!read.ok) {
+        return false;
+    }
+    VIEW.statement = adoptRows(VIEW.statement, read.rows, read.rates);
+    return true;
+}
+async function commitEdit(el) {
+    const ref = sheetRef(el);
+    if (!ref) {
+        return;
+    }
+    const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber);
+    if (!row) {
+        return;
+    }
+    const edit = el.dataset.edit;
+    if (edit === "bags") {
+        const built = bagsBody(row, el.value);
+        if (!built.ok) {
+            VIEW.status = built.error;
+            paint();
+            return;
+        }
+        await writeNow("Zapisuję liczbę worków…", built.body, () => {
+            VIEW.statement = commitBags(VIEW.statement, ref.sheetRow, ref.transportNumber, built.bagCount);
+            VIEW.status = "";
+        });
+        return;
+    }
+    if (edit === "route-rate") {
+        const routeName = el.dataset.route ?? row.routeName;
+        const built = routeRateBody(row, routeName, el.value);
+        if (!built.ok) {
+            VIEW.status = built.error;
+            paint();
+            return;
+        }
+        await writeNow("Zapisuję stawkę trasy…", built.body, () => {
+            VIEW.statement = commitRouteRate(VIEW.statement, routeName, built.grosze);
+            VIEW.status = "";
+        });
+        return;
+    }
+    const parsed = parseAmountText(el.value);
+    if (parsed.kind === "bad") {
+        VIEW.status = STATEMENT_ERROR.badRate;
+        paint();
+        return;
+    }
+    const amount = parsed.kind === "empty" ? null : parsed.value;
+    if (edit === "bag-rate-route") {
+        const routeName = el.dataset.route ?? "";
+        if (routeName === "") {
+            return;
+        }
+        VIEW.statement = setRouteBagRate(VIEW.statement, routeName, amount);
+    }
+    else if (edit === "bag-rate") {
+        VIEW.statement = setBagRate(VIEW.statement, ref.sheetRow, ref.transportNumber, amount);
+    }
+    else if (edit === "pickup") {
+        VIEW.statement = setPickup(VIEW.statement, ref.sheetRow, ref.transportNumber, amount);
+    }
+    VIEW.status = "";
+    paint();
+}
+async function runApprove() {
+    const statement = currentStatement(VIEW.statement);
+    const built = buildApprove(VIEW.statement.invoice, statement, VIEW.statement.selected);
+    if (!built.ok) {
+        VIEW.status = STATEMENT_ERROR[built.error];
+        paint();
+        return;
+    }
+    const kind = approveShow(statementSums(VIEW.statement).selected);
+    const started = Date.now();
+    VIEW.loading = true;
+    VIEW.loadKind = kind;
+    VIEW.loadMessage = "Zatwierdzam rozliczenie…";
+    VIEW.status = "";
+    paint();
+    try {
+        const result = await postSheet(built.body);
+        if (result.ok !== true) {
+            VIEW.status = writeError(result.error);
+        }
+        else {
+            const refreshed = await reloadStatement();
+            if (!refreshed) {
+                VIEW.status = STATEMENT_ERROR.refresh;
+            }
+            else if (skippedCount(result) > 0) {
+                VIEW.status = STATEMENT_ERROR.partial;
+            }
+            else {
+                VIEW.status = "";
+            }
+        }
+    }
+    catch {
+        VIEW.status = STATEMENT_ERROR.write;
+    }
+    finally {
+        if (kind === "unicorn") {
+            const left = UNICORN_HOLD_MS - (Date.now() - started);
+            if (left > 0) {
+                await new Promise((resolve) => {
+                    setTimeout(resolve, left);
+                });
+            }
+        }
+        VIEW.loading = false;
+        VIEW.loadKind = "logo";
+        paint();
+    }
+}
+boot();
+
+})();
+
+  </script>
+</body>
+</html>

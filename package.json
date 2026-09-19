@@ -1,0 +1,15 @@
+{
+  "name": "rozliczenia",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rozliczanie kosztów odbiorów — silnik TypeScript, strona statyczna",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-page.mjs",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.6"
+  }
+}

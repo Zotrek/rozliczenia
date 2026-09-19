@@ -1,0 +1,765 @@
+import { renderApp, type RangeViewModel } from "./rangeView.js";
+import {
+  applyNoStartDate,
+  fieldsForSearch,
+  readWebAppUrl,
+  screenAfterChangeRange,
+  screenAfterSearch,
+  searchParams,
+  selectedContractor,
+  startSearch,
+  webAppUrl,
+  blocksOnOrder,
+  type ContractorListItem,
+} from "./range.js";
+import { rowKey } from "./engine.js";
+import {
+  STATEMENT_ERROR,
+  UNICORN_HOLD_MS,
+  adoptRows,
+  approveShow,
+  attachDecision,
+  bagsBody,
+  buildApprove,
+  commitAttach,
+  commitBags,
+  commitDetach,
+  commitRouteRate,
+  currentStatement,
+  detachBody,
+  emptyStatement,
+  findRow,
+  freshStatement,
+  parseAmountText,
+  readSettlement,
+  routeRateBody,
+  setBagRate,
+  setBagsOnly,
+  setDidNotHappen,
+  setPickup,
+  setRouteBagRate,
+  skippedCount,
+  statementSums,
+  tieBody,
+  toggleOpen,
+  toggleSelected,
+  withoutTiedRates,
+  writeError,
+} from "./statement.js";
+import { rateContractorNames, rateSaveMessage, readAddressList, saveRateBody } from "./rateWindow.js";
+
+const VIEW: RangeViewModel = {
+  contractorQuery: "",
+  contractorOpen: false,
+  contractor: "",
+  contractors: [],
+  from: "",
+  to: "",
+  noFrom: false,
+  error: "",
+  screen: "range",
+  ratesOpen: false,
+  loading: false,
+  loadMessage: "",
+  applied: null,
+  status: "",
+  webappMissing: false,
+  statement: emptyStatement(),
+  loadKind: "logo",
+  addresses: [],
+  ratesShop: "",
+  ratesContractor: "",
+  ratesPickup: "",
+  ratesBag: "",
+  ratesFrom: "",
+  ratesMessage: "",
+  ratesMessageOk: false,
+};
+
+let heldFrom = "";
+let webapp = "";
+
+function fieldByKeep(root: ParentNode, keep: string): HTMLInputElement | null {
+  return (root.querySelector(`[data-keep="${keep}"]`) ??
+    root.querySelector(`[data-filter="${keep}"]`)) as HTMLInputElement | null;
+}
+
+function paint(keep?: string): void {
+  const root = document.getElementById("app");
+  if (!root) {
+    return;
+  }
+  const current = keep ? fieldByKeep(document, keep) : null;
+  const start = current?.selectionStart ?? null;
+  const end = current?.selectionEnd ?? null;
+  root.innerHTML = renderApp(VIEW);
+  if (!keep) {
+    return;
+  }
+  const next = fieldByKeep(root, keep);
+  if (!next) {
+    return;
+  }
+  next.focus();
+  if (start != null && end != null) {
+    next.setSelectionRange(start, end);
+  }
+}
+
+function boot(): void {
+  const read = readWebAppUrl(location.search, localStorage.getItem("rozliczenia.webapp"));
+  if (read.persist) {
+    localStorage.setItem("rozliczenia.webapp", read.persist);
+  }
+  webapp = read.url;
+  VIEW.webappMissing = webapp === "";
+  const root = document.getElementById("app");
+  if (!root) {
+    return;
+  }
+  root.addEventListener("click", onClick);
+  root.addEventListener("input", onInput);
+  root.addEventListener("change", onChange);
+  root.addEventListener("focusin", onFocusIn);
+  root.addEventListener("focusout", onFocusOut);
+  root.addEventListener("mousedown", onMouseDown);
+  paint();
+  if (webapp !== "") {
+    void loadContractors();
+  }
+}
+
+async function loadContractors(): Promise<void> {
+  VIEW.loading = true;
+  VIEW.loadKind = "logo";
+  VIEW.loadMessage = "Wczytuję listę podwykonawców…";
+  paint();
+  try {
+    const response = await fetch(webAppUrl(webapp, { action: "listContractors" }));
+    const body = (await response.json()) as {
+      ok?: boolean;
+      data?: ContractorListItem[];
+    };
+    if (!body.ok || !Array.isArray(body.data)) {
+      VIEW.contractors = [];
+      VIEW.status = "Nie udało się wczytać listy podwykonawców.";
+    } else {
+      VIEW.contractors = body.data;
+      VIEW.status = "";
+    }
+  } catch {
+    VIEW.contractors = [];
+    VIEW.status = "Nie udało się wczytać listy podwykonawców.";
+  } finally {
+    VIEW.loading = false;
+    paint();
+  }
+}
+
+async function runSearch(): Promise<void> {
+  const started = startSearch(
+    fieldsForSearch({
+      contractor: VIEW.contractor,
+      from: VIEW.from,
+      to: VIEW.to,
+      noFrom: VIEW.noFrom,
+    }),
+    VIEW.contractors,
+  );
+  if (!started.ok) {
+    VIEW.error = started.error;
+    VIEW.contractorOpen = false;
+    paint();
+    return;
+  }
+  if (webapp === "") {
+    VIEW.webappMissing = true;
+    paint();
+    return;
+  }
+  VIEW.error = "";
+  VIEW.loading = true;
+  VIEW.loadKind = "logo";
+  VIEW.loadMessage = "Szukam nierozliczonych odbiorów…";
+  paint();
+  try {
+    const response = await fetch(webAppUrl(webapp, searchParams(started)));
+    const read = readSettlement(await response.json());
+    if (!read.ok) {
+      VIEW.status = read.error;
+      return;
+    }
+    VIEW.applied = started;
+    VIEW.screen = screenAfterSearch();
+    VIEW.statement = freshStatement(read.rows, read.rates);
+    VIEW.status = "";
+    VIEW.ratesOpen = false;
+  } catch {
+    VIEW.status = "Wyszukanie nie doszło.";
+  } finally {
+    VIEW.loading = false;
+    paint();
+  }
+}
+
+function onClick(event: MouseEvent): void {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return;
+  }
+  if (
+    target.closest(".modal-panel") &&
+    !target.closest("[data-action='close-rates']") &&
+    !target.closest("[data-action='save-rates']")
+  ) {
+    return;
+  }
+  const el = target.closest("[data-action]");
+  if (!(el instanceof HTMLElement)) {
+    return;
+  }
+  const action = el.dataset.action;
+  if (action === "pick-contractor") {
+    const nazwa = el.dataset.nazwa ?? "";
+    VIEW.contractor = nazwa;
+    VIEW.contractorQuery = nazwa;
+    VIEW.contractorOpen = false;
+    if (VIEW.error === "contractor") {
+      VIEW.error = "";
+    }
+    paint();
+  } else if (action === "search") {
+    void runSearch();
+  } else if (action === "back") {
+    VIEW.screen = screenAfterChangeRange();
+    VIEW.loading = false;
+    VIEW.ratesOpen = false;
+    paint();
+  } else if (action === "rates") {
+    void openRates();
+  } else if (action === "close-rates") {
+    VIEW.ratesOpen = false;
+    VIEW.ratesMessage = "";
+    VIEW.ratesMessageOk = false;
+    paint();
+  } else if (action === "save-rates") {
+    void saveRates();
+  } else if (action === "expand") {
+    const routeName = el.dataset.route ?? "";
+    if (routeName === "") {
+      return;
+    }
+    VIEW.statement = toggleOpen(VIEW.statement, routeName);
+    paint();
+  } else if (action === "detach") {
+    const ref = sheetRef(el);
+    if (!ref) {
+      return;
+    }
+    const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber);
+    if (!row) {
+      return;
+    }
+    void writeNow("Odpinam sklep od trasy…", detachBody(row), () => {
+      const next = commitDetach(VIEW.statement, ref.sheetRow, ref.transportNumber);
+      if (next) {
+        VIEW.statement = next;
+      }
+      VIEW.status = "";
+    });
+  } else if (action === "attach") {
+    const ref = sheetRef(el);
+    if (!ref) {
+      return;
+    }
+    const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber);
+    if (!row) {
+      return;
+    }
+    const key = rowKey(ref.sheetRow, ref.transportNumber);
+    const draft = VIEW.statement.routeDraft[key] ?? { name: "", rate: "" };
+    const decision = attachDecision(row, draft.name, draft.rate, VIEW.statement.leftRoute[key] ?? "");
+    if (!decision.ok) {
+      VIEW.statement = {
+        ...VIEW.statement,
+        routeDraftError: { ...VIEW.statement.routeDraftError, [key]: decision.error },
+      };
+      paint();
+      return;
+    }
+    void writeNow("Zapisuję nową trasę…", decision.body, () => {
+      const next = commitAttach(
+        VIEW.statement,
+        ref.sheetRow,
+        ref.transportNumber,
+        decision.name,
+        decision.grosze,
+      );
+      if (next) {
+        VIEW.statement = next;
+      }
+      VIEW.status = "";
+    });
+  } else if (action === "resolve-tie") {
+    const rateRow = Number(el.dataset.rateRow);
+    if (!Number.isInteger(rateRow)) {
+      return;
+    }
+    void writeNow("Rozstrzygam remis stawek…", tieBody(rateRow), async () => {
+      const refreshed = await reloadStatement();
+      if (!refreshed) {
+        VIEW.statement = { ...VIEW.statement, rates: withoutTiedRates(VIEW.statement.rates, rateRow) };
+        VIEW.status = STATEMENT_ERROR.refresh;
+        return;
+      }
+      VIEW.status = "";
+    });
+  } else if (action === "approve") {
+    void runApprove();
+  }
+}
+
+function onInput(event: Event): void {
+  const el = event.target;
+  if (!(el instanceof HTMLInputElement)) {
+    return;
+  }
+  if (el.dataset.edit === "invoice") {
+    VIEW.statement = { ...VIEW.statement, invoice: el.value };
+    VIEW.status = "";
+    paint("invoice");
+    return;
+  }
+  if (el.dataset.draft === "route-name" || el.dataset.draft === "route-rate") {
+    const ref = sheetRef(el);
+    if (!ref) {
+      return;
+    }
+    const key = rowKey(ref.sheetRow, ref.transportNumber);
+    const prev = VIEW.statement.routeDraft[key] ?? { name: "", rate: "" };
+    const draft =
+      el.dataset.draft === "route-name" ? { ...prev, name: el.value } : { ...prev, rate: el.value };
+    const routeDraftError = { ...VIEW.statement.routeDraftError };
+    delete routeDraftError[key];
+    VIEW.statement = {
+      ...VIEW.statement,
+      routeDraft: { ...VIEW.statement.routeDraft, [key]: draft },
+      routeDraftError,
+    };
+    paint(el.dataset.keep);
+    return;
+  }
+  if (el.dataset.rate === "pickup" || el.dataset.rate === "bag" || el.dataset.rate === "from") {
+    if (el.dataset.rate === "pickup") {
+      VIEW.ratesPickup = el.value;
+    } else if (el.dataset.rate === "bag") {
+      VIEW.ratesBag = el.value;
+    } else {
+      VIEW.ratesFrom = el.value;
+    }
+    paint(el.dataset.keep);
+    return;
+  }
+  if (el.dataset.filter === "contractor") {
+    VIEW.contractorQuery = el.value;
+    const picked = selectedContractor(VIEW.contractors, el.value);
+    VIEW.contractor = picked ? picked.nazwa : "";
+    VIEW.contractorOpen = true;
+    if (VIEW.error === "contractor") {
+      VIEW.error = "";
+    }
+    paint("contractor");
+    return;
+  }
+  if (el.dataset.filter === "from" || el.dataset.filter === "to") {
+    syncDate(el);
+  }
+}
+
+function syncDate(el: HTMLInputElement): void {
+  if (el.dataset.filter === "from") {
+    VIEW.from = el.value;
+  }
+  if (el.dataset.filter === "to") {
+    VIEW.to = el.value;
+  }
+  if (VIEW.error === "end" && VIEW.to !== "") {
+    VIEW.error = "";
+  }
+  if (VIEW.error === "order" && !blocksOnOrder(VIEW.from, VIEW.to, VIEW.noFrom)) {
+    VIEW.error = "";
+  }
+  paint(el.dataset.filter);
+}
+
+function onChange(event: Event): void {
+  const el = event.target;
+  if (el instanceof HTMLSelectElement && (el.dataset.rate === "shop" || el.dataset.rate === "contractor")) {
+    if (el.dataset.rate === "shop") {
+      VIEW.ratesShop = el.value;
+    } else {
+      VIEW.ratesContractor = el.value;
+    }
+    VIEW.ratesMessage = "";
+    VIEW.ratesMessageOk = false;
+    paint();
+    return;
+  }
+  if (!(el instanceof HTMLInputElement)) {
+    return;
+  }
+  if (el.dataset.toggle === "checked") {
+    const key = decodeLine(el.dataset.line ?? "");
+    if (key === "") {
+      return;
+    }
+    VIEW.statement = toggleSelected(VIEW.statement, key);
+    VIEW.status = "";
+    paint();
+    return;
+  }
+  if (el.dataset.toggle === "bags-only" || el.dataset.toggle === "notrip") {
+    const ref = sheetRef(el);
+    if (!ref) {
+      return;
+    }
+    VIEW.statement =
+      el.dataset.toggle === "bags-only"
+        ? setBagsOnly(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked)
+        : setDidNotHappen(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked);
+    VIEW.status = "";
+    paint();
+    return;
+  }
+  if (
+    el.dataset.edit === "bags" ||
+    el.dataset.edit === "pickup" ||
+    el.dataset.edit === "bag-rate" ||
+    el.dataset.edit === "bag-rate-route" ||
+    el.dataset.edit === "route-rate"
+  ) {
+    void commitEdit(el);
+    return;
+  }
+  if (el.id === "mode-na") {
+    el.checked = true;
+    return;
+  }
+  if (el.id === "mode-h") {
+    el.checked = false;
+    return;
+  }
+  if (el.dataset.toggle === "nofrom") {
+    const next = applyNoStartDate({ from: VIEW.from, held: heldFrom }, el.checked);
+    VIEW.from = next.from;
+    heldFrom = next.held;
+    VIEW.noFrom = el.checked;
+    if (el.checked && VIEW.error === "order") {
+      VIEW.error = "";
+    }
+    paint();
+    return;
+  }
+  if (el.dataset.filter === "from" || el.dataset.filter === "to") {
+    syncDate(el);
+  }
+}
+
+function onFocusIn(event: FocusEvent): void {
+  const el = event.target;
+  if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
+    return;
+  }
+  VIEW.contractorOpen = true;
+  paint("contractor");
+}
+
+function onFocusOut(event: FocusEvent): void {
+  const el = event.target;
+  if (!(el instanceof HTMLInputElement) || el.dataset.filter !== "contractor") {
+    return;
+  }
+  VIEW.contractorOpen = false;
+  paint();
+}
+
+function onMouseDown(event: MouseEvent): void {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return;
+  }
+  if (target.closest("[data-action='pick-contractor']")) {
+    event.preventDefault();
+  }
+}
+
+function sheetRef(el: HTMLElement): { sheetRow: number; transportNumber: string } | null {
+  const sheetRow = Number(el.dataset.sheetRow);
+  const transportNumber = el.dataset.transport ?? "";
+  if (!Number.isInteger(sheetRow) || sheetRow < 2 || transportNumber === "") {
+    return null;
+  }
+  return { sheetRow, transportNumber };
+}
+
+function decodeLine(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return "";
+  }
+}
+
+async function openRates(): Promise<void> {
+  VIEW.ratesOpen = true;
+  VIEW.ratesMessage = "";
+  VIEW.ratesMessageOk = false;
+  if (webapp === "") {
+    paint();
+    return;
+  }
+  VIEW.loading = true;
+  VIEW.loadKind = "logo";
+  VIEW.loadMessage = "Wczytuję adresy sklepów…";
+  paint();
+  try {
+    const response = await fetch(webAppUrl(webapp, { action: "listStoreAddresses" }));
+    const read = readAddressList(await response.json());
+    if (!read.ok) {
+      VIEW.addresses = [];
+      VIEW.ratesShop = "";
+      VIEW.ratesMessage = rateSaveMessage("addresses");
+    } else {
+      VIEW.addresses = read.addresses;
+      if (!read.addresses.includes(VIEW.ratesShop)) {
+        VIEW.ratesShop = "";
+      }
+    }
+    if (VIEW.contractors.length === 0) {
+      const listed = await fetch(webAppUrl(webapp, { action: "listContractors" }));
+      const body = (await listed.json()) as { ok?: boolean; data?: ContractorListItem[] };
+      if (body.ok && Array.isArray(body.data)) {
+        VIEW.contractors = body.data;
+      }
+    }
+    if (!rateContractorNames(VIEW.contractors).includes(VIEW.ratesContractor)) {
+      VIEW.ratesContractor = "";
+    }
+  } catch {
+    VIEW.addresses = [];
+    VIEW.ratesMessage = rateSaveMessage("addresses");
+  } finally {
+    VIEW.loading = false;
+    paint();
+  }
+}
+
+async function saveRates(): Promise<void> {
+  const built = saveRateBody({
+    shop: VIEW.ratesShop,
+    contractor: VIEW.ratesContractor,
+    pickup: VIEW.ratesPickup,
+    bag: VIEW.ratesBag,
+    from: VIEW.ratesFrom,
+  });
+  if (!built.ok) {
+    VIEW.ratesMessage = rateSaveMessage(built.error);
+    VIEW.ratesMessageOk = false;
+    paint();
+    return;
+  }
+  if (webapp === "") {
+    VIEW.ratesMessage = "Brak adresu Web App.";
+    VIEW.ratesMessageOk = false;
+    paint();
+    return;
+  }
+  VIEW.loading = true;
+  VIEW.loadKind = "logo";
+  VIEW.loadMessage = "Zapisuję stawkę…";
+  paint();
+  try {
+    const result = await postSheet(built.body);
+    if (result.ok !== true) {
+      VIEW.ratesMessage = rateSaveMessage(result.error);
+      VIEW.ratesMessageOk = false;
+      return;
+    }
+    VIEW.ratesPickup = "";
+    VIEW.ratesBag = "";
+    VIEW.ratesFrom = "";
+    VIEW.ratesMessage = "Zapisano stawkę.";
+    VIEW.ratesMessageOk = true;
+    if (VIEW.screen === "statement") {
+      const refreshed = await reloadStatement();
+      if (!refreshed) {
+        VIEW.status = STATEMENT_ERROR.refresh;
+      }
+    }
+  } catch {
+    VIEW.ratesMessage = rateSaveMessage("write");
+    VIEW.ratesMessageOk = false;
+  } finally {
+    VIEW.loading = false;
+    paint();
+  }
+}
+
+async function postSheet(body: Record<string, unknown>): Promise<{ ok?: boolean; error?: unknown; pominiete?: unknown }> {
+  const response = await fetch(webapp, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify(body),
+  });
+  return (await response.json()) as { ok?: boolean; error?: unknown; pominiete?: unknown };
+}
+
+async function writeNow(
+  message: string,
+  body: Record<string, unknown>,
+  apply: () => void | Promise<void>,
+): Promise<void> {
+  if (webapp === "") {
+    VIEW.status = "Brak adresu Web App.";
+    paint();
+    return;
+  }
+  VIEW.loading = true;
+  VIEW.loadKind = "logo";
+  VIEW.loadMessage = message;
+  paint();
+  try {
+    const result = await postSheet(body);
+    if (result.ok !== true) {
+      VIEW.status = writeError(result.error);
+      return;
+    }
+    await apply();
+  } catch {
+    VIEW.status = STATEMENT_ERROR.write;
+  } finally {
+    VIEW.loading = false;
+    VIEW.loadKind = "logo";
+    paint();
+  }
+}
+
+async function reloadStatement(): Promise<boolean> {
+  if (!VIEW.applied || webapp === "") {
+    return false;
+  }
+  const response = await fetch(webAppUrl(webapp, searchParams(VIEW.applied)));
+  const read = readSettlement(await response.json());
+  if (!read.ok) {
+    return false;
+  }
+  VIEW.statement = adoptRows(VIEW.statement, read.rows, read.rates);
+  return true;
+}
+
+async function commitEdit(el: HTMLInputElement): Promise<void> {
+  const ref = sheetRef(el);
+  if (!ref) {
+    return;
+  }
+  const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber);
+  if (!row) {
+    return;
+  }
+  const edit = el.dataset.edit;
+  if (edit === "bags") {
+    const built = bagsBody(row, el.value);
+    if (!built.ok) {
+      VIEW.status = built.error;
+      paint();
+      return;
+    }
+    await writeNow("Zapisuję liczbę worków…", built.body, () => {
+      VIEW.statement = commitBags(VIEW.statement, ref.sheetRow, ref.transportNumber, built.bagCount);
+      VIEW.status = "";
+    });
+    return;
+  }
+  if (edit === "route-rate") {
+    const routeName = el.dataset.route ?? row.routeName;
+    const built = routeRateBody(row, routeName, el.value);
+    if (!built.ok) {
+      VIEW.status = built.error;
+      paint();
+      return;
+    }
+    await writeNow("Zapisuję stawkę trasy…", built.body, () => {
+      VIEW.statement = commitRouteRate(VIEW.statement, routeName, built.grosze);
+      VIEW.status = "";
+    });
+    return;
+  }
+  const parsed = parseAmountText(el.value);
+  if (parsed.kind === "bad") {
+    VIEW.status = STATEMENT_ERROR.badRate;
+    paint();
+    return;
+  }
+  const amount = parsed.kind === "empty" ? null : parsed.value;
+  if (edit === "bag-rate-route") {
+    const routeName = el.dataset.route ?? "";
+    if (routeName === "") {
+      return;
+    }
+    VIEW.statement = setRouteBagRate(VIEW.statement, routeName, amount);
+  } else if (edit === "bag-rate") {
+    VIEW.statement = setBagRate(VIEW.statement, ref.sheetRow, ref.transportNumber, amount);
+  } else if (edit === "pickup") {
+    VIEW.statement = setPickup(VIEW.statement, ref.sheetRow, ref.transportNumber, amount);
+  }
+  VIEW.status = "";
+  paint();
+}
+
+async function runApprove(): Promise<void> {
+  const statement = currentStatement(VIEW.statement);
+  const built = buildApprove(VIEW.statement.invoice, statement, VIEW.statement.selected);
+  if (!built.ok) {
+    VIEW.status = STATEMENT_ERROR[built.error];
+    paint();
+    return;
+  }
+  const kind = approveShow(statementSums(VIEW.statement).selected);
+  const started = Date.now();
+  VIEW.loading = true;
+  VIEW.loadKind = kind;
+  VIEW.loadMessage = "Zatwierdzam rozliczenie…";
+  VIEW.status = "";
+  paint();
+  try {
+    const result = await postSheet(built.body);
+    if (result.ok !== true) {
+      VIEW.status = writeError(result.error);
+    } else {
+      const refreshed = await reloadStatement();
+      if (!refreshed) {
+        VIEW.status = STATEMENT_ERROR.refresh;
+      } else if (skippedCount(result) > 0) {
+        VIEW.status = STATEMENT_ERROR.partial;
+      } else {
+        VIEW.status = "";
+      }
+    }
+  } catch {
+    VIEW.status = STATEMENT_ERROR.write;
+  } finally {
+    if (kind === "unicorn") {
+      const left = UNICORN_HOLD_MS - (Date.now() - started);
+      if (left > 0) {
+        await new Promise((resolve) => {
+          setTimeout(resolve, left);
+        });
+      }
+    }
+    VIEW.loading = false;
+    VIEW.loadKind = "logo";
+    paint();
+  }
+}
+
+boot();

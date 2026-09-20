@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { rateContractorNames, rateSaveMessage, readAddressList, saveRateBody } from "./rateWindow.js";
+import { rateContractorNames, rateSaveMessage, readAddressList, resolveStoreAddress, saveRateBody } from "./rateWindow.js";
 
 const gsPath = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -33,11 +33,13 @@ function functionSource(name: string): string {
   throw new Error(`niezamknięta funkcja ${name}`);
 }
 
-function loadUnique(): (cells: unknown[]) => string[] {
+function loadUnique(): (rows: unknown[]) => { adres: string; sklep: string }[] {
   const source = functionSource("uniqueStoreAddresses_");
   expect(source).not.toMatch(/SpreadsheetApp|LockService/);
   expect(source).not.toMatch(WRITE_CALL);
-  const load = new Function(`${source}\nreturn uniqueStoreAddresses_;`) as () => (cells: unknown[]) => string[];
+  const load = new Function(`${source}\nreturn uniqueStoreAddresses_;`) as () => (
+    rows: unknown[],
+  ) => { adres: string; sklep: string }[];
   return load();
 }
 
@@ -66,27 +68,63 @@ describe("saveRateBody", () => {
   });
 
   it("test_saveRateBody_does_not_carry_register_columns", () => {
-    const built = saveRateBody({ shop: "ul. A", contractor: "GPW", pickup: "20", bag: "2", from: "10.09.2026" });
+    const built = saveRateBody({ shop: "ul. A", contractor: "GPW", pickup: "20", bag: "2", from: "2026-09-10" });
     expect(built.ok).toBe(true);
     if (!built.ok) {
       return;
     }
+    expect(built.body.odKiedy).toBe("10.09.2026");
     expect(built.body).not.toHaveProperty("action");
     expect(JSON.stringify(built.body)).not.toMatch(/rozliczony|faktury|koszt|resolveRateTie/i);
+  });
+
+  it("test_saveRateBody_invalid_calendar_date_refuses", () => {
+    expect(saveRateBody({ shop: "ul. A", contractor: "GPW", pickup: "1", bag: "1", from: "2026-02-31" })).toEqual({
+      ok: false,
+      error: "date",
+    });
   });
 });
 
 describe("readAddressList", () => {
-  it("test_readAddressList_keeps_address_strings_and_drops_blanks", () => {
-    expect(readAddressList({ ok: true, data: [" ul. B ", "", "ul. A"] })).toEqual({
+  it("test_readAddressList_keeps_shop_name_and_legacy_address_string", () => {
+    expect(
+      readAddressList({
+        ok: true,
+        data: [{ adres: " ul. B ", sklep: " Sklep B " }, { adres: "", sklep: "puste" }, " ul. A ", { adres: "ul. C" }],
+      }),
+    ).toEqual({
       ok: true,
-      addresses: ["ul. B", "ul. A"],
+      addresses: [
+        { address: "ul. B", shop: "Sklep B" },
+        { address: "ul. A", shop: "" },
+        { address: "ul. C", shop: "" },
+      ],
     });
   });
 
   it("test_readAddressList_rejects_pin_objects", () => {
-    expect(readAddressList({ ok: true, data: [{ adres: "ul. Z mapy" }] }).ok).toBe(false);
+    expect(readAddressList({ ok: true, data: [{ adres: "ul. Z mapy", lat: 51, lng: 17 }] }).ok).toBe(false);
     expect(readAddressList({ ok: false }).ok).toBe(false);
+  });
+});
+
+describe("resolveStoreAddress", () => {
+  const shops = [
+    { address: "ul. Głogowska 12", shop: "Biedronka" },
+    { address: "ul. Hetmańska 90", shop: "Lewiatan" },
+  ];
+
+  it("test_resolveStoreAddress_shop_name_or_address_keeps_address_as_value", () => {
+    expect(resolveStoreAddress(shops, "biedronka")).toEqual({
+      address: "ul. Głogowska 12",
+      query: "Biedronka — ul. Głogowska 12",
+    });
+    expect(resolveStoreAddress(shops, "ul. Głogowska 12")).toEqual({
+      address: "ul. Głogowska 12",
+      query: "Biedronka — ul. Głogowska 12",
+    });
+    expect(resolveStoreAddress(shops, "ul.")).toEqual({ address: "", query: "ul." });
   });
 });
 
@@ -112,16 +150,29 @@ describe("rateSaveMessage", () => {
 });
 
 describe("listStoreAddresses w transport-log.gs", () => {
-  it("test_listStoreAddresses_reads_register_address_column_without_write", () => {
+  it("test_listStoreAddresses_reads_register_address_and_shop_without_write", () => {
     const body = functionSource("listStoreAddresses_");
     expect(body).toContain("COL.adres");
+    expect(body).toContain("COL.sklep");
     expect(body).toContain("uniqueStoreAddresses_");
-    expect(body).not.toContain("COL.sklep");
     expect(body).not.toMatch(WRITE_CALL);
     expect(gs).toContain("action === 'listStoreAddresses'");
   });
 
-  it("test_uniqueStoreAddresses_trims_drops_empty_and_keeps_one", () => {
-    expect(unique([" ul. B ", "", "ul. A", "ul. B", "  ", null])).toEqual(["ul. A", "ul. B"]);
+  it("test_uniqueStoreAddresses_pairs_first_shop_name_and_keeps_one_address", () => {
+    expect(
+      unique([
+        [" ul. B ", "PH", " Sklep B "],
+        ["", "PH", "x"],
+        ["ul. A", "PH", ""],
+        ["ul. B", "PH", "inna"],
+        ["ul. C", "PH", ""],
+        ["ul. C", "PH", "Sklep C"],
+      ]),
+    ).toEqual([
+      { adres: "ul. A", sklep: "" },
+      { adres: "ul. B", sklep: "Sklep B" },
+      { adres: "ul. C", sklep: "Sklep C" },
+    ]);
   });
 });

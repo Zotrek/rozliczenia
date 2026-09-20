@@ -1,9 +1,9 @@
 import { escapeHtml } from "./html.js";
+import { matchingStoreAddresses, storeAddressLabel, type StoreAddress } from "./rateWindow.js";
 import {
   RANGE_ERROR,
   foldPl,
   matchingContractors,
-  matchingTexts,
   rangeLabel,
   selectedContractor,
   type ContractorListItem,
@@ -33,8 +33,8 @@ export interface RangeViewModel {
   statement: StatementScreen;
   /** Od 10 000 zł przy Zatwierdź. Inaczej pulsujące logo. */
   loadKind?: "logo" | "unicorn";
-  /** Kolumna Adres sklepu rejestru. Nie pinezki. */
-  addresses: readonly string[];
+  /** Kolumna Adres sklepu i nazwa z kolumny Sklep. Zapis idzie adresem. */
+  addresses: readonly StoreAddress[];
   ratesShop: string;
   ratesShopQuery: string;
   ratesShopOpen: boolean;
@@ -118,7 +118,7 @@ function contractorField(model: RangeViewModel): string {
 function renderOptionList(
   listId: string,
   action: string,
-  values: readonly string[],
+  values: readonly (string | { value: string; text: string })[],
   empty: string,
 ): string {
   if (!values.length) {
@@ -127,22 +127,28 @@ function renderOptionList(
   return (
     `<ul class="picker-list" id="${listId}">` +
     values
-      .map(
-        (value) =>
-          `<li><button type="button" class="picker-option" role="option" data-action="${action}" data-value="${escapeHtml(value)}">` +
-          `<span>${escapeHtml(value)}</span></button></li>`,
-      )
+      .map((item) => {
+        const choice = typeof item === "string" ? { value: item, text: item } : item;
+        return (
+          `<li><button type="button" class="picker-option" role="option" data-action="${action}" data-value="${escapeHtml(choice.value)}">` +
+          `<span>${escapeHtml(choice.text)}</span></button></li>`
+        );
+      })
       .join("") +
     "</ul>"
   );
 }
 
-function rateShopHits(model: RangeViewModel): string[] {
+function rateShopHits(model: RangeViewModel): { value: string; text: string }[] {
+  const selected = model.addresses.find((item) => item.address === model.ratesShop);
+  const selectedLabel = selected ? storeAddressLabel(selected) : "";
   const browsing =
     model.ratesShopOpen &&
     model.ratesShop !== "" &&
-    foldPl(model.ratesShopQuery) === foldPl(model.ratesShop);
-  return matchingTexts(model.addresses, model.ratesShopQuery, browsing).slice(0, CONTRACTOR_LIST_LIMIT);
+    foldPl(model.ratesShopQuery) === foldPl(selectedLabel);
+  return matchingStoreAddresses(model.addresses, model.ratesShopQuery, browsing)
+    .slice(0, CONTRACTOR_LIST_LIMIT)
+    .map((item) => ({ value: item.address, text: storeAddressLabel(item) }));
 }
 
 /** Adresy z rejestru. Najwyżej 80. Tekstu spoza listy nie ma. */
@@ -279,7 +285,7 @@ export function renderRatesDialog(model: RangeViewModel): string {
       "shop",
       model.ratesShopQuery,
       model.ratesShopOpen,
-      "— wybierz adres —",
+      "Nazwa sklepu lub adres",
       renderRateShopList(model),
     ) +
     rateCombo(
@@ -295,9 +301,9 @@ export function renderRatesDialog(model: RangeViewModel): string {
     '<label class="field"><span>Kwota za worek</span>' +
     `<input type="text" inputmode="decimal" data-rate="bag" data-keep="bag" autocomplete="off" value="${escapeHtml(model.ratesBag)}"></label>` +
     '<label class="field"><span>Od kiedy obowiązuje</span>' +
-    `<input type="text" data-rate="from" data-keep="from" autocomplete="off" placeholder="dd.mm.yyyy" value="${escapeHtml(model.ratesFrom)}">` +
+    `<input type="date" data-rate="from" data-keep="from" value="${escapeHtml(model.ratesFrom)}">` +
     '<span class="note">Puste znaczy od zawsze.</span></label>' +
-    '<p class="note">Adres z kolumny Adres sklepu rejestru. Podwykonawca to nazwa krótka z Listy podwykonawców. Nie pinezki mapy. Wpisu ręcznego nie ma.</p>' +
+    '<p class="note">Nazwa z kolumny Sklep, adres z kolumny Adres sklepu rejestru. Zapisuje się adres. Podwykonawca to nazwa krótka z Listy podwykonawców. Nie pinezki mapy. Wpisu ręcznego nie ma.</p>' +
     `<p data-rates-message class="${messageClass}"${model.ratesMessage ? "" : " hidden"}>${escapeHtml(model.ratesMessage)}</p>` +
     '<div class="modal-actions">' +
     '<button type="button" class="btn-ghost" data-action="close-rates">Zamknij</button>' +

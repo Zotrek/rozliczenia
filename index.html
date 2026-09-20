@@ -611,6 +611,138 @@ function readWebAppUrl(search, stored) {
     return { url: stored?.trim() ?? "", persist: null };
 }
 
+
+/** Widoczny tekst listy. Sam adres, gdy nazwy nie ma albo jest taka sama. */
+function storeAddressLabel(item) {
+    const shop = item.shop.trim();
+    const address = item.address.trim();
+    if (shop !== "" && shop !== address) {
+        return `${shop} — ${address}`;
+    }
+    return address;
+}
+/** Pola `saveRate` jak na mapie. Listy wybiera widok, tu jest tylko body. */
+function saveRateBody(input) {
+    const shop = input.shop.trim();
+    const contractor = input.contractor.trim();
+    if (shop === "" || contractor === "") {
+        return { ok: false, error: "shop" };
+    }
+    const rawFrom = input.from.trim();
+    let odKiedy = "";
+    if (rawFrom !== "") {
+        const sheet = isoToSheetDate(rawFrom);
+        if (sheet === null) {
+            return { ok: false, error: "date" };
+        }
+        odKiedy = sheet;
+    }
+    return {
+        ok: true,
+        body: {
+            mode: "saveRate",
+            sklep: shop,
+            podwykonawca: contractor,
+            kwotaPodjazd: input.pickup,
+            kwotaWorek: input.bag,
+            odKiedy,
+        },
+    };
+}
+function rateSaveMessage(code) {
+    if (code === "tie") {
+        return "Więcej niż jeden wiersz tej daty. Zapisu nie ma.";
+    }
+    if (code === "date") {
+        return "Data w formacie dd.mm.yyyy albo puste.";
+    }
+    if (code === "amount") {
+        return "Nieprawidłowa kwota.";
+    }
+    if (code === "shop") {
+        return "Wybierz sklep i podwykonawcę.";
+    }
+    if (code === "addresses") {
+        return "Nie udało się wczytać adresów.";
+    }
+    return "Zapis nieudany.";
+}
+/** Fragment nazwy albo adresu. Pusty tekst albo przeglądanie zostawia całą listę. */
+function matchingStoreAddresses(items, query, browsingAll) {
+    if (browsingAll) {
+        return [...items];
+    }
+    const folded = foldPl(query);
+    if (folded === "") {
+        return [...items];
+    }
+    return items.filter((item) => foldPl(item.address).includes(folded) ||
+        foldPl(item.shop).includes(folded) ||
+        foldPl(storeAddressLabel(item)).includes(folded));
+}
+/** Dokładny adres albo dokładna etykieta, albo jedyne trafienie. Inaczej brak wyboru. */
+function resolveStoreAddress(items, text) {
+    const folded = foldPl(text);
+    if (folded === "") {
+        return { address: "", query: "" };
+    }
+    const exact = items.find((item) => foldPl(item.address) === folded || foldPl(storeAddressLabel(item)) === folded);
+    if (exact) {
+        return { address: exact.address, query: storeAddressLabel(exact) };
+    }
+    const hits = matchingStoreAddresses(items, text, false);
+    if (hits.length === 1) {
+        return { address: hits[0].address, query: storeAddressLabel(hits[0]) };
+    }
+    return { address: "", query: text };
+}
+/** Odczyt `listStoreAddresses`. Sam tekst zostaje adresem bez nazwy. Pinezka z `lat` nie przechodzi. */
+function readAddressList(body) {
+    if (!isRecord(body) || body.ok !== true || !Array.isArray(body.data)) {
+        return { ok: false };
+    }
+    const addresses = [];
+    for (const item of body.data) {
+        const parsed = parseStoreAddress(item);
+        if (parsed === null) {
+            return { ok: false };
+        }
+        if (parsed.address !== "") {
+            addresses.push(parsed);
+        }
+    }
+    addresses.sort((a, b) => storeAddressLabel(a).localeCompare(storeAddressLabel(b), "pl"));
+    return { ok: true, addresses };
+}
+function parseStoreAddress(item) {
+    if (typeof item === "string") {
+        return { address: item.trim(), shop: "" };
+    }
+    if (!isRecord(item) || "lat" in item || "lng" in item || typeof item.adres !== "string") {
+        return null;
+    }
+    const shop = typeof item.sklep === "string" ? item.sklep.trim() : "";
+    return { address: item.adres.trim(), shop };
+}
+/** Nazwa krótka, nie Dane do Worda. Puste i powtórki odpadają. */
+function rateContractorNames(items) {
+    const seen = new Set();
+    const names = [];
+    for (const item of items) {
+        const name = item.nazwa.trim();
+        if (name === "" || seen.has(name)) {
+            continue;
+        }
+        seen.add(name);
+        names.push(name);
+    }
+    names.sort((a, b) => a.localeCompare(b, "pl"));
+    return names;
+}
+function isRecord(value) {
+    return typeof value === "object" && value !== null;
+}
+
 /**
  * Złote z arkusza albo z pola na grosze.
  * Połówki w górę. Wejście silnika i tak jest już w groszach — to brama dla odczytu.
@@ -1739,6 +1871,7 @@ function shopsWord(count) {
 
 
 
+
 function brand() {
     return ('<div class="brand"><img src="logo.png" alt="" width="36" height="36">' +
         "<div><strong>Rozliczenia</strong><em>Na zgłoszenie</em></div></div>");
@@ -1790,16 +1923,23 @@ function renderOptionList(listId, action, values, empty) {
     }
     return (`<ul class="picker-list" id="${listId}">` +
         values
-            .map((value) => `<li><button type="button" class="picker-option" role="option" data-action="${action}" data-value="${escapeHtml(value)}">` +
-            `<span>${escapeHtml(value)}</span></button></li>`)
+            .map((item) => {
+            const choice = typeof item === "string" ? { value: item, text: item } : item;
+            return (`<li><button type="button" class="picker-option" role="option" data-action="${action}" data-value="${escapeHtml(choice.value)}">` +
+                `<span>${escapeHtml(choice.text)}</span></button></li>`);
+        })
             .join("") +
         "</ul>");
 }
 function rateShopHits(model) {
+    const selected = model.addresses.find((item) => item.address === model.ratesShop);
+    const selectedLabel = selected ? storeAddressLabel(selected) : "";
     const browsing = model.ratesShopOpen &&
         model.ratesShop !== "" &&
-        foldPl(model.ratesShopQuery) === foldPl(model.ratesShop);
-    return matchingTexts(model.addresses, model.ratesShopQuery, browsing).slice(0, CONTRACTOR_LIST_LIMIT);
+        foldPl(model.ratesShopQuery) === foldPl(selectedLabel);
+    return matchingStoreAddresses(model.addresses, model.ratesShopQuery, browsing)
+        .slice(0, CONTRACTOR_LIST_LIMIT)
+        .map((item) => ({ value: item.address, text: storeAddressLabel(item) }));
 }
 /** Adresy z rejestru. Najwyżej 80. Tekstu spoza listy nie ma. */
 function renderRateShopList(model) {
@@ -1895,16 +2035,16 @@ function renderRatesDialog(model) {
         '<div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="rates-title">' +
         '<h2 id="rates-title">Baza stawek</h2>' +
         '<p class="note">Zapis od razu, nie czeka na Zatwierdź. Nie zmienia Rozliczony, Numer faktury ani kolumn 16 i 17. Stawki trasy tu nie ma. Remis rozstrzyga się na zestawieniu, nie tutaj.</p>' +
-        rateCombo("Sklep", "shop", model.ratesShopQuery, model.ratesShopOpen, "— wybierz adres —", renderRateShopList(model)) +
+        rateCombo("Sklep", "shop", model.ratesShopQuery, model.ratesShopOpen, "Nazwa sklepu lub adres", renderRateShopList(model)) +
         rateCombo("Podwykonawca", "contractor", model.ratesContractorQuery, model.ratesContractorOpen, "— wybierz podwykonawcę —", renderRateContractorList(model)) +
         '<label class="field"><span>Kwota za podjazd</span>' +
         `<input type="text" inputmode="decimal" data-rate="pickup" data-keep="pickup" autocomplete="off" value="${escapeHtml(model.ratesPickup)}"></label>` +
         '<label class="field"><span>Kwota za worek</span>' +
         `<input type="text" inputmode="decimal" data-rate="bag" data-keep="bag" autocomplete="off" value="${escapeHtml(model.ratesBag)}"></label>` +
         '<label class="field"><span>Od kiedy obowiązuje</span>' +
-        `<input type="text" data-rate="from" data-keep="from" autocomplete="off" placeholder="dd.mm.yyyy" value="${escapeHtml(model.ratesFrom)}">` +
+        `<input type="date" data-rate="from" data-keep="from" value="${escapeHtml(model.ratesFrom)}">` +
         '<span class="note">Puste znaczy od zawsze.</span></label>' +
-        '<p class="note">Adres z kolumny Adres sklepu rejestru. Podwykonawca to nazwa krótka z Listy podwykonawców. Nie pinezki mapy. Wpisu ręcznego nie ma.</p>' +
+        '<p class="note">Nazwa z kolumny Sklep, adres z kolumny Adres sklepu rejestru. Zapisuje się adres. Podwykonawca to nazwa krótka z Listy podwykonawców. Nie pinezki mapy. Wpisu ręcznego nie ma.</p>' +
         `<p data-rates-message class="${messageClass}"${model.ratesMessage ? "" : " hidden"}>${escapeHtml(model.ratesMessage)}</p>` +
         '<div class="modal-actions">' +
         '<button type="button" class="btn-ghost" data-action="close-rates">Zamknij</button>' +
@@ -1924,79 +2064,6 @@ function renderApp(model) {
     const dialog = model.ratesOpen ? renderRatesDialog(model) : "";
     const loading = model.loading ? renderLoading(model.loadMessage, model.loadKind === "unicorn") : "";
     return main + dialog + loading;
-}
-
-/** Pola `saveRate` jak na mapie. Listy wybiera widok, tu jest tylko body. */
-function saveRateBody(input) {
-    const shop = input.shop.trim();
-    const contractor = input.contractor.trim();
-    if (shop === "" || contractor === "") {
-        return { ok: false, error: "shop" };
-    }
-    return {
-        ok: true,
-        body: {
-            mode: "saveRate",
-            sklep: shop,
-            podwykonawca: contractor,
-            kwotaPodjazd: input.pickup,
-            kwotaWorek: input.bag,
-            odKiedy: input.from.trim(),
-        },
-    };
-}
-function rateSaveMessage(code) {
-    if (code === "tie") {
-        return "Więcej niż jeden wiersz tej daty. Zapisu nie ma.";
-    }
-    if (code === "date") {
-        return "Data w formacie dd.mm.yyyy albo puste.";
-    }
-    if (code === "amount") {
-        return "Nieprawidłowa kwota.";
-    }
-    if (code === "shop") {
-        return "Wybierz sklep i podwykonawcę.";
-    }
-    if (code === "addresses") {
-        return "Nie udało się wczytać adresów.";
-    }
-    return "Zapis nieudany.";
-}
-/** Odczyt `listStoreAddresses`. Obiekt pinezki nie przechodzi: to nie ta lista. */
-function readAddressList(body) {
-    if (!isRecord(body) || body.ok !== true || !Array.isArray(body.data)) {
-        return { ok: false };
-    }
-    const addresses = [];
-    for (const item of body.data) {
-        if (typeof item !== "string") {
-            return { ok: false };
-        }
-        const text = item.trim();
-        if (text !== "") {
-            addresses.push(text);
-        }
-    }
-    return { ok: true, addresses };
-}
-/** Nazwa krótka, nie Dane do Worda. Puste i powtórki odpadają. */
-function rateContractorNames(items) {
-    const seen = new Set();
-    const names = [];
-    for (const item of items) {
-        const name = item.nazwa.trim();
-        if (name === "" || seen.has(name)) {
-            continue;
-        }
-        seen.add(name);
-        names.push(name);
-    }
-    names.sort((a, b) => a.localeCompare(b, "pl"));
-    return names;
-}
-function isRecord(value) {
-    return typeof value === "object" && value !== null;
 }
 
 
@@ -2417,9 +2484,9 @@ function typeRateField(el) {
     const field = el.dataset.rate === "shop" ? "shop" : "contractor";
     if (field === "shop") {
         VIEW.ratesShopQuery = el.value;
-        const resolved = resolveListText(VIEW.addresses, el.value);
+        const resolved = resolveStoreAddress(VIEW.addresses, el.value);
         VIEW.ratesShop =
-            foldPl(el.value) !== "" && foldPl(resolved.query) === foldPl(el.value) ? resolved.value : "";
+            foldPl(el.value) !== "" && foldPl(resolved.query) === foldPl(el.value) ? resolved.address : "";
         VIEW.ratesShopOpen = true;
         VIEW.ratesContractorOpen = false;
     }
@@ -2438,8 +2505,8 @@ function typeRateField(el) {
 }
 function commitRateField(field) {
     if (field === "shop") {
-        const resolved = resolveListText(VIEW.addresses, VIEW.ratesShopQuery);
-        VIEW.ratesShop = resolved.value;
+        const resolved = resolveStoreAddress(VIEW.addresses, VIEW.ratesShopQuery);
+        VIEW.ratesShop = resolved.address;
         VIEW.ratesShopQuery = resolved.query;
         VIEW.ratesShopOpen = false;
         return;
@@ -2458,8 +2525,9 @@ function pickRateValue(field, value) {
         return;
     }
     if (field === "shop") {
+        const picked = VIEW.addresses.find((item) => item.address === value);
         VIEW.ratesShop = value;
-        VIEW.ratesShopQuery = value;
+        VIEW.ratesShopQuery = picked ? storeAddressLabel(picked) : value;
         VIEW.ratesShopOpen = false;
     }
     else {
@@ -2770,9 +2838,13 @@ async function openRates() {
         }
         else {
             VIEW.addresses = read.addresses;
-            if (!read.addresses.includes(VIEW.ratesShop)) {
+            const current = read.addresses.find((item) => item.address === VIEW.ratesShop);
+            if (!current) {
                 VIEW.ratesShop = "";
                 VIEW.ratesShopQuery = "";
+            }
+            else {
+                VIEW.ratesShopQuery = storeAddressLabel(current);
             }
         }
         if (VIEW.contractors.length === 0) {

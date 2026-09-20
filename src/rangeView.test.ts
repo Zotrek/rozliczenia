@@ -138,10 +138,13 @@ describe("renderApp", () => {
     const html = renderApp(
       model({
         ratesOpen: true,
-        addresses: ["ul. Hetmańska 90", "ul. Głogowska 12"],
+        addresses: [
+          { address: "ul. Hetmańska 90", shop: "Lewiatan" },
+          { address: "ul. Głogowska 12", shop: "Biedronka" },
+        ],
         contractors: [{ nazwa: "GPW", dane: "DANE-WORD-XYZ" }],
         ratesShop: "ul. Głogowska 12",
-        ratesShopQuery: "ul. Głogowska 12",
+        ratesShopQuery: "Biedronka — ul. Głogowska 12",
         ratesShopOpen: true,
         ratesContractor: "GPW",
         ratesContractorQuery: "GPW",
@@ -150,15 +153,17 @@ describe("renderApp", () => {
     expect(html).toContain('role="combobox"');
     expect(html).toContain('data-rate="shop"');
     expect(html).toContain('data-rate="contractor"');
-    expect(html).toContain("ul. Głogowska 12");
-    expect(html).toContain("ul. Hetmańska 90");
+    expect(html).toContain("Biedronka — ul. Głogowska 12");
+    expect(html).toContain("Lewiatan — ul. Hetmańska 90");
+    expect(html).toContain('data-value="ul. Głogowska 12"');
+    expect(html).toContain('data-value="ul. Hetmańska 90"');
     expect(html).toContain('value="GPW"');
     expect(html).not.toContain("DANE-WORD-XYZ");
     expect(html).not.toContain("<select");
     expect(html).toContain("Kwota za podjazd");
     expect(html).toContain("Kwota za worek");
     expect(html).toContain("Od kiedy obowiązuje");
-    expect(html).toContain('placeholder="dd.mm.yyyy"');
+    expect(html).toContain('type="date" data-rate="from"');
     expect(html).toContain('data-action="save-rates"');
     expect(html).not.toContain("resolveRateTie");
     expect(html).not.toContain("Stawka za trasę");

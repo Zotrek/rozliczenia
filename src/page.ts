@@ -9,7 +9,6 @@ import {
   searchParams,
   selectedContractor,
   resolveContractorText,
-  resolveListText,
   startSearch,
   webAppUrl,
   blocksOnOrder,
@@ -49,7 +48,7 @@ import {
   withoutTiedRates,
   writeError,
 } from "./statement.js";
-import { rateContractorNames, rateSaveMessage, readAddressList, saveRateBody } from "./rateWindow.js";
+import { rateContractorNames, rateSaveMessage, readAddressList, resolveStoreAddress, saveRateBody, storeAddressLabel } from "./rateWindow.js";
 
 const VIEW: RangeViewModel = {
   contractorQuery: "",
@@ -478,9 +477,9 @@ function typeRateField(el: HTMLInputElement): void {
   const field: RateField = el.dataset.rate === "shop" ? "shop" : "contractor";
   if (field === "shop") {
     VIEW.ratesShopQuery = el.value;
-    const resolved = resolveListText(VIEW.addresses, el.value);
+    const resolved = resolveStoreAddress(VIEW.addresses, el.value);
     VIEW.ratesShop =
-      foldPl(el.value) !== "" && foldPl(resolved.query) === foldPl(el.value) ? resolved.value : "";
+      foldPl(el.value) !== "" && foldPl(resolved.query) === foldPl(el.value) ? resolved.address : "";
     VIEW.ratesShopOpen = true;
     VIEW.ratesContractorOpen = false;
   } else {
@@ -499,8 +498,8 @@ function typeRateField(el: HTMLInputElement): void {
 
 function commitRateField(field: RateField): void {
   if (field === "shop") {
-    const resolved = resolveListText(VIEW.addresses, VIEW.ratesShopQuery);
-    VIEW.ratesShop = resolved.value;
+    const resolved = resolveStoreAddress(VIEW.addresses, VIEW.ratesShopQuery);
+    VIEW.ratesShop = resolved.address;
     VIEW.ratesShopQuery = resolved.query;
     VIEW.ratesShopOpen = false;
     return;
@@ -521,8 +520,9 @@ function pickRateValue(field: RateField, value: string): void {
     return;
   }
   if (field === "shop") {
+    const picked = VIEW.addresses.find((item) => item.address === value);
     VIEW.ratesShop = value;
-    VIEW.ratesShopQuery = value;
+    VIEW.ratesShopQuery = picked ? storeAddressLabel(picked) : value;
     VIEW.ratesShopOpen = false;
   } else {
     VIEW.ratesContractor = value;
@@ -843,9 +843,12 @@ async function openRates(): Promise<void> {
       VIEW.ratesMessage = rateSaveMessage("addresses");
     } else {
       VIEW.addresses = read.addresses;
-      if (!read.addresses.includes(VIEW.ratesShop)) {
+      const current = read.addresses.find((item) => item.address === VIEW.ratesShop);
+      if (!current) {
         VIEW.ratesShop = "";
         VIEW.ratesShopQuery = "";
+      } else {
+        VIEW.ratesShopQuery = storeAddressLabel(current);
       }
     }
     if (VIEW.contractors.length === 0) {

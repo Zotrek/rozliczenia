@@ -227,7 +227,10 @@ describe("buildSettlementRead_", () => {
   it("test_buildSettlementRead_amounts_grosze_zero_and_empty", () => {
     const result = read(
       open,
-      [entry(2, { 8: 0, 11: "trasa-1", 12: 0 }), entry(3, { 8: "", 12: "" })],
+      [
+        entry(2, { 8: 0, 9: "trasa-1", 10: 0, 11: 20, 12: "10,5" }),
+        entry(3, { 8: "", 10: "", 11: "", 12: "" }),
+      ],
       [
         { sheetRow: 2, cells: ["Sklepowa 1", "gpw", 20, "10,5", ""] },
         { sheetRow: 4, cells: ["Inna 2", "gpw", 0, "", "10.09.2026"] },
@@ -238,8 +241,20 @@ describe("buildSettlementRead_", () => {
     if (!result.ok) {
       return;
     }
-    expect(result.rows[0]).toMatchObject({ bagCount: 0, routeName: "trasa-1", routeRate: 0 });
-    expect(result.rows[1]).toMatchObject({ bagCount: null, routeRate: null, routeName: "" });
+    expect(result.rows[0]).toMatchObject({
+      bagCount: 0,
+      routeName: "trasa-1",
+      routeRate: 0,
+      pickupRate: 2_000,
+      bagRate: 1_050,
+    });
+    expect(result.rows[1]).toMatchObject({
+      bagCount: null,
+      routeRate: null,
+      routeName: "",
+      pickupRate: null,
+      bagRate: null,
+    });
     expect(result.rates).toEqual([
       {
         sheetRow: 2,
@@ -300,7 +315,7 @@ describe("buildSettlementRead_", () => {
   });
 
   it("test_buildSettlementRead_rows_feed_engine", () => {
-    const result = read({ podwykonawca: "gpw", dataDo: "30.09.2026" }, [entry(2, { 8: 1 })], [
+    const result = read({ podwykonawca: "gpw", dataDo: "30.09.2026" }, [entry(2, { 8: 1, 11: 20, 12: 10 })], [
       { sheetRow: 2, cells: ["Sklepowa 1", "gpw", 20, 10, ""] },
     ]);
     expect(result.ok).toBe(true);

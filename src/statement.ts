@@ -689,6 +689,8 @@ function readRegisterRow(value: unknown): RegisterRow | null {
   const contractor = readText(value.contractor);
   const routeName = readText(value.routeName);
   const routeRate = readGrosze(value.routeRate);
+  const pickupRate = readGrosze(value.pickupRate);
+  const bagRate = readGrosze(value.bagRate);
   if (
     typeof sheetRow !== "number" ||
     !Number.isInteger(sheetRow) ||
@@ -699,7 +701,9 @@ function readRegisterRow(value: unknown): RegisterRow | null {
     pickupDate === null ||
     contractor === null ||
     routeName === null ||
-    routeRate === undefined
+    routeRate === undefined ||
+    pickupRate === undefined ||
+    bagRate === undefined
   ) {
     return null;
   }
@@ -726,6 +730,8 @@ function readRegisterRow(value: unknown): RegisterRow | null {
     bagCount,
     routeName,
     routeRate,
+    pickupRate,
+    bagRate,
   };
 }
 

@@ -904,54 +904,11 @@ function roundReal(value) {
 }
 
 
-/**
- * Który wiersz Bazy stawek obowiązuje w dniu odbioru.
- * Pusta data jest starsza niż każda wpisana. Wygrywa najpóźniejsza data nie późniejsza niż odbiór.
- * Dwa wiersze tej daty to remis, nie 0 zł. Starszy dublet, który przegrywa z późniejszą datą, nie blokuje.
- */
-function resolveRate(rates, shop, contractor, pickupDate) {
-    parseSheetDate(pickupDate);
-    const matching = rates
-        .map((rate, index) => ({ rate, index }))
-        .filter((entry) => entry.rate.shop === shop &&
-        entry.rate.contractor === contractor &&
-        isOnOrBefore(entry.rate.validFrom, pickupDate));
-    if (matching.length === 0) {
-        return { kind: "none" };
-    }
-    let bestFrom = matching[0].rate.validFrom;
-    for (const entry of matching) {
-        if (compareSheetDate(entry.rate.validFrom, bestFrom) > 0) {
-            bestFrom = entry.rate.validFrom;
-        }
-    }
-    const winners = matching.filter((entry) => entry.rate.validFrom === bestFrom);
-    if (winners.length > 1) {
-        const candidates = winners.map((entry) => ({
-            index: entry.index,
-            validFrom: entry.rate.validFrom,
-            pickupAmount: entry.rate.pickupAmount,
-            bagAmount: entry.rate.bagAmount,
-        }));
-        return {
-            kind: "tie",
-            tie: { shop, contractor, validFrom: bestFrom, candidates },
-        };
-    }
-    return {
-        kind: "ok",
-        pickupAmount: winners[0].rate.pickupAmount,
-        bagAmount: winners[0].rate.bagAmount,
-    };
-}
-
-
-
 
 /**
  * Silnik kosztów. Czyste funkcje, bez arkusza i bez DOM.
  * Kwoty w groszach. Daty tekstem `dd.mm.yyyy`.
- * Reguły: docs/SPECIFICATION.md — Koszt odbioru, Baza stawek.
+ * Reguły: docs/SPECIFICATION.md — Koszt odbioru ze snapshotu rejestru (kol. 12–13).
  */
 function rowKey(sheetRow, transportNumber) {
     return `${sheetRow}\t${transportNumber}`;
@@ -1042,7 +999,7 @@ function buildShop(row, input, mode) {
     const screen = screenOf(input, row);
     const happened = !screen.didNotHappen;
     const bagsOnly = mode.kind === "plain" && screen.bagsOnly === true;
-    const priced = price(row, input.rates, screen);
+    const priced = price(row, screen);
     let legAmount;
     let bagSum;
     let receptionCost;
@@ -1051,12 +1008,6 @@ function buildShop(row, input, mode) {
         legAmount = 0;
         bagSum = 0;
         receptionCost = 0;
-        perBag = null;
-    }
-    else if (priced.tie) {
-        legAmount = mode.kind === "route" ? mode.share : null;
-        bagSum = null;
-        receptionCost = null;
         perBag = null;
     }
     else if (mode.kind === "route") {
@@ -1087,26 +1038,21 @@ function buildShop(row, input, mode) {
         happened,
         bagsOnly,
         legAmount,
-        bagRate: priced.tie ? null : priced.bagRate,
+        bagRate: priced.bagRate,
         bagSum,
         receptionCost,
         costPerBag: perBag,
-        tie: priced.tie,
+        tie: null,
     };
 }
-function price(row, rates, screen) {
-    const resolved = resolveRate(rates, row.address, row.contractor, row.pickupDate);
-    if (resolved.kind === "tie") {
-        return { tie: resolved.tie, pickup: 0, bagRate: null, bagSum: 0 };
-    }
-    const basePickup = resolved.kind === "ok" ? resolved.pickupAmount : null;
-    const baseBag = resolved.kind === "ok" ? resolved.bagAmount : null;
-    const pickupAmount = screen.pickupAmount !== undefined ? screen.pickupAmount : basePickup;
-    const bagAmount = screen.bagAmount !== undefined ? screen.bagAmount : baseBag;
+/** Koszt ze snapshotu rejestru. Nadpisanie ekranu jak wcześniej. Brak / pusta → 0. */
+function price(row, screen) {
+    const pickupAmount = screen.pickupAmount !== undefined ? screen.pickupAmount : row.pickupRate;
+    const bagAmount = screen.bagAmount !== undefined ? screen.bagAmount : row.bagRate;
     const pickup = pickupAmount ?? 0;
     const bagRate = bagAmount;
     const bagSum = bagRate === null || bagRate === 0 ? 0 : mulGrosze(row.bagCount ?? 0, bagRate);
-    return { tie: null, pickup, bagRate, bagSum };
+    return { pickup, bagRate, bagSum };
 }
 function screenOf(input, row) {
     return input.screenByRow[rowKey(row.sheetRow, row.transportNumber)] ?? {};
@@ -1678,6 +1624,8 @@ function readRegisterRow(value) {
     const contractor = readText(value.contractor);
     const routeName = readText(value.routeName);
     const routeRate = readGrosze(value.routeRate);
+    const pickupRate = readGrosze(value.pickupRate);
+    const bagRate = readGrosze(value.bagRate);
     if (typeof sheetRow !== "number" ||
         !Number.isInteger(sheetRow) ||
         sheetRow < 2 ||
@@ -1687,7 +1635,9 @@ function readRegisterRow(value) {
         pickupDate === null ||
         contractor === null ||
         routeName === null ||
-        routeRate === undefined) {
+        routeRate === undefined ||
+        pickupRate === undefined ||
+        bagRate === undefined) {
         return null;
     }
     let bagCount;
@@ -1716,6 +1666,8 @@ function readRegisterRow(value) {
         bagCount,
         routeName,
         routeRate,
+        pickupRate,
+        bagRate,
     };
 }
 function readRateRow(value) {
@@ -1801,10 +1753,10 @@ function plainRow(screen, shop) {
         ? DASH
         : dead
             ? money(shop.legAmount, true)
-            : `<span class="tag">podjazd</span>${amountInput(shop, "pickup", state.pickupAmount, shop.legAmount, "Zmiana kwoty za podjazd tylko na tym ekranie, nie w Bazie stawek")}`;
+            : `<span class="tag">podjazd</span>${amountInput(shop, "pickup", state.pickupAmount, shop.legAmount, "Zmiana kwoty za podjazd tylko na tym ekranie — nie w rejestrze ani w Bazie stawek")}`;
     const bagCell = shop.tie
         ? DASH
-        : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie, nie w Bazie stawek");
+        : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
     return (`<tr class="${rowClass(dead, checked, "plain")}" data-kind="plain">` +
         `<td class="c">${lineBox(line, checked)}</td>` +
         `<td>${text(shop.transportNumber, dead)}</td>` +
@@ -1857,7 +1809,7 @@ function childRow(screen, shop, sharedBagRate) {
     const state = screen.screenByRow[rowKey(shop.sheetRow, shop.transportNumber)] ?? {};
     const bagCell = shop.tie || sharedBagRate
         ? DASH
-        : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie w Bazie stawek.");
+        : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie zapisuje kolumn rejestru ani Bazy stawek.");
     return (`<tr class="${rowClass(dead, false, "child")}" data-kind="child">` +
         "<td></td>" +
         `<td>${text(shop.transportNumber, dead)}</td>` +

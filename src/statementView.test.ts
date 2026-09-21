@@ -23,6 +23,8 @@ function row(over: Partial<RegisterRow> & { sheetRow: number }): RegisterRow {
     bagCount: 0,
     routeName: "",
     routeRate: null,
+    pickupRate: 2_000,
+    bagRate: 0,
     ...over,
   };
 }
@@ -49,7 +51,7 @@ describe("renderStatement", () => {
   it("test_renderStatement_bagsOnly_under_shop_name_dash_in_leg", () => {
     const html = renderStatement(
       setBagsOnly(
-        screen([row({ sheetRow: 2, bagCount: 1 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]),
+        screen([row({ sheetRow: 2, bagCount: 1, bagRate: 1_000 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]),
         2,
         "2",
         true,
@@ -118,7 +120,7 @@ describe("renderStatement", () => {
   it("test_renderStatement_didNotHappen_strikes_row_before_save", () => {
     const html = renderStatement(
       setDidNotHappen(
-        screen([row({ sheetRow: 2, bagCount: 1 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]),
+        screen([row({ sheetRow: 2, bagCount: 1, bagRate: 1_000 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]),
         2,
         "2",
         true,
@@ -130,19 +132,18 @@ describe("renderStatement", () => {
     expect(html).not.toContain("patchBags");
   });
 
-  it("test_renderStatement_tie_buttons_use_rate_sheet_row", () => {
+  it("test_renderStatement_rate_sheet_tie_does_not_appear_on_statement", () => {
     const html = renderStatement(
       screen(
-        [row({ sheetRow: 3, address: "A" })],
+        [row({ sheetRow: 3, address: "A", pickupRate: null, bagRate: null })],
         [
           rate({ sheetRow: 5, shop: "A", pickupAmount: 1_000, bagAmount: 100 }),
           rate({ sheetRow: 6, shop: "A", pickupAmount: 2_000, bagAmount: 200 }),
         ],
       ),
     );
-    expect(html).toContain('data-action="resolve-tie" data-rate-row="5"');
-    expect(html).toContain('data-action="resolve-tie" data-rate-row="6"');
-    expect(html).not.toContain('data-rate-row="3"');
+    expect(html).not.toContain("resolve-tie");
+    expect(html).toContain(formatPln(0));
   });
 
   it("test_renderStatement_detached_shop_can_start_a_new_route", () => {

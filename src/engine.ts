@@ -1,11 +1,9 @@
 import { costPerBag, mulGrosze, divRoundHalfUp } from "./money.js";
 import { parseSheetDate } from "./sheetDate.js";
-import { resolveRate } from "./rates.js";
 import type {
   EngineInput,
   Grosze,
   PlainLine,
-  RateRow,
   RateTie,
   RegisterRow,
   RouteLine,
@@ -18,7 +16,7 @@ import type {
 /**
  * Silnik kosztów. Czyste funkcje, bez arkusza i bez DOM.
  * Kwoty w groszach. Daty tekstem `dd.mm.yyyy`.
- * Reguły: docs/SPECIFICATION.md — Koszt odbioru, Baza stawek.
+ * Reguły: docs/SPECIFICATION.md — Koszt odbioru ze snapshotu rejestru (kol. 12–13).
  */
 
 export function rowKey(sheetRow: number, transportNumber: string): string {
@@ -120,7 +118,7 @@ function buildShop(row: RegisterRow, input: EngineInput, mode: ShopMode): ShopCo
   const screen = screenOf(input, row);
   const happened = !screen.didNotHappen;
   const bagsOnly = mode.kind === "plain" && screen.bagsOnly === true;
-  const priced = price(row, input.rates, screen);
+  const priced = price(row, screen);
 
   let legAmount: Grosze | null;
   let bagSum: Grosze | null;
@@ -131,11 +129,6 @@ function buildShop(row: RegisterRow, input: EngineInput, mode: ShopMode): ShopCo
     legAmount = 0;
     bagSum = 0;
     receptionCost = 0;
-    perBag = null;
-  } else if (priced.tie) {
-    legAmount = mode.kind === "route" ? mode.share : null;
-    bagSum = null;
-    receptionCost = null;
     perBag = null;
   } else if (mode.kind === "route") {
     legAmount = mode.share;
@@ -164,35 +157,28 @@ function buildShop(row: RegisterRow, input: EngineInput, mode: ShopMode): ShopCo
     happened,
     bagsOnly,
     legAmount,
-    bagRate: priced.tie ? null : priced.bagRate,
+    bagRate: priced.bagRate,
     bagSum,
     receptionCost,
     costPerBag: perBag,
-    tie: priced.tie,
+    tie: null,
   };
 }
 
 interface Priced {
-  tie: RateTie | null;
   pickup: Grosze;
   bagRate: Grosze | null;
   bagSum: Grosze;
 }
 
-function price(row: RegisterRow, rates: readonly RateRow[], screen: ScreenState): Priced {
-  const resolved = resolveRate(rates, row.address, row.contractor, row.pickupDate);
-  if (resolved.kind === "tie") {
-    return { tie: resolved.tie, pickup: 0, bagRate: null, bagSum: 0 };
-  }
-
-  const basePickup = resolved.kind === "ok" ? resolved.pickupAmount : null;
-  const baseBag = resolved.kind === "ok" ? resolved.bagAmount : null;
-  const pickupAmount = screen.pickupAmount !== undefined ? screen.pickupAmount : basePickup;
-  const bagAmount = screen.bagAmount !== undefined ? screen.bagAmount : baseBag;
+/** Koszt ze snapshotu rejestru. Nadpisanie ekranu jak wcześniej. Brak / pusta → 0. */
+function price(row: RegisterRow, screen: ScreenState): Priced {
+  const pickupAmount = screen.pickupAmount !== undefined ? screen.pickupAmount : row.pickupRate;
+  const bagAmount = screen.bagAmount !== undefined ? screen.bagAmount : row.bagRate;
   const pickup = pickupAmount ?? 0;
   const bagRate = bagAmount;
   const bagSum = bagRate === null || bagRate === 0 ? 0 : mulGrosze(row.bagCount ?? 0, bagRate);
-  return { tie: null, pickup, bagRate, bagSum };
+  return { pickup, bagRate, bagSum };
 }
 
 function screenOf(input: EngineInput, row: RegisterRow): ScreenState {

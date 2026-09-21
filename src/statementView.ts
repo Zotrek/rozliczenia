@@ -71,10 +71,10 @@ function plainRow(screen: StatementScreen, shop: ShopCost): string {
     ? DASH
     : dead
       ? money(shop.legAmount, true)
-      : `<span class="tag">podjazd</span>${amountInput(shop, "pickup", state.pickupAmount, shop.legAmount, "Zmiana kwoty za podjazd tylko na tym ekranie, nie w Bazie stawek")}`;
+      : `<span class="tag">podjazd</span>${amountInput(shop, "pickup", state.pickupAmount, shop.legAmount, "Zmiana kwoty za podjazd tylko na tym ekranie — nie w rejestrze ani w Bazie stawek")}`;
   const bagCell = shop.tie
     ? DASH
-    : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie, nie w Bazie stawek");
+    : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
   return (
     `<tr class="${rowClass(dead, checked, "plain")}" data-kind="plain">` +
     `<td class="c">${lineBox(line, checked)}</td>` +
@@ -148,7 +148,7 @@ function childRow(screen: StatementScreen, shop: ShopCost, sharedBagRate: boolea
   const state = screen.screenByRow[rowKey(shop.sheetRow, shop.transportNumber)] ?? {};
   const bagCell = shop.tie || sharedBagRate
     ? DASH
-    : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie w Bazie stawek.");
+    : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie zapisuje kolumn rejestru ani Bazy stawek.");
   return (
     `<tr class="${rowClass(dead, false, "child")}" data-kind="child">` +
     "<td></td>" +

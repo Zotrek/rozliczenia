@@ -17,7 +17,7 @@ Aplikacja nie służy do wpisywania odbiorów. Dane odbioru powstają przy gener
 
 **Dlaczego to robimy?**
 
-Koszt podjazdu, worków i trasy ma być liczony z danych już zapisanych przy protokole oraz z bazy stawek. Bez przepisywania sklepu, daty, worków i numeru protokołu do drugiego miejsca.
+Koszt podjazdu, worków i trasy ma być liczony z danych już zapisanych przy protokole (w tym snapshot stawek podjazdu i worka w rejestrze). Bez przepisywania sklepu, daty, worków i numeru protokołu do drugiego miejsca.
 
 ---
 
@@ -63,17 +63,17 @@ Reguła z pierwotnych wytycznych, że jedna pozycja może mieć naraz podjazd, w
 
 ### Podjazd
 
-Tylko odbiór zwykły. Raz na sklep, według stawki z bazy dla pary Sklep + Podwykonawca.
+Tylko odbiór zwykły. Raz na sklep, według **Stawka za podjazd** z rejestru (snapshot z Bazy stawek przy protokole).
 
 Dziesięć sklepów tego podwykonawcy to do dziesięciu podjazdów, każdy według stawki tego sklepu.
 
-Gdy na dzień odbioru nie ma wiersza tej pary, koszt podjazdu wynosi 0 zł, tak samo jak opłata za worki. To nie jest błąd. Bez ostrzeżenia i bez blokady zatwierdzenia.
+Gdy snapshot jest pusty (brak pary w Bazie w dniu protokołu albo remis), koszt podjazdu wynosi 0 zł, tak samo jak opłata za worki. To nie jest błąd. Bez ostrzeżenia i bez blokady zatwierdzenia.
 
 ### Worki
 
-Opłata za worki jest naliczana tylko wtedy, gdy spełnione są naraz trzy warunki: na dzień odbioru obowiązuje wiersz Sklep + Podwykonawca, stawka za worek w tym wierszu nie jest pusta i nie jest równa 0. Wtedy kwota to `Ilość worków × stawka za worek`. Który wiersz obowiązuje — [Baza stawek](#baza-stawek).
+Opłata za worki jest naliczana tylko wtedy, gdy **Stawka za worek** w rejestrze nie jest pusta i nie jest równa 0. Wtedy kwota to `Ilość worków × stawka za worek`. Snapshot powstaje przy protokole z Bazy stawek — [Baza stawek](#baza-stawek).
 
-Brak wiersza, pusta stawka za worek albo stawka równa 0: opłata za worki = 0 zł. To nie jest błąd.
+Pusta stawka za worek albo stawka równa 0: opłata za worki = 0 zł. To nie jest błąd.
 
 Przy trasie koszty worków sklepów sumują się w kolumnie Suma za worki wiersza trasy. Stawka trasy od tego mnożenia nie zależy.
 
@@ -126,9 +126,9 @@ Rejestr transportów to **pierwsza zakładka** pliku. Tak bierze ją makro dziś
 
 Słowniki już istniejące (**Lista podwykonawców**, **Popraw adres**) oraz nowa **Baza stawek** są po nazwie. To nie jest rejestr. Ich nie szuka się jako pierwszej zakładki.
 
-Kolumny rejestru są po **kolejności**, nie po nazwie nagłówka. Numer kolumny jest umową zapisu i odczytu, w makrze i w aplikacji rozliczeń. Nagłówek w wierszu 1 jest dla człowieka: ma stać w tej samej kolumnie i tym samym tekstem. Wstawienie albo zamiana kolumny w środku zmienia znaczenie danych. Nowe pole dopisuje się tylko na końcu, następnym numerem z listy niżej.
+Kolumny rejestru są po **kolejności**, nie po nazwie nagłówka. Numer kolumny jest umową zapisu i odczytu, w makrze i w aplikacji rozliczeń. Nagłówek w wierszu 1 jest dla człowieka: ma stać w tej samej kolumnie i tym samym tekstem. Wstawienie albo zamiana kolumny w środku zmienia znaczenie danych. Nowe pole dopisuje się zwykle na końcu — wyjątek: jednorazowa migracja V2 (komentarze na 19–20, stawki podjazdu/worka w 12–13) w [TRANSPORT_SHEET.md](../../arkusz-mapa/docs/TRANSPORT_SHEET.md).
 
-Właścicielem wiersza nagłówków rejestru jest makro mapy, to samo, które dopisuje protokół. Zanim pierwszy raz dopisze jakikolwiek wiersz protokołu, także gdy to nie jest odbiór z trasy, wpisuje nagłówki kolumn 12–18 w wierszu 1, jeśli te komórki są puste. W tym samym kroku, raz, zakłada na kolumnie 18 listę `tak` / `nie` i przekreślenie wiersza z `nie`. Kolumn 1–11 nie rusza i nie przesuwa. Brak nagłówka nie jest powodem, żeby pominąć zapis albo wybrać inną kolumnę. Aplikacja rozliczeń tych nagłówków nie wpisuje. Pisze w te same numery. Nie szuka kolumny po nazwie i nie zakłada drugiej kopii rejestru. Dopóki po tym wdrożeniu nie zapisze się żadnego nowego protokołu, kolumny 18 nie ma. Brak kolumny znaczy to samo co pusta: transport się odbył.
+Właścicielem wiersza nagłówków rejestru jest makro mapy, to samo, które dopisuje protokół. Zanim pierwszy raz dopisze jakikolwiek wiersz protokołu, także gdy to nie jest odbiór z trasy, wpisuje nagłówki kolumn 10–20 w wierszu 1, jeśli te komórki są puste. W tym samym kroku, raz, zakłada na kolumnie 18 listę `tak` / `nie` i przekreślenie wiersza z `nie`. Kolumn 1–9 nie rusza i nie przesuwa. Brak nagłówka nie jest powodem, żeby pominąć zapis albo wybrać inną kolumnę. Aplikacja rozliczeń tych nagłówków nie wpisuje. Pisze w te same numery. Nie szuka kolumny po nazwie i nie zakłada drugiej kopii rejestru. Dopóki po tym wdrożeniu nie zapisze się żadnego nowego protokołu, kolumny 18 nie ma. Brak kolumny znaczy to samo co pusta: transport się odbył.
 
 | Jak się znajduje | Zakładka | Rola |
 |------------------|----------|------|
@@ -141,7 +141,7 @@ Brak zakładki o nazwie **Baza stawek** nie kończy się cichym brakiem zapisu. 
 
 To jest „arkusz podsumowania tras” z wytycznych. Mechanizm już istnieje: przy protokole dopisywany jest wiersz na sklep. Rozliczenie czyta te same wiersze i dopisuje na nich status oraz numer faktury. Drugiej kopii odbioru nie ma.
 
-Kolejność kolumn rejestru. Numery 1–11 są już w makrze. Numery 12–18 dochodzą na końcu, za Komentarz 2:
+Kolejność kolumn rejestru. Numery 1–9 są już w makrze. Po migracji V2:
 
 1. Numer transportowy
 2. Adres sklepu
@@ -152,15 +152,17 @@ Kolejność kolumn rejestru. Numery 1–11 są już w makrze. Numery 12–18 doc
 7. Miejsce zrzutu
 8. Rodzaj zbiórki
 9. Ilość worków
-10. Komentarz 1
-11. Komentarz 2
-12. **Trasa** — nazwa lub numer trasy. Pusta, gdy to nie jest odbiór z trasy, także po odpięciu od trasy. Nie zastępuje numeru transportowego.
-13. **Stawka za trasę** — jedna kwota dla całej nazwy trasy. Pusta, gdy to nie jest odbiór z trasy. W bazie stawek tej kwoty nie ma. Zmiana przy protokole i edycja na zestawieniu rozliczeń nadpisują **Stawka za trasę** na wszystkich nierozliczonych wierszach z tą samą nazwą w **Trasa**. Kluczem zapisu jest sam tekst nazwy. Zapis nie patrzy na **Kto odbiera** i nie patrzy na zakres dat. Dzielnik przy rozliczeniu patrzy: liczy tylko sklepy tego podwykonawcy w bieżącym zestawieniu. Własna nazwa, nie ze schematu, może więc nadpisać stawkę innego podwykonawcy z tym samym tekstem w **Trasa**. Zmiana na zestawieniu z jednego dnia nadpisuje też sklepy tej nazwy z innego dnia, choć ich na ekranie nie ma i to Zatwierdź ich nie oznacza. System nie ostrzega i nie blokuje. Wiersze już rozliczone są pominięte. Ten zapis jest od razu. Kolumn 16 i 17 nie rusza. Szczegóły: [Tabela — odbiór z trasy](#tabela--odbiór-z-trasy).
+10. **Trasa** — nazwa lub numer trasy. Pusta, gdy to nie jest odbiór z trasy, także po odpięciu od trasy. Nie zastępuje numeru transportowego.
+11. **Stawka za trasę** — jedna kwota dla całej nazwy trasy. Pusta, gdy to nie jest odbiór z trasy. W bazie stawek tej kwoty nie ma. Zmiana przy protokole i edycja na zestawieniu rozliczeń nadpisują **Stawka za trasę** na wszystkich nierozliczonych wierszach z tą samą nazwą w **Trasa**. Kluczem zapisu jest sam tekst nazwy. Zapis nie patrzy na **Kto odbiera** i nie patrzy na zakres dat. Dzielnik przy rozliczeniu patrzy: liczy tylko sklepy tego podwykonawcy w bieżącym zestawieniu. Własna nazwa, nie ze schematu, może więc nadpisać stawkę innego podwykonawcy z tym samym tekstem w **Trasa**. Zmiana na zestawieniu z jednego dnia nadpisuje też sklepy tej nazwy z innego dnia, choć ich na ekranie nie ma i to Zatwierdź ich nie oznacza. System nie ostrzega i nie blokuje. Wiersze już rozliczone są pominięte. Ten zapis jest od razu. Kolumn 16 i 17 nie rusza. Szczegóły: [Tabela — odbiór z trasy](#tabela--odbiór-z-trasy).
+12. **Stawka za podjazd** — snapshot z Bazy stawek przy dopisaniu wiersza protokołu (adres + kto odbiera + data odbioru). Remis albo brak pary → puste. Aplikacja rozliczeń liczy koszt z tej kolumny, nie z Bazy na żywo. Nadpisanie na ekranie zestawienia nie wraca tu ani do Bazy.
+13. **Stawka za worek** — j.w. snapshot przy protokole.
 14. **Rozliczony** — puste do momentu Zatwierdź. Po zatwierdzeniu `tak`. Wpisuje aplikacja rozliczeń, nie mapa. Wiersz z `tak` jest rozliczony i nie wraca do wyszukiwania. Inna wartość niż `tak`, także pusta, znaczy, że nie jest rozliczony.
 15. **Numer faktury** — pusty do zatwierdzenia. Potem jeden numer, tylko na transportach rozliczonych na tym ekranie. Wiersze pokazane, ale niezaznaczone, oraz transporty spoza tego ekranu numeru nie dostają. Wpisuje aplikacja rozliczeń.
 16. **Koszt odbioru** — kwota tego sklepu. Wzór: [Koszt odbioru](#koszt-odbioru). Pusta do Zatwierdź. Wpisuje ją aplikacja rozliczeń dopiero wtedy, razem z **Rozliczony** `tak`. Po Zatwierdź się nie zmienia.
 17. **Koszt odbioru per worek** — w tym samym zapisie co kolumna 16, nie wcześniej. `Koszt odbioru / Ilość worków`. Gdy Ilość worków jest pusta albo równa 0, dzielimy przez 1.
 18. **transport się odbył** — lista rozwijana: `tak` albo `nie`. Da się wybrać w arkuszu, także przy edycji w Excelu. Pusta albo `tak` znaczy, że transport się odbył. Wartość `nie` znaczy, że się nie odbył. Taki wiersz nie dostaje **Rozliczony** `tak`, numeru faktury ani kolumn 16 i 17. Nie wchodzi w udział w trasie ani w całą stawkę trasy. Nie wraca do wyszukiwania. Przy zatwierdzeniu wiersza, który go obejmuje, aplikacja rozliczeń wpisuje samo `nie`. Inna wartość niż `nie` też znaczy, że transport się odbył.
+19. **Komentarz 1** — tylko rejestr / protokół mapy. Rozliczenia nie czytają.
+20. **Komentarz 2** — j.w.
 
 Gdy **transport się odbył** ma wartość `nie`, także wpisaną w arkuszu przed otwarciem rozliczenia, wiersz nie wchodzi do wyszukiwania. Na Arkusz1 jest przekreślony. W aplikacji rozliczeń go nie ma. Arkusz-mapa traktuje worki tego wiersza jako nieodebrane. Data tego wiersza nie odcina worków tak, jak data transportu, który się odbył. W pozostałych miejscach wiersz jest transportem, który się nie odbył. Nie wchodzi w koszt: bez podjazdu, bez worków i bez udziału w trasie. Przy trasie ten sklep nie wchodzi w liczbę sklepów ani w sumę worków. Gdy żaden sklep trasy się nie odbył, kosztu trasy nie ma.
 
@@ -170,7 +172,7 @@ Liczba sklepów to liczba sklepów tej nazwy i tego „Kto odbiera” w bieżąc
 
 Przykład: stawka 150 zł, trzy sklepy, jeden oznaczony na ekranie, że transport się nie odbył. Dzielnik to 2. Udział każdego z dwóch, które się odbyły, to 75 zł. Wyłączony sklep dostaje 0 zł.
 
-Koszt worków jest liczony jak w regułach worków, ze stawki obowiązującej w dniu odbioru: tylko gdy stawka za worek nie jest pusta ani równa 0. Inaczej 0 zł. Koszt podjazdu bierze się z tego samego wiersza bazy stawek. Brak wiersza na ten dzień daje 0 zł za podjazd i 0 zł za worki.
+Koszt worków jest liczony jak w regułach worków, ze **Stawka za worek** w rejestrze: tylko gdy nie jest pusta ani równa 0. Inaczej 0 zł. Koszt podjazdu bierze się z **Stawka za podjazd** w tym samym wierszu rejestru. Puste snapshoty dają 0 zł za podjazd i 0 zł za worki.
 
 Kolumny 16 i 17 są puste do zatwierdzenia. Aplikacja rozliczeń pokazuje koszt na ekranie z aktualnych stawek i z kwot wpisanych na zestawieniu. Przy **Zatwierdź** wpisuje obie, jako kwotę ostateczną. Dopisanie kolejnego sklepu do trasy i późniejsza zmiana stawek nie przeliczają już kwot zapisanych przy zatwierdzeniu. Edycja stawki za trasę nie rusza wierszy już rozliczonych i nie wpisuje kolumn 16 ani 17.
 
@@ -209,7 +211,7 @@ Przy rozliczeniu taki odbiór pokazuje błąd stawek. Kosztu z tej pary na ekran
 
 Wybór zapisuje się od razu i zostaje. W Bazie stawek zostaje wskazany wiersz. Pozostałe z tą samą parą i tą samą datą są usuwane. To jedyne usuwanie wiersza stawki w tej wersji. Już zapisany Koszt odbioru i Koszt odbioru per worek się nie zmieniają. Koszt jeszcze niezatwierdzony liczy się od nowa ze stawki, która została.
 
-Mapa i aplikacja, gdy trafią na więcej niż jeden wiersz tego klucza, nie nadpisują jednego z nich. Ten sam remis rozstrzyga użytkownik przy rozliczeniu.
+Mapa i aplikacja, gdy trafią na więcej niż jeden wiersz tego klucza przy zapisie do Bazy, nie nadpisują jednego z nich. Remis przy zapisie `saveRate` odmawia. Przy dopisywaniu protokołu remis w Bazie kończy się pustym snapshotem w rejestrze (koszt 0), bez blokady zatwierdzenia.
 
 Przykład dla jednej pary Sklep + Podwykonawca:
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { lineKey, rowKey, settle, sumSelected } from "./engine.js";
-import type { EngineInput, RateRow, RegisterRow, RouteLine, ScreenState, ShopCost, Statement } from "./types.js";
+import type { EngineInput, RegisterRow, RouteLine, ScreenState, ShopCost, Statement } from "./types.js";
 
 function reception(over: Partial<RegisterRow> & Pick<RegisterRow, "sheetRow">): RegisterRow {
   return {
@@ -12,27 +12,14 @@ function reception(over: Partial<RegisterRow> & Pick<RegisterRow, "sheetRow">): 
     bagCount: 1,
     routeName: "",
     routeRate: null,
+    pickupRate: 2_000,
+    bagRate: 1_000,
     ...over,
   };
 }
 
-function rate(over: Partial<RateRow> = {}): RateRow {
-  return {
-    shop: "Sklepowa 1",
-    contractor: "gpw",
-    pickupAmount: 2_000,
-    bagAmount: 1_000,
-    validFrom: "",
-    ...over,
-  };
-}
-
-function go(
-  rows: RegisterRow[],
-  rates: RateRow[] = [],
-  screenByRow: EngineInput["screenByRow"] = {},
-): Statement {
-  return settle({ rows, rates, screenByRow });
+function go(rows: RegisterRow[], screenByRow: EngineInput["screenByRow"] = {}): Statement {
+  return settle({ rows, rates: [], screenByRow });
 }
 
 function screen(row: RegisterRow, state: ScreenState): EngineInput["screenByRow"] {
@@ -57,21 +44,9 @@ function onlyRoute(statement: Statement): RouteLine {
   return line;
 }
 
-const RATE_TABLE: RateRow[] = [
-  rate({ pickupAmount: 10_000, bagAmount: 0, validFrom: "" }),
-  rate({ pickupAmount: 15_000, bagAmount: 0, validFrom: "10.09.2026" }),
-  rate({ pickupAmount: 20_000, bagAmount: 0, validFrom: "10.10.2026" }),
-];
-
-function interval(pickupDate: string): ShopCost {
-  return onlyPlain(
-    go([reception({ sheetRow: 2, pickupDate, bagCount: 0 })], RATE_TABLE),
-  );
-}
-
 describe("settle", () => {
   it("test_settle_pickup20_bags10_cost30", () => {
-    const shop = onlyPlain(go([reception({ sheetRow: 2 })], [rate()]));
+    const shop = onlyPlain(go([reception({ sheetRow: 2 })]));
     expect(shop.legAmount).toBe(2_000);
     expect(shop.bagSum).toBe(1_000);
     expect(shop.receptionCost).toBe(3_000);
@@ -87,6 +62,8 @@ describe("settle", () => {
       routeName: "gpw-18.09.26-01",
       routeRate: 15_000,
       bagCount: 4,
+      pickupRate: 2_000,
+      bagRate: 1_000,
     });
     const second = reception({
       sheetRow: 3,
@@ -95,14 +72,10 @@ describe("settle", () => {
       routeName: "gpw-18.09.26-01",
       routeRate: 15_000,
       bagCount: 0,
+      pickupRate: 2_000,
+      bagRate: 1_000,
     });
-    const statement = go(
-      [first, second],
-      [
-        rate({ shop: "A 1", pickupAmount: 2_000, bagAmount: 1_000 }),
-        rate({ shop: "B 2", pickupAmount: 2_000, bagAmount: 1_000 }),
-      ],
-    );
+    const statement = go([first, second]);
     const line = onlyRoute(statement);
     expect(line.date).toBe("18.09.2026");
     expect(line.shops[0].legAmount).toBe(7_500);
@@ -122,6 +95,8 @@ describe("settle", () => {
         routeName: "trasa",
         routeRate: 10_000,
         bagCount: 0,
+        pickupRate: null,
+        bagRate: null,
       }),
     );
     const line = onlyRoute(go(rows));
@@ -134,7 +109,7 @@ describe("settle", () => {
 
   it("test_settle_bagsOnly_10_leg_dash", () => {
     const row = reception({ sheetRow: 2 });
-    const shop = onlyPlain(go([row], [rate()], screen(row, { bagsOnly: true })));
+    const shop = onlyPlain(go([row], screen(row, { bagsOnly: true })));
     expect(shop.legAmount).toBeNull();
     expect(shop.bagSum).toBe(1_000);
     expect(shop.receptionCost).toBe(1_000);
@@ -149,10 +124,12 @@ describe("settle", () => {
         routeName: "trasa",
         routeRate: 15_000,
         bagCount: 0,
+        pickupRate: null,
+        bagRate: null,
       }),
     );
     const absent = rows[2];
-    const line = onlyRoute(go(rows, [], screen(absent, { didNotHappen: true })));
+    const line = onlyRoute(go(rows, screen(absent, { didNotHappen: true })));
     expect(line.routeCostApplies).toBe(true);
     expect(line.shops[0].legAmount).toBe(7_500);
     expect(line.shops[1].legAmount).toBe(7_500);
@@ -170,13 +147,14 @@ describe("settle", () => {
         routeName: "trasa",
         routeRate: 15_000,
         bagCount: 1,
+        bagRate: 1_000,
       }),
     );
     const screenByRow = Object.assign(
       {},
       ...rows.map((row) => screen(row, { didNotHappen: true })),
     ) as EngineInput["screenByRow"];
-    const statement = go(rows, [rate({ bagAmount: 1_000 })], screenByRow);
+    const statement = go(rows, screenByRow);
     const line = onlyRoute(statement);
     expect(line.routeCostApplies).toBe(false);
     expect(line.routeRate).toBe(15_000);
@@ -187,7 +165,9 @@ describe("settle", () => {
   });
 
   it("test_settle_missingPair_0_noTie", () => {
-    const shop = onlyPlain(go([reception({ sheetRow: 2, bagCount: 3 })]));
+    const shop = onlyPlain(
+      go([reception({ sheetRow: 2, bagCount: 3, pickupRate: null, bagRate: null })]),
+    );
     expect(shop.receptionCost).toBe(0);
     expect(shop.bagSum).toBe(0);
     expect(shop.legAmount).toBe(0);
@@ -195,9 +175,7 @@ describe("settle", () => {
   });
 
   it("test_settle_emptyBagRate_0_noTie", () => {
-    const shop = onlyPlain(
-      go([reception({ sheetRow: 2, bagCount: 3 })], [rate({ bagAmount: null })]),
-    );
+    const shop = onlyPlain(go([reception({ sheetRow: 2, bagCount: 3, bagRate: null })]));
     expect(shop.bagSum).toBe(0);
     expect(shop.bagRate).toBeNull();
     expect(shop.receptionCost).toBe(2_000);
@@ -205,75 +183,48 @@ describe("settle", () => {
   });
 
   it("test_settle_zeroBagRate_0_noTie", () => {
-    const shop = onlyPlain(
-      go([reception({ sheetRow: 2, bagCount: 3 })], [rate({ bagAmount: 0 })]),
-    );
+    const shop = onlyPlain(go([reception({ sheetRow: 2, bagCount: 3, bagRate: 0 })]));
     expect(shop.bagSum).toBe(0);
     expect(shop.bagRate).toBe(0);
     expect(shop.receptionCost).toBe(2_000);
     expect(shop.tie).toBeNull();
   });
 
-  it("test_settle_rateTie_isError_notZero", () => {
-    const statement = go(
-      [reception({ sheetRow: 2 })],
-      [rate({ pickupAmount: 2_000 }), rate({ pickupAmount: 10_000 })],
-    );
+  it("test_settle_emptySnapshot_afterTieAtWrite_isZero_notError", () => {
+    const statement = go([reception({ sheetRow: 2, pickupRate: null, bagRate: null })]);
     const shop = onlyPlain(statement);
-    expect(shop.receptionCost).toBeNull();
-    expect(shop.tie).not.toBeNull();
-    expect(shop.tie?.candidates).toHaveLength(2);
-    expect(statement.ties).toHaveLength(1);
+    expect(shop.receptionCost).toBe(0);
+    expect(shop.tie).toBeNull();
+    expect(statement.ties).toHaveLength(0);
     expect(statement.total).toBe(0);
   });
 
-  it("test_settle_olderDuplicate_loses_to_laterDate_noTie", () => {
+  it("test_settle_snapshot_uses_register_not_rate_sheet_interval", () => {
     const shop = onlyPlain(
-      go(
-        [reception({ sheetRow: 2, pickupDate: "11.10.2026", bagCount: 0 })],
-        [
-          rate({ pickupAmount: 10_000, bagAmount: 0, validFrom: "" }),
-          rate({ pickupAmount: 10_000, bagAmount: 0, validFrom: "" }),
-          rate({ pickupAmount: 20_000, bagAmount: 0, validFrom: "10.10.2026" }),
-        ],
-      ),
+      go([reception({ sheetRow: 2, pickupDate: "11.10.2026", bagCount: 0, pickupRate: 20_000, bagRate: 0 })]),
     );
     expect(shop.receptionCost).toBe(20_000);
     expect(shop.tie).toBeNull();
   });
 
-  it("test_settle_rateInterval_before_10_09_2026_100", () => {
-    expect(interval("09.09.2026").receptionCost).toBe(10_000);
-    expect(interval("09.09.2026").tie).toBeNull();
-  });
-
-  it("test_settle_rateInterval_on_10_09_2026_150", () => {
-    expect(interval("10.09.2026").receptionCost).toBe(15_000);
-  });
-
-  it("test_settle_rateInterval_on_09_10_2026_150_not_text_sort", () => {
-    expect(interval("09.10.2026").receptionCost).toBe(15_000);
-  });
-
-  it("test_settle_rateInterval_on_10_10_2026_200", () => {
-    expect(interval("10.10.2026").receptionCost).toBe(20_000);
-  });
-
-  it("test_settle_rateInterval_after_10_10_2026_200", () => {
-    expect(interval("11.10.2026").receptionCost).toBe(20_000);
-  });
-
   it("test_settle_costPerBag_nullCount_divides_by_1", () => {
-    const shop = onlyPlain(
-      go([reception({ sheetRow: 2, bagCount: null })], [rate({ bagAmount: 1_000 })]),
-    );
+    const shop = onlyPlain(go([reception({ sheetRow: 2, bagCount: null })]));
     expect(shop.receptionCost).toBe(2_000);
     expect(shop.costPerBag).toBe(2_000);
   });
 
   it("test_settle_costPerBag_zeroCount_divides_by_1", () => {
     const line = onlyRoute(
-      go([reception({ sheetRow: 2, routeName: "trasa", routeRate: 15_000, bagCount: 0 })]),
+      go([
+        reception({
+          sheetRow: 2,
+          routeName: "trasa",
+          routeRate: 15_000,
+          bagCount: 0,
+          pickupRate: null,
+          bagRate: null,
+        }),
+      ]),
     );
     expect(line.shops[0].receptionCost).toBe(15_000);
     expect(line.shops[0].costPerBag).toBe(15_000);
@@ -281,10 +232,16 @@ describe("settle", () => {
 
   it("test_settle_routeShop_excludes_pickup", () => {
     const line = onlyRoute(
-      go(
-        [reception({ sheetRow: 2, routeName: "trasa", routeRate: 15_000, bagCount: 0 })],
-        [rate({ pickupAmount: 10_000, bagAmount: 0 })],
-      ),
+      go([
+        reception({
+          sheetRow: 2,
+          routeName: "trasa",
+          routeRate: 15_000,
+          bagCount: 0,
+          pickupRate: 10_000,
+          bagRate: 0,
+        }),
+      ]),
     );
     expect(line.shops[0].receptionCost).toBe(15_000);
     expect(line.shops[0].legAmount).toBe(15_000);
@@ -293,8 +250,24 @@ describe("settle", () => {
   it("test_settle_emptyRouteRate_share0", () => {
     const line = onlyRoute(
       go([
-        reception({ sheetRow: 2, address: "A", routeName: "trasa", routeRate: null, bagCount: 0 }),
-        reception({ sheetRow: 3, address: "B", routeName: "trasa", routeRate: null, bagCount: 0 }),
+        reception({
+          sheetRow: 2,
+          address: "A",
+          routeName: "trasa",
+          routeRate: null,
+          bagCount: 0,
+          pickupRate: null,
+          bagRate: null,
+        }),
+        reception({
+          sheetRow: 3,
+          address: "B",
+          routeName: "trasa",
+          routeRate: null,
+          bagCount: 0,
+          pickupRate: null,
+          bagRate: null,
+        }),
       ]),
     );
     expect(line.routeCostApplies).toBe(true);
@@ -306,7 +279,14 @@ describe("settle", () => {
   it("test_settle_zeroRouteRate_share0", () => {
     const line = onlyRoute(
       go([
-        reception({ sheetRow: 2, routeName: "trasa", routeRate: 0, bagCount: 0 }),
+        reception({
+          sheetRow: 2,
+          routeName: "trasa",
+          routeRate: 0,
+          bagCount: 0,
+          pickupRate: null,
+          bagRate: null,
+        }),
       ]),
     );
     expect(line.routeCostApplies).toBe(true);
@@ -318,17 +298,25 @@ describe("settle", () => {
     expect(() => go([reception({ sheetRow: 2, pickupDate: "2026-09-18" })])).toThrow(/dd\.mm\.yyyy/);
   });
 
-  it("test_settle_rateKey_is_address_not_shop_name", () => {
-    const statement = go(
-      [
-        reception({ sheetRow: 2, address: "A 1", shopName: "Lewiatan", bagCount: 0 }),
-        reception({ sheetRow: 3, address: "B 2", shopName: "Lewiatan", bagCount: 0 }),
-      ],
-      [
-        rate({ shop: "A 1", pickupAmount: 2_000, bagAmount: 0 }),
-        rate({ shop: "B 2", pickupAmount: 10_000, bagAmount: 0 }),
-      ],
-    );
+  it("test_settle_snapshot_is_per_address_not_shop_name", () => {
+    const statement = go([
+      reception({
+        sheetRow: 2,
+        address: "A 1",
+        shopName: "Lewiatan",
+        bagCount: 0,
+        pickupRate: 2_000,
+        bagRate: 0,
+      }),
+      reception({
+        sheetRow: 3,
+        address: "B 2",
+        shopName: "Lewiatan",
+        bagCount: 0,
+        pickupRate: 10_000,
+        bagRate: 0,
+      }),
+    ]);
     expect(statement.lines).toHaveLength(2);
     const costs = statement.lines.map((line) => (line.kind === "plain" ? line.shop.receptionCost : null));
     expect(costs).toEqual([2_000, 10_000]);
@@ -344,6 +332,8 @@ describe("settle", () => {
           routeName: "trasa",
           routeRate: 15_000,
           bagCount: 0,
+          pickupRate: null,
+          bagRate: null,
         }),
         reception({
           sheetRow: 3,
@@ -352,6 +342,8 @@ describe("settle", () => {
           routeName: "trasa",
           routeRate: 15_000,
           bagCount: 0,
+          pickupRate: null,
+          bagRate: null,
         }),
       ]),
     );
@@ -359,9 +351,9 @@ describe("settle", () => {
     expect(line.shops[0].legAmount).toBe(7_500);
   });
 
-  it("test_settle_screenBagOverride_0_replaces_database_noTie", () => {
+  it("test_settle_screenBagOverride_0_replaces_register_noTie", () => {
     const row = reception({ sheetRow: 2 });
-    const shop = onlyPlain(go([row], [rate()], screen(row, { bagAmount: 0 })));
+    const shop = onlyPlain(go([row], screen(row, { bagAmount: 0 })));
     expect(shop.bagSum).toBe(0);
     expect(shop.receptionCost).toBe(2_000);
     expect(shop.tie).toBeNull();
@@ -375,6 +367,7 @@ describe("settle", () => {
       routeName: "trasa",
       routeRate: 15_000,
       bagCount: 4,
+      bagRate: 1_000,
     });
     const second = reception({
       sheetRow: 4,
@@ -382,13 +375,9 @@ describe("settle", () => {
       routeName: "trasa",
       routeRate: 15_000,
       bagCount: 0,
+      bagRate: 1_000,
     });
-    const rates = [
-      rate({ shop: "Zwykly" }),
-      rate({ shop: "A", bagAmount: 1_000 }),
-      rate({ shop: "B", bagAmount: 1_000 }),
-    ];
-    const statement = go([plain, first, second], rates);
+    const statement = go([plain, first, second]);
     expect(statement.total).toBe(3_000 + 19_000);
     const routeLine = statement.lines.find((line) => line.kind === "route");
     if (!routeLine || routeLine.kind !== "route") {

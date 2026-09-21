@@ -205,11 +205,9 @@ Mapa nie dostaje tabeli rozliczeń ani wykresu. Zbiorczy protokół zostaje jak 
 | Miejsce | Dziś | Zmiana |
 |---------|------|--------|
 | `arkusz-mapa/src/routeName.ts` | `proposeRouteName`. Źródło wstrzyknięte w `phase6.ts`, gdy jest okno Word | Propozycja nazwy. Jedna funkcja, testowana. Pamięć sesji nie jest w tej funkcji: żyje w otwartej stronie |
-| `arkusz-mapa/src/phase6.ts`, okno `#doc-modal` | Funkcja nazwy jest w skrypcie strony. Pola kończą się na komentarzach | Checkbox „odbiór z trasy”, nazwa, stawka. Bez zaznaczenia pola schowane. POST niesie kolumny 12–13 albo ich nie niesie |
-| `transport-log.gs`, `COL` i `appendTransportRow_` | `appendRow` kończy się na komentarzu 2 | Przed dopisaniem jakiegokolwiek wiersza protokołu, także bez trasy, wpisuje nagłówki 12–18, jeśli komórki są puste. Kolumn 1–11 nie przesuwa. Lista `tak`/`nie` na kolumnie 18 i przekreślenie wiersza z `nie`, raz. Body z trasą dopisuje 12–13. Aplikacja rozliczeń nagłówków rejestru nie wpisuje |
-| `transport-log.gs`, `buildBulkLastTransportDatesMap_` i `findLastTransportInfo_` | Ostatnia data to max z kolumny 5 | Wiersz z kolumną 18 = `nie` nie wchodzi w tę datę i nie odcina worków. Brak kolumny znaczy to samo co pusta: odbył się |
-| `arkusz-mapa/src/buildMapManualAdmin.ts` | Dwie zakładki | Trzecia: Baza stawek. Adres z pinezek, podwykonawca z nazw krótkich, oba bez wpisu ręcznego. Stawki trasy tu nie ma. Zapis woła `saveRate` |
-| `arkusz-mapa/docs/TRANSPORT_SHEET.md` | Kolumny 1–11 | Kolumny 12–18 i nowe pola body |
+| `arkusz-mapa/src/phase6.ts`, okno `#doc-modal` | Funkcja nazwy jest w skrypcie strony. Pola kończą się na komentarzach | Checkbox „odbiór z trasy”, nazwa, stawka. Bez zaznaczenia pola schowane. POST niesie kolumny 10–11 albo ich nie niesie |
+| `transport-log.gs`, `COL` i `appendTransportRow_` | `appendRow` kończy się na komentarzu 2 | Przed dopisaniem wpisuje nagłówki 10–20, jeśli puste. Kolumn 1–9 nie przesuwa. Snapshot podjazdu/worka w 12–13 z Bazy. Komentarze na 19–20. Lista `tak`/`nie` na kolumnie 18. Body z trasą dopisuje 10–11 |
+| `arkusz-mapa/docs/TRANSPORT_SHEET.md` | Kolumny 1–11 | Kolumny 1–20 (V2: stawki w rejestrze, komentarze na końcu) |
 
 Mapa nie wpisuje kolumn 14–17, nie woła Zatwierdź i nie rozstrzyga remisu. Nie ostrzega, gdy ta sama nazwa trasy trafia do dwóch podwykonawców.
 

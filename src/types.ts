@@ -20,10 +20,14 @@ export interface RegisterRow {
   contractor: string;
   /** Kolumna 9. Pusta = null. Zero zostaje zerem. */
   bagCount: number | null;
-  /** Kolumna 12. Pusta = odbiór zwykły. */
+  /** Kolumna 10. Pusta = odbiór zwykły. */
   routeName: string;
-  /** Kolumna 13. Grosze. Pusta = null. Zero zostaje zerem. */
+  /** Kolumna 11. Grosze. Pusta = null. Zero zostaje zerem. */
   routeRate: Grosze | null;
+  /** Kolumna 12. Snapshot z Bazy stawek przy protokole. null = puste. */
+  pickupRate: Grosze | null;
+  /** Kolumna 13. Snapshot z Bazy stawek przy protokole. null = puste. */
+  bagRate: Grosze | null;
 }
 
 /** Wiersz Bazy stawek. Kwoty w groszach. Data tekstem `dd.mm.yyyy` albo pusta. */
@@ -41,15 +45,15 @@ export interface RateRow {
 }
 
 /**
- * Stan, którego arkusz nie pamięta.
- * Brak klucza = odbiór odbyty, ze stawką z bazy, z podjazdem.
+ * Stan, którego arkusz nie pamięta poza snapshotem.
+ * Brak klucza = odbiór odbyty, ze stawką z rejestru, z podjazdem.
  */
 export interface ScreenState {
   bagsOnly?: boolean;
   didNotHappen?: boolean;
-  /** undefined = stawka z bazy. null = puste pole na ekranie. */
+  /** undefined = stawka z rejestru. null = puste pole na ekranie. */
   pickupAmount?: Grosze | null;
-  /** undefined = stawka z bazy. null = puste pole na ekranie. */
+  /** undefined = stawka z rejestru. null = puste pole na ekranie. */
   bagAmount?: Grosze | null;
 }
 
@@ -118,7 +122,7 @@ export interface RouteLine {
   routeName: string;
   /** null = „—”, gdy dzień odbioru nie jest jeden. */
   date: string | null;
-  /** Stawka z kolumny 13. null = pusta. */
+  /** Stawka z kolumny 11. null = pusta. */
   routeRate: Grosze | null;
   /**
    * false, gdy żaden sklep się nie odbył.

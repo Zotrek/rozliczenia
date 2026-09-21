@@ -35,6 +35,8 @@ function row(over: Partial<RegisterRow> & { sheetRow: number }): RegisterRow {
     bagCount: 0,
     routeName: "",
     routeRate: null,
+    pickupRate: 2_000,
+    bagRate: 0,
     ...over,
   };
 }
@@ -94,7 +96,7 @@ describe("currentStatement", () => {
 
 describe("screen edits", () => {
   it("test_setPickup_and_setBagRate_stay_on_screen_rows_unchanged", () => {
-    const base = screen([row({ sheetRow: 2, bagCount: 2 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]);
+    const base = screen([row({ sheetRow: 2, bagCount: 2, bagRate: 1_000 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]);
     const next = setBagRate(setPickup(base, 2, "2", 5_000), 2, "2", 250);
     expect(next.rows).toEqual(base.rows);
     expect(next.screenByRow["2\t2"]).toEqual({ pickupAmount: 5_000, bagAmount: 250 });
@@ -103,7 +105,7 @@ describe("screen edits", () => {
 
   it("test_setBagsOnly_drops_pickup_from_cost", () => {
     const next = setBagsOnly(
-      screen([row({ sheetRow: 2, bagCount: 1 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]),
+      screen([row({ sheetRow: 2, bagCount: 1, bagRate: 1_000 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]),
       2,
       "2",
       true,
@@ -120,7 +122,7 @@ describe("screen edits", () => {
 
   it("test_setDidNotHappen_zeroes_cost_and_writes_nothing", () => {
     const base = screen(
-      [row({ sheetRow: 2, address: "A", routeName: "trasa", routeRate: 15_000, bagCount: 1 })],
+      [row({ sheetRow: 2, address: "A", routeName: "trasa", routeRate: 15_000, bagCount: 1, bagRate: 1_000 })],
       [rate({ sheetRow: 2, shop: "A", bagAmount: 1_000 })],
     );
     const next = setDidNotHappen(base, 2, "2", true);
@@ -205,33 +207,37 @@ describe("buildApprove", () => {
     }
   });
 
-  it("test_buildApprove_skips_tie_route_and_keeps_other_selected", () => {
+  it("test_buildApprove_empty_snapshot_does_not_block_route", () => {
     const rows = [
       row({ sheetRow: 2, address: "Z" }),
-      row({ sheetRow: 3, address: "A", routeName: "trasa", routeRate: 15_000 }),
-      row({ sheetRow: 4, address: "B", routeName: "trasa", routeRate: 15_000 }),
+      row({
+        sheetRow: 3,
+        address: "A",
+        routeName: "trasa",
+        routeRate: 15_000,
+        pickupRate: null,
+        bagRate: null,
+      }),
+      row({
+        sheetRow: 4,
+        address: "B",
+        routeName: "trasa",
+        routeRate: 15_000,
+        pickupRate: null,
+        bagRate: null,
+      }),
     ];
-    const rates = [
-      rate({ sheetRow: 2, shop: "Z" }),
-      rate({ sheetRow: 5, shop: "A", pickupAmount: 1_000 }),
-      rate({ sheetRow: 6, shop: "A", pickupAmount: 2_000 }),
-      rate({ sheetRow: 7, shop: "B" }),
-    ];
-    const statement = currentStatement(screen(rows, rates));
+    const statement = currentStatement(screen(rows, []));
     const both = buildApprove("FV/1", statement, { "2\t2": true, [routeSelectionKey("trasa")]: true });
     expect(both.ok).toBe(true);
     if (both.ok) {
-      expect(both.body.wiersze.map((item) => item.sheetRow)).toEqual([2]);
+      expect(both.body.wiersze.map((item) => item.sheetRow).sort()).toEqual([2, 3, 4]);
     }
-    expect(buildApprove("FV/1", statement, { [routeSelectionKey("trasa")]: true })).toEqual({
-      ok: false,
-      error: "tie",
-    });
   });
 
   it("test_buildApprove_didNotHappen_sends_nie_without_cost", () => {
     const next = setDidNotHappen(
-      screen([row({ sheetRow: 2, bagCount: 1 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]),
+      screen([row({ sheetRow: 2, bagCount: 1, bagRate: 1_000 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]),
       2,
       "2",
       true,
@@ -269,12 +275,13 @@ describe("readSettlement", () => {
     expect(readSettlement({ ok: true, rows: [] }).ok).toBe(false);
     const read = readSettlement({
       ok: true,
-      rows: [row({ sheetRow: 2, bagCount: null, routeRate: null })],
+      rows: [row({ sheetRow: 2, bagCount: null, routeRate: null, pickupRate: null, bagRate: null })],
       rates: [rate({ sheetRow: 8, shop: "Sklepowa 1", validFrom: "" })],
     });
     expect(read.ok).toBe(true);
     if (read.ok) {
       expect(read.rows[0].bagCount).toBeNull();
+      expect(read.rows[0].pickupRate).toBeNull();
       expect(read.rates[0].sheetRow).toBe(8);
     }
   });

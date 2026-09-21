@@ -7,11 +7,120 @@ export interface StoreAddress {
   shop: string;
 }
 
-/** Widoczny tekst listy. Sam adres, gdy nazwy nie ma albo jest taka sama. */
+const LOCALITY_SECOND_WORD = new Set([
+  "gora",
+  "sol",
+  "targ",
+  "dunajec",
+  "gdanski",
+  "podlaski",
+  "podlaska",
+  "mazowiecka",
+  "mazowiecki",
+  "wielkopolska",
+  "wielkopolski",
+  "wilekopolski",
+  "wlkp",
+  "deba",
+  "sacz",
+  "zabkowicki",
+  "zabkowicka",
+  "lodzki",
+  "lodzka",
+  "swietokrzyski",
+  "swietokrzyska",
+  "trybunalski",
+  "slaski",
+  "slaska",
+]);
+
+function foldLocality(text: string): string {
+  return foldPl(text).replace(/\./g, "");
+}
+
+function foldAddress(text: string): string {
+  return foldPl(text).replace(/,/g, "");
+}
+
+function splitLeadingPostcode(address: string): { prefix: string; rest: string } {
+  const match = /^(\d{2}-\d{3})(?:\s+|$)/.exec(address);
+  if (!match) {
+    return { prefix: "", rest: address };
+  }
+  return { prefix: match[1], rest: address.slice(match[0].length).trim() };
+}
+
+function insertCommaAfterPlace(address: string, locality: string): string | null {
+  const place = locality.replace(/\s+/g, " ").trim();
+  if (!place) {
+    return null;
+  }
+  const { prefix, rest } = splitLeadingPostcode(address);
+  if (rest.length < place.length) {
+    return null;
+  }
+  if (foldLocality(rest.slice(0, place.length)) !== foldLocality(place)) {
+    return null;
+  }
+  const boundary = rest[place.length] ?? "";
+  if (boundary && boundary !== " " && boundary !== ",") {
+    return null;
+  }
+  if (boundary === ",") {
+    return address;
+  }
+  const tail = rest.slice(place.length).trim();
+  if (!tail) {
+    return address;
+  }
+  const head = prefix ? `${prefix} ${rest.slice(0, place.length)}` : rest.slice(0, place.length);
+  return `${head}, ${tail}`;
+}
+
+function insertCommaAfterLocalityHeuristic(address: string): string {
+  if (address.includes(",")) {
+    return address;
+  }
+  const { prefix, rest } = splitLeadingPostcode(address);
+  if (!prefix) {
+    return address;
+  }
+  const words = rest.split(" ").filter((word) => word.length > 0);
+  if (words.length < 2) {
+    return address;
+  }
+  let take = 1;
+  const second = foldLocality(words[1] ?? "");
+  if (second === "nad" && words.length >= 4) {
+    take = 3;
+  } else if (LOCALITY_SECOND_WORD.has(second)) {
+    take = 2;
+  }
+  if (take >= words.length) {
+    return address;
+  }
+  return `${prefix} ${words.slice(0, take).join(" ")}, ${words.slice(take).join(" ")}`;
+}
+
+/** Ta sama reguła co na mapie. Zapis dalej używa adresu bez przecinka. */
+export function addressWithCommaAfterLocality(address: string, locality = ""): string {
+  const addr = address.replace(/\s+/g, " ").trim();
+  if (!addr) {
+    return "";
+  }
+  const placed = insertCommaAfterPlace(addr, locality);
+  if (placed !== null) {
+    return placed;
+  }
+  return insertCommaAfterLocalityHeuristic(addr);
+}
+
+/** Widoczny tekst listy. Sam adres, gdy nazwy nie ma albo jest taka sama. Przecinek po miejscowości. */
 export function storeAddressLabel(item: StoreAddress): string {
   const shop = item.shop.trim();
-  const address = item.address.trim();
-  if (shop !== "" && shop !== address) {
+  const raw = item.address.trim();
+  const address = addressWithCommaAfterLocality(raw);
+  if (shop !== "" && shop !== raw && shop !== address) {
     return `${shop} — ${address}`;
   }
   return address;
@@ -80,15 +189,15 @@ export function matchingStoreAddresses(
   if (browsingAll) {
     return [...items];
   }
-  const folded = foldPl(query);
+  const folded = foldAddress(query);
   if (folded === "") {
     return [...items];
   }
   return items.filter(
     (item) =>
-      foldPl(item.address).includes(folded) ||
-      foldPl(item.shop).includes(folded) ||
-      foldPl(storeAddressLabel(item)).includes(folded),
+      foldAddress(item.address).includes(folded) ||
+      foldAddress(item.shop).includes(folded) ||
+      foldAddress(storeAddressLabel(item)).includes(folded),
   );
 }
 
@@ -97,12 +206,12 @@ export function resolveStoreAddress(
   items: readonly StoreAddress[],
   text: string,
 ): { address: string; query: string } {
-  const folded = foldPl(text);
+  const folded = foldAddress(text);
   if (folded === "") {
     return { address: "", query: "" };
   }
   const exact = items.find(
-    (item) => foldPl(item.address) === folded || foldPl(storeAddressLabel(item)) === folded,
+    (item) => foldAddress(item.address) === folded || foldAddress(storeAddressLabel(item)) === folded,
   );
   if (exact) {
     return { address: exact.address, query: storeAddressLabel(exact) };

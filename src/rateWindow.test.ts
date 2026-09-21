@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { rateContractorNames, rateSaveMessage, readAddressList, resolveStoreAddress, saveRateBody } from "./rateWindow.js";
+import { rateContractorNames, rateSaveMessage, readAddressList, resolveStoreAddress, saveRateBody, storeAddressLabel, addressWithCommaAfterLocality } from "./rateWindow.js";
 
 const gsPath = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -83,6 +83,19 @@ describe("saveRateBody", () => {
       ok: false,
       error: "date",
     });
+  });
+});
+
+describe("addressWithCommaAfterLocality", () => {
+  it("test_addressWithCommaAfterLocality_when_postcode_should_put_comma_after_locality", () => {
+    expect(addressWithCommaAfterLocality("98-300 Wieluń Sieradzka 62A")).toBe("98-300 Wieluń, Sieradzka 62A");
+    expect(addressWithCommaAfterLocality("22-672 Susiec Turystyczna 27")).toBe("22-672 Susiec, Turystyczna 27");
+    expect(addressWithCommaAfterLocality("63-000 Środa Wielkopolska Sienkiewicza 19")).toBe(
+      "63-000 Środa Wielkopolska, Sienkiewicza 19",
+    );
+    expect(storeAddressLabel({ address: "98-300 Wieluń Sieradzka 62A", shop: "10 Wieluń" })).toBe(
+      "10 Wieluń — 98-300 Wieluń, Sieradzka 62A",
+    );
   });
 });
 

@@ -1,5 +1,6 @@
 import { rowKey, sumSelected } from "./engine.js";
 import { escapeHtml } from "./html.js";
+import { addressWithCommaAfterLocality } from "./rateWindow.js";
 import type { SettlementRateRow } from "./search.js";
 import {
   canPressApprove,
@@ -78,7 +79,7 @@ function plainRow(screen: StatementScreen, shop: ShopCost): string {
     `<tr class="${rowClass(dead, checked, "plain")}" data-kind="plain">` +
     `<td class="c">${lineBox(line, checked)}</td>` +
     `<td>${text(shop.transportNumber, dead)}</td>` +
-    `<td class="adres">${text(shop.address, dead)}</td>` +
+    `<td class="adres">${text(addressWithCommaAfterLocality(shop.address), dead)}</td>` +
     `<td class="sklep"><div>${text(shop.shopName, dead)}${bagsOnlyBox(shop, shop.bagsOnly)}${tieBox(shop.tie, screen.rates)}${newRouteBox(screen, shop)}</div></td>` +
     `<td>${text(shop.pickupDate, dead)}</td>` +
     `<td>${leg}</td>` +
@@ -152,7 +153,7 @@ function childRow(screen: StatementScreen, shop: ShopCost, sharedBagRate: boolea
     `<tr class="${rowClass(dead, false, "child")}" data-kind="child">` +
     "<td></td>" +
     `<td>${text(shop.transportNumber, dead)}</td>` +
-    `<td class="adres">${text(shop.address, dead)}</td>` +
+    `<td class="adres">${text(addressWithCommaAfterLocality(shop.address), dead)}</td>` +
     `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}</div></td>` +
     `<td>${text(shop.pickupDate, dead)}</td>` +
     `<td>${DASH}</td>` +

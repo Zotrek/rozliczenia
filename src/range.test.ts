@@ -18,6 +18,7 @@ import {
   reportMode,
   resolveContractorText,
   resolveListText,
+  screenAfterApprove,
   screenAfterChangeRange,
   screenAfterSearch,
   searchParams,
@@ -170,6 +171,10 @@ describe("screens", () => {
   it("test_screenAfterChangeRange_returns_to_range", () => {
     expect(screenAfterSearch()).toBe("statement");
     expect(screenAfterChangeRange()).toBe("range");
+  });
+
+  it("test_screenAfterApprove_returns_to_range", () => {
+    expect(screenAfterApprove()).toBe("range");
   });
 
   it("test_openRatesWindow_stays_on_current_screen", () => {

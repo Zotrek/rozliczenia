@@ -575,6 +575,10 @@ function screenAfterSearch() {
 function screenAfterChangeRange() {
     return "range";
 }
+/** Po udanym Zatwierdź wraca do karty zakresu, jak Zmień zakres. */
+function screenAfterApprove() {
+    return "range";
+}
 /** Baza stawek jest oknem na bieżącym ekranie, nie trzecim ekranem. */
 function openRatesWindow(screen) {
     return { screen, window: "rates" };
@@ -3113,17 +3117,19 @@ async function runApprove() {
         if (result.ok !== true) {
             VIEW.status = writeError(result.error);
         }
-        else {
+        else if (skippedCount(result) > 0) {
             const refreshed = await reloadStatement();
             if (!refreshed) {
                 VIEW.status = STATEMENT_ERROR.refresh;
             }
-            else if (skippedCount(result) > 0) {
+            else {
                 VIEW.status = STATEMENT_ERROR.partial;
             }
-            else {
-                VIEW.status = "";
-            }
+        }
+        else {
+            VIEW.status = "";
+            VIEW.screen = screenAfterApprove();
+            VIEW.ratesOpen = false;
         }
     }
     catch {

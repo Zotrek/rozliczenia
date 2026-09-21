@@ -4,6 +4,7 @@ import {
   fieldsForSearch,
   foldPl,
   readWebAppUrl,
+  screenAfterApprove,
   screenAfterChangeRange,
   screenAfterSearch,
   searchParams,
@@ -1064,15 +1065,17 @@ async function runApprove(): Promise<void> {
     const result = await postSheet(built.body);
     if (result.ok !== true) {
       VIEW.status = writeError(result.error);
-    } else {
+    } else if (skippedCount(result) > 0) {
       const refreshed = await reloadStatement();
       if (!refreshed) {
         VIEW.status = STATEMENT_ERROR.refresh;
-      } else if (skippedCount(result) > 0) {
-        VIEW.status = STATEMENT_ERROR.partial;
       } else {
-        VIEW.status = "";
+        VIEW.status = STATEMENT_ERROR.partial;
       }
+    } else {
+      VIEW.status = "";
+      VIEW.screen = screenAfterApprove();
+      VIEW.ratesOpen = false;
     }
   } catch {
     VIEW.status = STATEMENT_ERROR.write;

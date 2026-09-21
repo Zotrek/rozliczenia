@@ -237,6 +237,11 @@ export function screenAfterChangeRange(): ScreenId {
   return "range";
 }
 
+/** Po udanym Zatwierdź wraca do karty zakresu, jak Zmień zakres. */
+export function screenAfterApprove(): ScreenId {
+  return "range";
+}
+
 /** Baza stawek jest oknem na bieżącym ekranie, nie trzecim ekranem. */
 export function openRatesWindow<T extends ScreenId>(screen: T): { screen: T; window: "rates" } {
   return { screen, window: "rates" };

@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Skrypt mapy do testów kontraktu
+        run: git clone --depth 1 https://github.com/Zotrek/arkusz-mapa.git "${GITHUB_WORKSPACE}/../arkusz-mapa"
+
       - name: Testy
         run: npm test
 

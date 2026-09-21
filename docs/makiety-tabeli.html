@@ -886,13 +886,11 @@
       if (!state.ratesOpen) return '';
       return '<div class="modal" data-action="close-rates"><div class="modal-panel" role="dialog" aria-labelledby="rates-title">'
         + '<h2 id="rates-title">Baza stawek</h2>'
-        + '<p class="note">Zapis od razu, nie czeka na Zatwierdź. Nie zmienia Rozliczony, Numer faktury ani kolumn 16 i 17. W tym oknie stawki trasy nie ma. Na wierszu trasy da się ją zmienić: zapis idzie od razu do Stawka za trasę. Koszt odbioru czeka na Zatwierdź. Usuwania wiersza nie ma.</p>'
         + '<label class="field"><span>Sklep</span><select><option>ul. Głogowska 12, Poznań</option><option>ul. Hetmańska 90, Poznań</option><option>ul. Serbska 7, Poznań</option></select></label>'
         + '<label class="field"><span>Podwykonawca</span><select><option>GPW</option><option>BLUECARGO</option></select></label>'
         + '<label class="field"><span>Kwota za podjazd</span><input type="text" inputmode="decimal" value="20,00"></label>'
         + '<label class="field"><span>Kwota za worek</span><input type="text" inputmode="decimal" value="2,50"></label>'
         + '<label class="field"><span>Od kiedy obowiązuje</span><input type="date"><span class="note">W arkuszu tekst dd.mm.yyyy, jak data odbioru. Puste znaczy od zawsze.</span></label>'
-        + '<p class="note">Sklep z listy adresów rejestru, podwykonawca z nazw krótkich Listy podwykonawców. Nie pinezki mapy. Wpisu ręcznego nie ma.</p>'
         + '<div class="modal-actions"><button type="button" class="btn-ghost" data-action="close-rates">Zamknij</button><button type="button" class="btn-teal" data-action="save-rates">Zapisz</button></div>'
         + '</div></div>';
     }

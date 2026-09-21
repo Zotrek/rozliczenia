@@ -167,7 +167,7 @@ describe("renderApp", () => {
     expect(html).toContain('data-action="save-rates"');
     expect(html).not.toContain("resolveRateTie");
     expect(html).not.toContain("Stawka za trasę");
-    expect(html).toContain("kolumn 16 i 17");
+    expect(html).not.toContain("kolumn 16 i 17");
   });
 
   it("test_renderApp_rates_contractor_combobox_matches_word_data_but_shows_the_short_name", () => {

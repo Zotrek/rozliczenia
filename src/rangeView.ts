@@ -279,7 +279,6 @@ export function renderRatesDialog(model: RangeViewModel): string {
     '<div class="modal" data-window="rates">' +
     '<div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="rates-title">' +
     '<h2 id="rates-title">Baza stawek</h2>' +
-    '<p class="note">Zapis od razu, nie czeka na Zatwierdź. Nie zmienia Rozliczony, Numer faktury ani kolumn 16 i 17. Stawki trasy tu nie ma. Remis rozstrzyga się na zestawieniu, nie tutaj.</p>' +
     rateCombo(
       "Sklep",
       "shop",
@@ -303,7 +302,6 @@ export function renderRatesDialog(model: RangeViewModel): string {
     '<label class="field"><span>Od kiedy obowiązuje</span>' +
     `<input type="date" data-rate="from" data-keep="from" value="${escapeHtml(model.ratesFrom)}">` +
     '<span class="note">Puste znaczy od zawsze.</span></label>' +
-    '<p class="note">Nazwa z kolumny Sklep, adres z kolumny Adres sklepu rejestru. Zapisuje się adres. Podwykonawca to nazwa krótka z Listy podwykonawców. Nie pinezki mapy. Wpisu ręcznego nie ma.</p>' +
     `<p data-rates-message class="${messageClass}"${model.ratesMessage ? "" : " hidden"}>${escapeHtml(model.ratesMessage)}</p>` +
     '<div class="modal-actions">' +
     '<button type="button" class="btn-ghost" data-action="close-rates">Zamknij</button>' +

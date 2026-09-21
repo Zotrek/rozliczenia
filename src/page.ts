@@ -112,8 +112,17 @@ function paint(keep?: string): void {
   }
 }
 
+function builtWebAppUrl(): string {
+  const value = (globalThis as { __ROZLICZENIA_WEBAPP__?: unknown }).__ROZLICZENIA_WEBAPP__;
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function boot(): void {
-  const read = readWebAppUrl(location.search, localStorage.getItem("rozliczenia.webapp"));
+  const read = readWebAppUrl(
+    location.search,
+    localStorage.getItem("rozliczenia.webapp"),
+    builtWebAppUrl(),
+  );
   if (read.persist) {
     localStorage.setItem("rozliczenia.webapp", read.persist);
   }

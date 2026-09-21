@@ -11,14 +11,12 @@ npm test
 npm run build    # → index.html
 ```
 
-Otwórz `index.html`. Adres Web App podajesz w adresie strony: `?webapp=https://script.google.com/.../exec`. Strona zapamiętuje go w tej przeglądarce.
+Otwórz `index.html`. Adres Web App wchodzi przy buildzie ze zmiennej `TRANSPORT_WEBAPP_URL` (lokalnie albo z sekretu GitHub). Bez niej zostaje `?webapp=` i pamięć przeglądarki.
 
 ## Publikacja GitHub Pages
 
-1. Settings → Pages → Source: **Deploy from a branch**
-2. Branch: `main`, folder: **`/ (root)`**
-3. Commit i push `index.html` oraz `logo.png` i `jednorozec-deba.gif`
+1. W repozytorium rozliczeń: Settings → Secrets → `TRANSPORT_WEBAPP_URL` = `https://script.google.com/.../exec`
+2. Settings → Pages → Source: **Deploy from a branch** → gałąź **`gh-pages`**, folder **`/ (root)`**
+3. Push na `main` albo Actions → „rozliczenia — Pages” → Run workflow
 
-**Bez GitHub Actions.** Po zmianie kodu: lokalnie `npm test && npm run build` → commit `index.html` → push.
-
-> Pages przy branch deploy obsługuje tylko `/` lub `/docs` — stąd publikacja z roota.
+Workflow buduje `index.html` z sekretu i publikuje go na `gh-pages` razem z `logo.png` i `jednorozec-deba.gif`. Adres nie jest zapisywany na `main`.

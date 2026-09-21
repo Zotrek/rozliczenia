@@ -348,6 +348,7 @@ td input[type="text"]:focus { border-color: var(--teal); background: #fff; outli
 <body>
   <div id="app"></div>
   <script>
+window.__ROZLICZENIA_WEBAPP__="";
 (function () {
 function escapeHtml(text) {
     return text
@@ -601,12 +602,16 @@ function webAppUrl(base, params) {
     const sep = trimmed.includes("?") ? "&" : "?";
     return trimmed + sep + new URLSearchParams(params).toString();
 }
-/** Adres odczytu z `?webapp=`, inaczej z pamięci strony. */
-function readWebAppUrl(search, stored) {
+/** Adres z `?webapp=`, inaczej z buildu, inaczej z pamięci strony. */
+function readWebAppUrl(search, stored, builtIn = "") {
     const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
     const fromQuery = params.get("webapp")?.trim() ?? "";
     if (fromQuery !== "") {
         return { url: fromQuery, persist: fromQuery };
+    }
+    const fromBuild = builtIn.trim();
+    if (fromBuild !== "") {
+        return { url: fromBuild, persist: null };
     }
     return { url: stored?.trim() ?? "", persist: null };
 }
@@ -2231,8 +2236,12 @@ function paint(keep) {
         next.setSelectionRange(start, end);
     }
 }
+function builtWebAppUrl() {
+    const value = globalThis.__ROZLICZENIA_WEBAPP__;
+    return typeof value === "string" ? value.trim() : "";
+}
 function boot() {
-    const read = readWebAppUrl(location.search, localStorage.getItem("rozliczenia.webapp"));
+    const read = readWebAppUrl(location.search, localStorage.getItem("rozliczenia.webapp"), builtWebAppUrl());
     if (read.persist) {
         localStorage.setItem("rozliczenia.webapp", read.persist);
     }

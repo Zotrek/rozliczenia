@@ -25,7 +25,7 @@ Specyfikacja mówi wprost, że z zachowania nie wynika Symfony, Vue ani PostgreS
 | Zapis i odczyt | Rozszerzenie istniejącego Web App (`arkusz-mapa/google-apps-script/transport-log.gs`) | Lock, odczyt zestawienia, zapis edycji i zatwierdzenia. Nagłówki rejestru tylko przy dopisaniu protokołu. Nagłówki Bazy stawek przy pierwszym zapisie stawki |
 | Reguły kosztów | TypeScript, czyste funkcje, Vitest | Liczenie na ekranie. Te same funkcje da się odpalić w teście bez arkusza |
 | Ekran | Jedna strona HTML, style z makiety | Dwa ekrany: Zakres i Zestawienie. Okno Baza stawek, nie trzeci ekran |
-| Hosting | Własne repozytorium, GitHub Pages z `main` / `/` | Nie ścieżka w Pages mapy. Workflow mapy publikuje tylko `site/` i zastępuje całą gałąź `gh-pages` |
+| Hosting | Własne repozytorium, GitHub Pages z `gh-pages` | Sekret `TRANSPORT_WEBAPP_URL` wchodzi do `index.html` w workflow. Nie ścieżka w Pages mapy |
 
 Vue i Symfony odpadają na tę wersję: nie ma encji do trzymania, a stawka podjazdu i worka zmieniona na zestawieniu **nie** idzie do bazy stawek. Kwota ostateczna powstaje dopiero przy Zatwierdź, z tego, co widać na ekranie. Osobna baza rozjechałaby się z arkuszem.
 
@@ -82,7 +82,7 @@ Podział odpowiedzialności:
 | Silnik kosztów | `rozliczenia/src/` | TypeScript, Vitest. Strona rozliczeń buduje się lokalnie do jednego HTML. Własny `package.json` (typescript, vitest) powstaje przy starcie silnika, nie wcześniej |
 | Szablon Word | `arkusz-mapa/docs/pusty.docx` | Bez zmian. Okno protokołu dostaje pola trasy. Dokument Word ich nie dostaje |
 
-Strona rozliczeń ma własne repozytorium. Publikacja jest jak w Drugiej Mili: lokalny `npm run build` zapisuje `index.html`, commit idzie na `main`, Pages serwuje root. Własnego workflow Actions nie ma. Katalog nie wchodzi do `site/` mapy.
+Strona rozliczeń ma własne repozytorium. Workflow `rozliczenia-pages.yml` czyta sekret `TRANSPORT_WEBAPP_URL`, wpisuje go do `index.html` i publikuje `gh-pages`. Katalog nie wchodzi do `site/` mapy.
 
 ---
 
@@ -251,7 +251,7 @@ Dane w arkuszu to adresy sklepów i nazwy podwykonawców, nie konta osób. RODO:
 Bez tego kod nie startował. Kolejność etapów jest zatwierdzona w [`PLAN.md`](PLAN.md).
 
 - [x] Stos: strona HTML + TypeScript (Vitest) + rozszerzenie istniejącego Apps Script. Bez Symfony, Vue i PostgreSQL w tej wersji
-- [x] Hosting: własne repozytorium, Pages z `main` / `/`. Nie wchodzi do workflow Pages mapy
+- [x] Hosting: własne repozytorium, Pages z `gh-pages`. Adres Web App z sekretu przy buildzie. Nie wchodzi do workflow Pages mapy
 - [x] Klucz zapisu: numer wiersza arkusza plus numer z kolumny 1. Zapis odpada, gdy para się nie zgadza
 - [x] Kanał zapisu: ten sam Web App co mapa. Przed W1 (`approve` na żywym arkuszu) wiadomo, czy jest sekret, czy dostęp zostaje „każdy”
 - [x] Okno stawek w aplikacji: sposób wyboru adresu i podwykonawcy. Listy (adres z rejestru, nazwa krótka z Listy podwykonawców), bez wpisu ręcznego. Na mapie zostają pinezki — to osobna lista

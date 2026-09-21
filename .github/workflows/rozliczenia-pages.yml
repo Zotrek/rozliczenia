@@ -1,0 +1,59 @@
+# Katalog główny repozytorium = pakiet rozliczenia.
+#
+# Wymagany sekret:
+#   TRANSPORT_WEBAPP_URL — URL Web App (Apps Script), ten sam co w arkuszu-mapie.
+#   Build wpisuje go do index.html. W źródłach na main go nie ma.
+#
+# GitHub Pages: Settings → Pages → Source: Deploy from a branch → gh-pages / (root).
+name: rozliczenia — Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rozliczenia-pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Testy
+        run: npm test
+
+      - name: Złóż stronę z adresem Web App
+        env:
+          TRANSPORT_WEBAPP_URL: ${{ secrets.TRANSPORT_WEBAPP_URL }}
+        run: |
+          if [ -z "$TRANSPORT_WEBAPP_URL" ]; then
+            echo "::error::Brak sekretu TRANSPORT_WEBAPP_URL"
+            exit 1
+          fi
+          npm run build
+          mkdir -p site
+          cp index.html logo.png jednorozec-deba.gif site/
+
+      - name: Publikacja na gałąź gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          force_orphan: true
+          commit_message: "deploy: rozliczenia ${{ github.run_id }}"

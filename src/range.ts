@@ -269,15 +269,20 @@ export function webAppUrl(base: string, params: Record<string, string>): string 
   return trimmed + sep + new URLSearchParams(params).toString();
 }
 
-/** Adres odczytu z `?webapp=`, inaczej z pamięci strony. */
+/** Adres z `?webapp=`, inaczej z buildu, inaczej z pamięci strony. */
 export function readWebAppUrl(
   search: string,
   stored: string | null,
+  builtIn = "",
 ): { url: string; persist: string | null } {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const fromQuery = params.get("webapp")?.trim() ?? "";
   if (fromQuery !== "") {
     return { url: fromQuery, persist: fromQuery };
+  }
+  const fromBuild = builtIn.trim();
+  if (fromBuild !== "") {
+    return { url: fromBuild, persist: null };
   }
   return { url: stored?.trim() ?? "", persist: null };
 }

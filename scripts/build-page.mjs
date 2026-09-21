@@ -43,6 +43,11 @@ function transpile(file) {
     .replace(/^export\s+/gm, "");
 }
 
+export function webAppBootstrap(url) {
+  const value = typeof url === "string" ? url.trim() : "";
+  return `window.__ROZLICZENIA_WEBAPP__=${JSON.stringify(value)};`;
+}
+
 export function buildPage() {
   const ordered = [];
   collect(entry, new Set(), ordered);
@@ -65,6 +70,7 @@ ${css}
 <body>
   <div id="app"></div>
   <script>
+${webAppBootstrap(process.env.TRANSPORT_WEBAPP_URL)}
 ${js}
   </script>
 </body>

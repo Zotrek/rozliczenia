@@ -94,7 +94,7 @@ Okno z M2 wchodzi na stronę dopiero, gdy przejdzie workflow `arkusz-mapa-pages.
 
 ## Rozliczenia
 
-`package.json` z typescript i vitest, w wersjach jak arkusz-mapa, powstaje na początku R1. Wcześniej zależności nie dokładamy. Strona buduje się lokalnie do jednego HTML, który woła silnik. Publikacja: własne repozytorium, Pages z `main` / `/`, bez workflow Actions.
+`package.json` z typescript i vitest, w wersjach jak arkusz-mapa, powstaje na początku R1. Wcześniej zależności nie dokładamy. Strona buduje się lokalnie do jednego HTML, który woła silnik. Publikacja: własne repozytorium, workflow wkłada sekret `TRANSPORT_WEBAPP_URL` do `index.html` i wystawia gałąź `gh-pages`.
 
 ### R1. Silnik
 
@@ -181,7 +181,7 @@ Nowa wersja **istniejącego** wdrożenia, ten sam URL. Nie drugie wdrożenie obo
 - Wykresy.
 - Zmiana szablonu Word.
 - Ostrzeżenie, gdy ta sama nazwa trasy albo drugie Zatwierdź dzieli stawkę jeszcze raz. Specyfikacja tego nie blokuje. Test w R1 pokazuje, że dzielnik liczy sklepy widoczne w zestawieniu, nie że system odmawia.
-- Własny workflow Actions dla Pages. Publikacja jest z gałęzi `main`, bez CI.
+- Własny workflow Actions publikuje Pages z sekretu `TRANSPORT_WEBAPP_URL`. Adres nie leży na `main`.
 - Folder zadań w `dev_docs/`. Powstaje przy kodowaniu etapu, nie teraz.
 
 ---

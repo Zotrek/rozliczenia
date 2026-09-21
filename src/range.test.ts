@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { webAppBootstrap } from "../scripts/build-page.mjs";
 import {
   RANGE_ERROR,
   applyNoStartDate,
@@ -188,6 +189,26 @@ describe("webAppUrl", () => {
       url: "https://stored/exec",
       persist: null,
     });
+    expect(readWebAppUrl("", null, " https://built/exec ")).toEqual({
+      url: "https://built/exec",
+      persist: null,
+    });
+    expect(readWebAppUrl("?webapp=https://query/exec", "https://stored/exec", "https://built/exec")).toEqual({
+      url: "https://query/exec",
+      persist: "https://query/exec",
+    });
+    expect(readWebAppUrl("", "https://stored/exec", "https://built/exec")).toEqual({
+      url: "https://built/exec",
+      persist: null,
+    });
+  });
+
+  it("test_webAppBootstrap_embeds_secret_url", () => {
+    expect(webAppBootstrap(" https://script.google.com/macros/s/abc/exec ")).toBe(
+      'window.__ROZLICZENIA_WEBAPP__="https://script.google.com/macros/s/abc/exec";',
+    );
+    expect(webAppBootstrap("")).toBe('window.__ROZLICZENIA_WEBAPP__="";');
+    expect(webAppBootstrap(undefined)).toBe('window.__ROZLICZENIA_WEBAPP__="";');
   });
 
   it("test_webAppUrl_appends_query", () => {

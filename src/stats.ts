@@ -162,17 +162,37 @@ export function calendarMonthPeriod(year: number, month: number): SheetDateRange
   };
 }
 
+/** Numer kwartału 1..4 dla miesiąca 1..12. */
+export function calendarQuarter(month: number): number {
+  return Math.ceil(month / 3);
+}
+
+/** Od 1. dnia bieżącego kwartału do dziś (włącznie). */
+export function currentQuarterPeriod(today: CalendarDate): SheetDateRange {
+  const quarter = calendarQuarter(today.month);
+  const startMonth = (quarter - 1) * 3 + 1;
+  return {
+    from: formatSheetDate({ year: today.year, month: startMonth, day: 1 }),
+    to: formatSheetDate(today),
+  };
+}
+
+/** Pełny kwartał kalendarzowy. `quarter` = 1..4. */
+export function calendarQuarterPeriod(year: number, quarter: number): SheetDateRange {
+  const startMonth = (quarter - 1) * 3 + 1;
+  return calendarMonthSpan(year, startMonth, startMonth + 2);
+}
+
 /**
  * Pełny poprzedni kwartał względem `today`
  * (nie „ostatnie 90 dni”).
  */
 export function previousQuarterPeriod(today: CalendarDate): SheetDateRange {
-  const quarter = Math.ceil(today.month / 3);
+  const quarter = calendarQuarter(today.month);
   if (quarter === 1) {
-    return calendarMonthSpan(today.year - 1, 10, 12);
+    return calendarQuarterPeriod(today.year - 1, 4);
   }
-  const startMonth = (quarter - 2) * 3 + 1;
-  return calendarMonthSpan(today.year, startMonth, startMonth + 2);
+  return calendarQuarterPeriod(today.year, quarter - 1);
 }
 
 /**
@@ -697,12 +717,21 @@ function gapEntry(row: StatsRow, kind: RateGapKind, tie: RateTie | null): RateGa
   };
 }
 
-export type StatsPeriodKind = "current" | "prev" | "quarter" | "exact";
+export type StatsPeriodKind = "current" | "prev" | "quarter" | "prevQuarter" | "exact";
 
 export interface MonthOption {
   year: number;
   month: number;
   /** `yyyy-mm` */
+  value: string;
+  label: string;
+}
+
+export interface QuarterOption {
+  year: number;
+  /** 1..4 */
+  quarter: number;
+  /** `yyyy-Qn` */
   value: string;
   label: string;
 }
@@ -740,6 +769,8 @@ const MONTH_PL = [
   "listopad",
   "grudzień",
 ] as const;
+
+const QUARTER_ROMAN = ["", "I", "II", "III", "IV"] as const;
 
 /** Pełny raport pod filtry (wszystkie bloki ekranu). */
 export function buildStatsReport(
@@ -794,20 +825,57 @@ export function monthOptionLabel(value: string): string {
   return `${MONTH_PL[month]} ${match[1]}`;
 }
 
+/** Poprzednie pełne kwartały (bez bieżącego), od najnowszego. */
+export function previousQuarterOptions(today: CalendarDate, count = 8): QuarterOption[] {
+  const out: QuarterOption[] = [];
+  let year = today.year;
+  let quarter = calendarQuarter(today.month) - 1;
+  for (let i = 0; i < count; i++) {
+    if (quarter < 1) {
+      quarter = 4;
+      year -= 1;
+    }
+    out.push({
+      year,
+      quarter,
+      value: `${year}-Q${quarter}`,
+      label: `${QUARTER_ROMAN[quarter]} kwartał ${year}`,
+    });
+    quarter -= 1;
+  }
+  return out;
+}
+
+export function quarterOptionLabel(value: string): string {
+  const match = /^(\d{4})-Q([1-4])$/.exec(value);
+  if (!match) {
+    return value;
+  }
+  const quarter = Number(match[2]);
+  return `${QUARTER_ROMAN[quarter]} kwartał ${match[1]}`;
+}
+
 /**
  * Zakres dat z chipa + pól pomocniczych.
- * `month` = `yyyy-mm`; `from`/`to` = ISO lub arkusz.
+ * `month` = `yyyy-mm`; `quarter` = `yyyy-Qn`; `from`/`to` = ISO lub arkusz.
  */
 export function resolveStatsPeriod(
   kind: StatsPeriodKind,
   today: CalendarDate,
-  draft: { month: string; from: string; to: string },
+  draft: { month: string; quarter: string; from: string; to: string },
 ): SheetDateRange | null {
   if (kind === "current") {
     return currentMonthPeriod(today);
   }
   if (kind === "quarter") {
-    return previousQuarterPeriod(today);
+    return currentQuarterPeriod(today);
+  }
+  if (kind === "prevQuarter") {
+    const match = /^(\d{4})-Q([1-4])$/.exec(draft.quarter);
+    if (!match) {
+      return null;
+    }
+    return calendarQuarterPeriod(Number(match[1]), Number(match[2]));
   }
   if (kind === "prev") {
     const match = /^(\d{4})-(\d{2})$/.exec(draft.month);
@@ -825,12 +893,19 @@ export function resolveStatsPeriod(
 }
 
 /** Podpis pod chipami (język zarządu). */
-export function statsPeriodKindLabel(kind: StatsPeriodKind, monthValue = ""): string {
+export function statsPeriodKindLabel(
+  kind: StatsPeriodKind,
+  monthValue = "",
+  quarterValue = "",
+): string {
   if (kind === "current") {
     return "bieżący miesiąc";
   }
   if (kind === "quarter") {
-    return "ostatni kwartał";
+    return "bieżący kwartał";
+  }
+  if (kind === "prevQuarter") {
+    return quarterOptionLabel(quarterValue) || "poprzedni kwartał";
   }
   if (kind === "prev") {
     return monthOptionLabel(monthValue) || "poprzedni miesiąc";

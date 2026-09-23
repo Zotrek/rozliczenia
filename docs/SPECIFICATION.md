@@ -456,7 +456,8 @@ Teksty na ekranie mają być jasne dla osoby nietechnicznej (np. zarząd): bez l
 |-------|------------|
 | **Bieżący miesiąc** (domyślnie) | od 1. dnia bieżącego miesiąca do dziś (włącznie) |
 | **Poprzednie miesiące** | pełny miesiąc kalendarzowy z listy |
-| **Ostatni kwartał** | pełny poprzedni kwartał kalendarzowy względem dziś |
+| **Bieżący kwartał** | od 1. dnia bieżącego kwartału do dziś (włącznie) |
+| **Poprzednie kwartały** | pełny kwartał kalendarzowy z listy |
 | **Dokładny zakres** | od–do (włącznie) |
 
 Dodatkowo: **podwykonawca** (Wszyscy / jeden). Przycisk **Pokaż raport** odświeża dane. W trakcie odczytu — pulsujące logo jak przy Szukaj.

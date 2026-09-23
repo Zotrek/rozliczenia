@@ -5,10 +5,12 @@ import {
   chartShouldStack,
   pageSlice,
   previousMonthOptions,
+  previousQuarterOptions,
   rateGapLabel,
   statsPeriodKindLabel,
   STATS_PAGE_SIZE,
   type MonthOption,
+  type QuarterOption,
   type StatsPeriodKind,
   type StatsReport,
   type TimeSeriesStats,
@@ -21,17 +23,20 @@ export const STATS_FOLD_LS_PREFIX = "rozliczenia.stats.fold.";
 export interface StatsViewModel {
   period: StatsPeriodKind;
   month: string;
+  quarter: string;
   from: string;
   to: string;
   contractor: string;
   contractors: readonly ContractorListItem[];
   months: readonly MonthOption[];
+  quarters: readonly QuarterOption[];
   today: CalendarDate;
   /** Zakres zastosowany w ostatnim raporcie (arkusz). */
   appliedFrom: string;
   appliedTo: string;
   appliedKind: StatsPeriodKind;
   appliedMonth: string;
+  appliedQuarter: string;
   appliedContractor: string;
   report: StatsReport | null;
   status: string;
@@ -49,19 +54,24 @@ export function defaultStatsView(
 ): StatsViewModel {
   const months = previousMonthOptions(today);
   const month = months[0]?.value ?? `${today.year}-${String(today.month).padStart(2, "0")}`;
+  const quarters = previousQuarterOptions(today);
+  const quarter = quarters[0]?.value ?? `${today.year}-Q1`;
   return {
     period: "current",
     month,
+    quarter,
     from: "",
     to: "",
     contractor: "",
     contractors: [],
     months,
+    quarters,
     today,
     appliedFrom: "",
     appliedTo: "",
     appliedKind: "current",
     appliedMonth: month,
+    appliedQuarter: quarter,
     appliedContractor: "",
     report: null,
     status: "",
@@ -152,7 +162,8 @@ function statsFilters(model: StatsViewModel): string {
   const chips: { id: StatsPeriodKind; label: string }[] = [
     { id: "current", label: "Bieżący miesiąc" },
     { id: "prev", label: "Poprzednie miesiące" },
-    { id: "quarter", label: "Ostatni kwartał" },
+    { id: "quarter", label: "Bieżący kwartał" },
+    { id: "prevQuarter", label: "Poprzednie kwartały" },
     { id: "exact", label: "Dokładny zakres" },
   ];
   const chipHtml = chips
@@ -167,6 +178,13 @@ function statsFilters(model: StatsViewModel): string {
       (m) =>
         `<option value="${escapeHtml(m.value)}"${m.value === model.month ? " selected" : ""}>` +
         `${escapeHtml(m.label)}</option>`,
+    )
+    .join("");
+  const quarterOpts = model.quarters
+    .map(
+      (q) =>
+        `<option value="${escapeHtml(q.value)}"${q.value === model.quarter ? " selected" : ""}>` +
+        `${escapeHtml(q.label)}</option>`,
     )
     .join("");
   const whoOpts =
@@ -190,6 +208,9 @@ function statsFilters(model: StatsViewModel): string {
     `<div class="field month-pick${model.period === "prev" ? " is-on" : ""}">` +
     '<label for="stats-month">Miesiąc</label>' +
     `<select id="stats-month" data-stats="month">${monthOpts}</select></div>` +
+    `<div class="field quarter-pick${model.period === "prevQuarter" ? " is-on" : ""}">` +
+    '<label for="stats-quarter">Kwartał</label>' +
+    `<select id="stats-quarter" data-stats="quarter">${quarterOpts}</select></div>` +
     `<div class="exact-range${model.period === "exact" ? " is-on" : ""}">` +
     '<div class="field"><label for="stats-from">Od</label>' +
     `<input id="stats-from" type="date" data-stats="from" value="${escapeHtml(model.from)}"></div>` +
@@ -212,7 +233,11 @@ function statsBody(model: StatsViewModel): string {
   }
   const who =
     model.appliedContractor === "" ? "Wszyscy" : model.appliedContractor;
-  const kindLabel = statsPeriodKindLabel(model.appliedKind, model.appliedMonth);
+  const kindLabel = statsPeriodKindLabel(
+    model.appliedKind,
+    model.appliedMonth,
+    model.appliedQuarter,
+  );
   const periodLabel =
     `Okres: <strong>${escapeHtml(model.appliedFrom)} – ${escapeHtml(model.appliedTo)}</strong>` +
     ` (${escapeHtml(kindLabel)}) · podwykonawca: <strong>${escapeHtml(who)}</strong>`;

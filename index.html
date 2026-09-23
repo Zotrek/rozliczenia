@@ -411,8 +411,10 @@ td input[type="text"]:focus { border-color: var(--teal); background: #fff; outli
 }
 .exact-range { display: none; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
 .exact-range.is-on { display: flex; }
-.month-pick { display: none; }
-.month-pick.is-on { display: flex; }
+.month-pick,
+.quarter-pick { display: none; }
+.month-pick.is-on,
+.quarter-pick.is-on { display: flex; }
 .stats .body {
   flex: 1;
   overflow: auto;
@@ -2508,17 +2510,34 @@ function calendarMonthPeriod(year, month) {
         to: formatSheetDate({ year, month, day: daysInMonth(year, month) }),
     };
 }
+/** Numer kwartału 1..4 dla miesiąca 1..12. */
+function calendarQuarter(month) {
+    return Math.ceil(month / 3);
+}
+/** Od 1. dnia bieżącego kwartału do dziś (włącznie). */
+function currentQuarterPeriod(today) {
+    const quarter = calendarQuarter(today.month);
+    const startMonth = (quarter - 1) * 3 + 1;
+    return {
+        from: formatSheetDate({ year: today.year, month: startMonth, day: 1 }),
+        to: formatSheetDate(today),
+    };
+}
+/** Pełny kwartał kalendarzowy. `quarter` = 1..4. */
+function calendarQuarterPeriod(year, quarter) {
+    const startMonth = (quarter - 1) * 3 + 1;
+    return calendarMonthSpan(year, startMonth, startMonth + 2);
+}
 /**
  * Pełny poprzedni kwartał względem `today`
  * (nie „ostatnie 90 dni”).
  */
 function previousQuarterPeriod(today) {
-    const quarter = Math.ceil(today.month / 3);
+    const quarter = calendarQuarter(today.month);
     if (quarter === 1) {
-        return calendarMonthSpan(today.year - 1, 10, 12);
+        return calendarQuarterPeriod(today.year - 1, 4);
     }
-    const startMonth = (quarter - 2) * 3 + 1;
-    return calendarMonthSpan(today.year, startMonth, startMonth + 2);
+    return calendarQuarterPeriod(today.year, quarter - 1);
 }
 /**
  * Exact od–do. ISO `yyyy-mm-dd` albo już `dd.mm.yyyy`.
@@ -2961,6 +2980,7 @@ const MONTH_PL = [
     "listopad",
     "grudzień",
 ];
+const QUARTER_ROMAN = ["", "I", "II", "III", "IV"];
 /** Pełny raport pod filtry (wszystkie bloki ekranu). */
 function buildStatsReport(rows, rates, filters) {
     return {
@@ -3007,16 +3027,51 @@ function monthOptionLabel(value) {
     }
     return `${MONTH_PL[month]} ${match[1]}`;
 }
+/** Poprzednie pełne kwartały (bez bieżącego), od najnowszego. */
+function previousQuarterOptions(today, count = 8) {
+    const out = [];
+    let year = today.year;
+    let quarter = calendarQuarter(today.month) - 1;
+    for (let i = 0; i < count; i++) {
+        if (quarter < 1) {
+            quarter = 4;
+            year -= 1;
+        }
+        out.push({
+            year,
+            quarter,
+            value: `${year}-Q${quarter}`,
+            label: `${QUARTER_ROMAN[quarter]} kwartał ${year}`,
+        });
+        quarter -= 1;
+    }
+    return out;
+}
+function quarterOptionLabel(value) {
+    const match = /^(\d{4})-Q([1-4])$/.exec(value);
+    if (!match) {
+        return value;
+    }
+    const quarter = Number(match[2]);
+    return `${QUARTER_ROMAN[quarter]} kwartał ${match[1]}`;
+}
 /**
  * Zakres dat z chipa + pól pomocniczych.
- * `month` = `yyyy-mm`; `from`/`to` = ISO lub arkusz.
+ * `month` = `yyyy-mm`; `quarter` = `yyyy-Qn`; `from`/`to` = ISO lub arkusz.
  */
 function resolveStatsPeriod(kind, today, draft) {
     if (kind === "current") {
         return currentMonthPeriod(today);
     }
     if (kind === "quarter") {
-        return previousQuarterPeriod(today);
+        return currentQuarterPeriod(today);
+    }
+    if (kind === "prevQuarter") {
+        const match = /^(\d{4})-Q([1-4])$/.exec(draft.quarter);
+        if (!match) {
+            return null;
+        }
+        return calendarQuarterPeriod(Number(match[1]), Number(match[2]));
     }
     if (kind === "prev") {
         const match = /^(\d{4})-(\d{2})$/.exec(draft.month);
@@ -3033,12 +3088,15 @@ function resolveStatsPeriod(kind, today, draft) {
     return exactPeriod(draft.from, draft.to);
 }
 /** Podpis pod chipami (język zarządu). */
-function statsPeriodKindLabel(kind, monthValue = "") {
+function statsPeriodKindLabel(kind, monthValue = "", quarterValue = "") {
     if (kind === "current") {
         return "bieżący miesiąc";
     }
     if (kind === "quarter") {
-        return "ostatni kwartał";
+        return "bieżący kwartał";
+    }
+    if (kind === "prevQuarter") {
+        return quarterOptionLabel(quarterValue) || "poprzedni kwartał";
     }
     if (kind === "prev") {
         return monthOptionLabel(monthValue) || "poprzedni miesiąc";
@@ -3073,19 +3131,24 @@ const STATS_FOLD_LS_PREFIX = "rozliczenia.stats.fold.";
 function defaultStatsView(today, over = {}) {
     const months = previousMonthOptions(today);
     const month = months[0]?.value ?? `${today.year}-${String(today.month).padStart(2, "0")}`;
+    const quarters = previousQuarterOptions(today);
+    const quarter = quarters[0]?.value ?? `${today.year}-Q1`;
     return {
         period: "current",
         month,
+        quarter,
         from: "",
         to: "",
         contractor: "",
         contractors: [],
         months,
+        quarters,
         today,
         appliedFrom: "",
         appliedTo: "",
         appliedKind: "current",
         appliedMonth: month,
+        appliedQuarter: quarter,
         appliedContractor: "",
         report: null,
         status: "",
@@ -3160,7 +3223,8 @@ function statsFilters(model) {
     const chips = [
         { id: "current", label: "Bieżący miesiąc" },
         { id: "prev", label: "Poprzednie miesiące" },
-        { id: "quarter", label: "Ostatni kwartał" },
+        { id: "quarter", label: "Bieżący kwartał" },
+        { id: "prevQuarter", label: "Poprzednie kwartały" },
         { id: "exact", label: "Dokładny zakres" },
     ];
     const chipHtml = chips
@@ -3170,6 +3234,10 @@ function statsFilters(model) {
     const monthOpts = model.months
         .map((m) => `<option value="${escapeHtml(m.value)}"${m.value === model.month ? " selected" : ""}>` +
         `${escapeHtml(m.label)}</option>`)
+        .join("");
+    const quarterOpts = model.quarters
+        .map((q) => `<option value="${escapeHtml(q.value)}"${q.value === model.quarter ? " selected" : ""}>` +
+        `${escapeHtml(q.label)}</option>`)
         .join("");
     const whoOpts = '<option value="">Wszyscy</option>' +
         model.contractors
@@ -3188,6 +3256,9 @@ function statsFilters(model) {
         `<div class="field month-pick${model.period === "prev" ? " is-on" : ""}">` +
         '<label for="stats-month">Miesiąc</label>' +
         `<select id="stats-month" data-stats="month">${monthOpts}</select></div>` +
+        `<div class="field quarter-pick${model.period === "prevQuarter" ? " is-on" : ""}">` +
+        '<label for="stats-quarter">Kwartał</label>' +
+        `<select id="stats-quarter" data-stats="quarter">${quarterOpts}</select></div>` +
         `<div class="exact-range${model.period === "exact" ? " is-on" : ""}">` +
         '<div class="field"><label for="stats-from">Od</label>' +
         `<input id="stats-from" type="date" data-stats="from" value="${escapeHtml(model.from)}"></div>` +
@@ -3205,7 +3276,7 @@ function statsBody(model) {
             '<p class="period-label">Wybierz okres i naciśnij <strong>Pokaż raport</strong>.</p></div>');
     }
     const who = model.appliedContractor === "" ? "Wszyscy" : model.appliedContractor;
-    const kindLabel = statsPeriodKindLabel(model.appliedKind, model.appliedMonth);
+    const kindLabel = statsPeriodKindLabel(model.appliedKind, model.appliedMonth, model.appliedQuarter);
     const periodLabel = `Okres: <strong>${escapeHtml(model.appliedFrom)} – ${escapeHtml(model.appliedTo)}</strong>` +
         ` (${escapeHtml(kindLabel)}) · podwykonawca: <strong>${escapeHtml(who)}</strong>`;
     return (`<div class="body">${status}` +
@@ -4753,6 +4824,9 @@ function applyStatsField(field, value) {
     if (field === "month") {
         VIEW.stats = { ...VIEW.stats, month: value };
     }
+    else if (field === "quarter") {
+        VIEW.stats = { ...VIEW.stats, quarter: value };
+    }
     else if (field === "from") {
         VIEW.stats = { ...VIEW.stats, from: value };
     }
@@ -4815,16 +4889,17 @@ async function runStats() {
     const today = todayCalendar();
     const range = resolveStatsPeriod(VIEW.stats.period, today, {
         month: VIEW.stats.month,
+        quarter: VIEW.stats.quarter,
         from: VIEW.stats.from,
         to: VIEW.stats.to,
     });
     if (!range) {
-        VIEW.stats = {
-            ...VIEW.stats,
-            status: VIEW.stats.period === "exact"
-                ? "Podaj poprawny zakres od–do (data początkowa nie później niż końcowa)."
-                : "Wybierz miesiąc z listy.",
-        };
+        const status = VIEW.stats.period === "exact"
+            ? "Podaj poprawny zakres od–do (data początkowa nie później niż końcowa)."
+            : VIEW.stats.period === "prevQuarter"
+                ? "Wybierz kwartał z listy."
+                : "Wybierz miesiąc z listy.";
+        VIEW.stats = { ...VIEW.stats, status };
         paint();
         return;
     }
@@ -4861,6 +4936,7 @@ async function runStats() {
             appliedTo: range.to,
             appliedKind: VIEW.stats.period,
             appliedMonth: VIEW.stats.month,
+            appliedQuarter: VIEW.stats.quarter,
             appliedContractor: VIEW.stats.contractor,
             report,
             status: "",

@@ -259,8 +259,10 @@
     }
     .exact-range { display: none; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
     .exact-range.is-on { display: flex; }
-    .month-pick { display: none; }
-    .month-pick.is-on { display: flex; }
+    .month-pick,
+    .quarter-pick { display: none; }
+    .month-pick.is-on,
+    .quarter-pick.is-on { display: flex; }
     .body {
       flex: 1;
       overflow: auto;
@@ -818,7 +820,8 @@
             <div class="period-chips" role="group" aria-label="Okres">
               <button type="button" class="chip is-on" data-period="current">Bieżący miesiąc</button>
               <button type="button" class="chip" data-period="prev">Poprzednie miesiące</button>
-              <button type="button" class="chip" data-period="quarter">Ostatni kwartał</button>
+              <button type="button" class="chip" data-period="quarter">Bieżący kwartał</button>
+              <button type="button" class="chip" data-period="prevQuarter">Poprzednie kwartały</button>
               <button type="button" class="chip" data-period="exact">Dokładny zakres</button>
             </div>
           </div>

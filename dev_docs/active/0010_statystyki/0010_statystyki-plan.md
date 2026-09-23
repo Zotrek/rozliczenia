@@ -22,7 +22,8 @@ Trzeci widok w aplikacji Rozliczenia: odczytowe KPI, tabele i proste słupki CSS
 |-------|------------|
 | **Bieżący miesiąc** (domyślnie) | od 1. dnia bieżącego miesiąca do dziś (włącznie) |
 | **Poprzednie miesiące** | wybór pełnego miesiąca kalendarzowego z listy |
-| **Ostatni kwartał** | pełny poprzedni kwartał kalendarzowy |
+| **Bieżący kwartał** | od 1. dnia bieżącego kwartału do dziś (włącznie) |
+| **Poprzednie kwartały** | pełny kwartał kalendarzowy z listy |
 | **Dokładny zakres** | od–do (włącznie), jak na Zakresie |
 
 Dodatkowo: **podwykonawca** (wszyscy / jeden). Przycisk **Pokaż raport**.

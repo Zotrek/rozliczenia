@@ -112,3 +112,7 @@
 - Top N: stałe **5**.
 - „Ostatni kwartał”: poprzedni pełny kwartał (nie 90 dni).
 - **Smoke (punkt 4):** żywy Web App **nie** zna `settlementStats` (`unknown action`); `listContractors` OK. Wdrożyć nową wersję istniejącego Web App (ten sam URL; kod już w `transport-log.gs`). Potem lokalnie `?webapp=` albo Pages (workflow → `gh-pages`; Settings Pages powinno czytać `gh-pages`, nie `main`).
+
+### 2026-09-23 — filtry kwartałów jak miesiące
+- `quarter` = bieżący kwartał (od 1. dnia Q do dziś)
+- `prevQuarter` = lista poprzednich pełnych kwartałów (`yyyy-Qn`)

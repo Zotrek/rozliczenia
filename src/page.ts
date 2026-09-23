@@ -1188,6 +1188,8 @@ function openStats(): void {
 function applyStatsField(field: string, value: string): void {
   if (field === "month") {
     VIEW.stats = { ...VIEW.stats, month: value };
+  } else if (field === "quarter") {
+    VIEW.stats = { ...VIEW.stats, quarter: value };
   } else if (field === "from") {
     VIEW.stats = { ...VIEW.stats, from: value };
   } else if (field === "to") {
@@ -1259,17 +1261,18 @@ async function runStats(): Promise<void> {
   const today = todayCalendar();
   const range = resolveStatsPeriod(VIEW.stats.period, today, {
     month: VIEW.stats.month,
+    quarter: VIEW.stats.quarter,
     from: VIEW.stats.from,
     to: VIEW.stats.to,
   });
   if (!range) {
-    VIEW.stats = {
-      ...VIEW.stats,
-      status:
-        VIEW.stats.period === "exact"
-          ? "Podaj poprawny zakres od–do (data początkowa nie później niż końcowa)."
-          : "Wybierz miesiąc z listy.",
-    };
+    const status =
+      VIEW.stats.period === "exact"
+        ? "Podaj poprawny zakres od–do (data początkowa nie później niż końcowa)."
+        : VIEW.stats.period === "prevQuarter"
+          ? "Wybierz kwartał z listy."
+          : "Wybierz miesiąc z listy.";
+    VIEW.stats = { ...VIEW.stats, status };
     paint();
     return;
   }
@@ -1311,6 +1314,7 @@ async function runStats(): Promise<void> {
       appliedTo: range.to,
       appliedKind: VIEW.stats.period,
       appliedMonth: VIEW.stats.month,
+      appliedQuarter: VIEW.stats.quarter,
       appliedContractor: VIEW.stats.contractor,
       report,
       status: "",

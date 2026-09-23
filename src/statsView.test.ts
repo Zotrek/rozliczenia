@@ -45,26 +45,39 @@ function row(over: Partial<StatsRow> & Pick<StatsRow, "sheetRow">): StatsRow {
 const TODAY = { year: 2026, month: 9, day: 23 };
 
 describe("resolveStatsPeriod", () => {
+  const emptyDraft = { month: "", quarter: "", from: "", to: "" };
+
   it("test_resolveStatsPeriod_current_and_quarter", () => {
-    expect(resolveStatsPeriod("current", TODAY, { month: "", from: "", to: "" })).toEqual({
+    expect(resolveStatsPeriod("current", TODAY, emptyDraft)).toEqual({
       from: "01.09.2026",
       to: "23.09.2026",
     });
-    expect(resolveStatsPeriod("quarter", TODAY, { month: "", from: "", to: "" })).toEqual({
-      from: "01.04.2026",
-      to: "30.06.2026",
+    expect(resolveStatsPeriod("quarter", TODAY, emptyDraft)).toEqual({
+      from: "01.07.2026",
+      to: "23.09.2026",
     });
   });
 
-  it("test_resolveStatsPeriod_prev_month_and_exact", () => {
+  it("test_resolveStatsPeriod_prev_month_prev_quarter_and_exact", () => {
     expect(
-      resolveStatsPeriod("prev", TODAY, { month: "2026-08", from: "", to: "" }),
+      resolveStatsPeriod("prev", TODAY, { ...emptyDraft, month: "2026-08" }),
     ).toEqual({ from: "01.08.2026", to: "31.08.2026" });
     expect(
-      resolveStatsPeriod("exact", TODAY, { month: "", from: "2026-09-01", to: "2026-09-10" }),
+      resolveStatsPeriod("prevQuarter", TODAY, { ...emptyDraft, quarter: "2026-Q2" }),
+    ).toEqual({ from: "01.04.2026", to: "30.06.2026" });
+    expect(
+      resolveStatsPeriod("exact", TODAY, {
+        ...emptyDraft,
+        from: "2026-09-01",
+        to: "2026-09-10",
+      }),
     ).toEqual({ from: "01.09.2026", to: "10.09.2026" });
     expect(
-      resolveStatsPeriod("exact", TODAY, { month: "", from: "2026-09-10", to: "2026-09-01" }),
+      resolveStatsPeriod("exact", TODAY, {
+        ...emptyDraft,
+        from: "2026-09-10",
+        to: "2026-09-01",
+      }),
     ).toBeNull();
   });
 });
@@ -172,6 +185,8 @@ describe("renderStatsScreen", () => {
     expect(html).toContain('data-screen="stats"');
     expect(html).toContain("Pokaż raport");
     expect(html).toContain("Bieżący miesiąc");
+    expect(html).toContain("Bieżący kwartał");
+    expect(html).toContain("Poprzednie kwartały");
     expect(html).toContain("Wybierz okres");
   });
 

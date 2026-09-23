@@ -13,14 +13,18 @@ import {
   aggregateRateGaps,
   aggregateSettled,
   calendarMonthPeriod,
+  calendarQuarterPeriod,
   currentMonthPeriod,
+  currentQuarterPeriod,
   exactPeriod,
   findRateTiesInBase,
   formatSheetDate,
   inSheetDateRange,
   listZeroBagPickups,
   monthOptionLabel,
+  previousQuarterOptions,
   previousQuarterPeriod,
+  quarterOptionLabel,
   rateGapLabel,
   statsPeriodKindLabel,
   timeBucketGranularity,
@@ -103,6 +107,26 @@ describe("formatSheetDate / periods", () => {
       from: "01.01.2026",
       to: "31.03.2026",
     });
+  });
+
+  it("test_currentQuarterPeriod_start_of_quarter_to_today", () => {
+    expect(currentQuarterPeriod(TODAY)).toEqual({ from: "01.07.2026", to: "23.09.2026" });
+    expect(currentQuarterPeriod({ year: 2026, month: 2, day: 5 })).toEqual({
+      from: "01.01.2026",
+      to: "05.02.2026",
+    });
+  });
+
+  it("test_calendarQuarterPeriod_full_q2", () => {
+    expect(calendarQuarterPeriod(2026, 2)).toEqual({ from: "01.04.2026", to: "30.06.2026" });
+  });
+
+  it("test_previousQuarterOptions_starts_from_previous_quarter", () => {
+    expect(previousQuarterOptions(TODAY, 3)).toEqual([
+      { year: 2026, quarter: 2, value: "2026-Q2", label: "II kwartał 2026" },
+      { year: 2026, quarter: 1, value: "2026-Q1", label: "I kwartał 2026" },
+      { year: 2025, quarter: 4, value: "2025-Q4", label: "IV kwartał 2025" },
+    ]);
   });
 
   it("test_exactPeriod_iso_inclusive_range", () => {
@@ -730,8 +754,10 @@ describe("labels", () => {
   it("test_monthOptionLabel_and_statsPeriodKindLabel", () => {
     expect(monthOptionLabel("2026-09")).toBe("wrzesień 2026");
     expect(monthOptionLabel("bad")).toBe("bad");
+    expect(quarterOptionLabel("2026-Q3")).toBe("III kwartał 2026");
     expect(statsPeriodKindLabel("current")).toBe("bieżący miesiąc");
-    expect(statsPeriodKindLabel("quarter")).toBe("ostatni kwartał");
+    expect(statsPeriodKindLabel("quarter")).toBe("bieżący kwartał");
+    expect(statsPeriodKindLabel("prevQuarter", "", "2026-Q2")).toBe("II kwartał 2026");
     expect(statsPeriodKindLabel("prev", "2026-08")).toBe("sierpień 2026");
     expect(statsPeriodKindLabel("exact")).toBe("dokładny zakres");
   });

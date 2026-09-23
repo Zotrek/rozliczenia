@@ -403,8 +403,10 @@ td input[type="text"]:focus { border-color: var(--teal); background: #fff; outli
 }
 .exact-range { display: none; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
 .exact-range.is-on { display: flex; }
-.month-pick { display: none; }
-.month-pick.is-on { display: flex; }
+.month-pick,
+.quarter-pick { display: none; }
+.month-pick.is-on,
+.quarter-pick.is-on { display: flex; }
 .stats .body {
   flex: 1;
   overflow: auto;

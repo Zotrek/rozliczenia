@@ -50,7 +50,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .mode input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .mode.is-on { background: var(--teal); color: #fff; }
-.mode.is-off { color: #94a3b8; cursor: not-allowed; }
+.mode.is-off { color: #64748b; cursor: pointer; }
+.mode.is-off:hover { color: var(--ink); }
 .filters { display: flex; flex-direction: column; gap: 10px; }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
 .field input, .field select {

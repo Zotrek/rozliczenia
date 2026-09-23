@@ -58,7 +58,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 }
 .mode input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .mode.is-on { background: var(--teal); color: #fff; }
-.mode.is-off { color: #94a3b8; cursor: not-allowed; }
+.mode.is-off { color: #64748b; cursor: pointer; }
+.mode.is-off:hover { color: var(--ink); }
 .filters { display: flex; flex-direction: column; gap: 10px; }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
 .field input, .field select {
@@ -583,8 +584,12 @@ function screenAfterApprove() {
 function openRatesWindow(screen) {
     return { screen, window: "rates" };
 }
-function reportMode() {
-    return { report: true, schedule: false };
+function modeLabel(mode) {
+    return mode === "schedule" ? "Harmonogram" : "Na zgłoszenie";
+}
+/** Jeden tryb naraz. Domyślnie Na zgłoszenie. */
+function selectMode(mode) {
+    return { report: mode === "report", schedule: mode === "schedule" };
 }
 function rangeLabel(query) {
     const from = query.dataOd ? `od ${query.dataOd}` : "bez daty początkowej";
@@ -1937,15 +1942,18 @@ function shopsWord(count) {
 
 
 
-function brand() {
+function brand(mode) {
     return ('<div class="brand"><img src="logo.png" alt="" width="36" height="36">' +
-        "<div><strong>Rozliczenia</strong><em>Na zgłoszenie</em></div></div>");
+        `<div><strong>Rozliczenia</strong><em>${escapeHtml(modeLabel(mode))}</em></div></div>`);
 }
-function renderModes() {
+function renderModes(mode = "report") {
+    const reportOn = mode === "report";
+    const scheduleOn = mode === "schedule";
     return ('<div class="modes" role="group" aria-label="Tryb">' +
-        '<label class="mode is-on"><input type="checkbox" id="mode-na" checked> Na zgłoszenie</label>' +
-        '<label class="mode is-off" title="W tej wersji niedostępne">' +
-        '<input type="checkbox" id="mode-h" disabled> Harmonogram</label></div>');
+        `<label class="mode${reportOn ? " is-on" : " is-off"}">` +
+        `<input type="checkbox" id="mode-na"${reportOn ? " checked" : ""}> Na zgłoszenie</label>` +
+        `<label class="mode${scheduleOn ? " is-on" : " is-off"}">` +
+        `<input type="checkbox" id="mode-h"${scheduleOn ? " checked" : ""}> Harmonogram</label></div>`);
 }
 const CONTRACTOR_LIST_LIMIT = 80;
 function contractorHits(model) {
@@ -2068,10 +2076,10 @@ function renderRangeScreen(model) {
         : "";
     const status = model.status ? `<p class="err">${escapeHtml(model.status)}</p>` : "";
     return ('<div class="setup" data-screen="range"><div class="setup-card">' +
-        brand() +
+        brand(model.mode) +
         "<h2>Zakres rozliczenia</h2>" +
         '<p class="setup-lead">Ustal, czego dotyczy to rozliczenie. Pozycje pojawią się na następnym ekranie.</p>' +
-        renderModes() +
+        renderModes(model.mode) +
         '<div class="filters setup-fields">' +
         contractorField(model) +
         dateFields(model) +
@@ -2086,8 +2094,8 @@ function renderRangeScreen(model) {
 function renderStatementScreen(model) {
     const label = model.applied ? rangeLabel(model.applied) : "";
     return ('<div class="statement" data-screen="statement"><div class="top">' +
-        brand() +
-        `<div class="range"><span>Na zgłoszenie</span><strong>${escapeHtml(label)}</strong></div>` +
+        brand(model.mode) +
+        `<div class="range"><span>${escapeHtml(modeLabel(model.mode))}</span><strong>${escapeHtml(label)}</strong></div>` +
         '<button type="button" class="btn-ghost" data-action="back">Zmień zakres</button>' +
         ratesButton() +
         "</div>" +
@@ -2135,6 +2143,7 @@ function renderApp(model) {
 
 
 const VIEW = {
+    mode: "report",
     contractorQuery: "",
     contractorOpen: false,
     contractor: "",
@@ -2513,11 +2522,13 @@ function onChange(event) {
         return;
     }
     if (el.id === "mode-na") {
-        el.checked = true;
+        VIEW.mode = "report";
+        paint();
         return;
     }
     if (el.id === "mode-h") {
-        el.checked = false;
+        VIEW.mode = "schedule";
+        paint();
         return;
     }
     if (el.dataset.toggle === "nofrom") {

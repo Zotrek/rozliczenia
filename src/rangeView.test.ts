@@ -9,6 +9,7 @@ import { emptyStatement } from "./statement.js";
 
 function model(over: Partial<RangeViewModel> = {}): RangeViewModel {
   return {
+    mode: "report",
     contractorQuery: "",
     contractorOpen: false,
     contractor: "",
@@ -49,13 +50,23 @@ const APPLIED: StartedSearch = {
 };
 
 describe("renderModes", () => {
-  it("test_renderModes_report_on_schedule_visible_and_disabled", () => {
-    const html = renderModes();
+  it("test_renderModes_report_on_schedule_selectable", () => {
+    const html = renderModes("report");
     expect(html).toContain('id="mode-na" checked');
     expect(html).toContain("Na zgłoszenie");
-    expect(html).toContain('id="mode-h" disabled');
-    expect(html).toContain("Harmonogram");
+    expect(html).toContain('id="mode-h"');
+    expect(html).not.toContain("disabled");
     expect(html).not.toContain('id="mode-h" checked');
+    expect(html).toContain("Harmonogram");
+  });
+
+  it("test_renderModes_schedule_can_be_selected", () => {
+    const html = renderModes("schedule");
+    expect(html).toContain('id="mode-h" checked');
+    expect(html).toContain('id="mode-na"');
+    expect(html).not.toContain('id="mode-na" checked');
+    expect(html).not.toContain("disabled");
+    expect(renderApp(model({ mode: "schedule" }))).toContain("<em>Harmonogram</em>");
   });
 });
 
@@ -199,7 +210,8 @@ describe("buildPage", () => {
     const html = buildPage();
     const needle = "Data początkowa nie może być późniejsza niż końcowa.";
     expect(html.split(needle).length - 1).toBe(1);
-    expect(html).toContain('id="mode-h" disabled');
+    expect(html).toContain('id="mode-h"');
+    expect(html).not.toContain('id="mode-h" disabled');
     expect(html).toContain("function startSearch");
     expect(html).not.toContain("mix-bar");
     expect(html).not.toMatch(/\bimport\s/);

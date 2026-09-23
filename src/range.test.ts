@@ -15,7 +15,7 @@ import {
   openRatesWindow,
   rangeLabel,
   readWebAppUrl,
-  reportMode,
+  selectMode,
   resolveContractorText,
   resolveListText,
   screenAfterApprove,
@@ -180,7 +180,8 @@ describe("screens", () => {
   it("test_openRatesWindow_stays_on_current_screen", () => {
     expect(openRatesWindow("range")).toEqual({ screen: "range", window: "rates" });
     expect(openRatesWindow("statement")).toEqual({ screen: "statement", window: "rates" });
-    expect(reportMode()).toEqual({ report: true, schedule: false });
+    expect(selectMode("report")).toEqual({ report: true, schedule: false });
+    expect(selectMode("schedule")).toEqual({ report: false, schedule: true });
   });
 });
 

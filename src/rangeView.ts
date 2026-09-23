@@ -4,17 +4,20 @@ import {
   RANGE_ERROR,
   foldPl,
   matchingContractors,
+  modeLabel,
   rangeLabel,
   selectedContractor,
   type ContractorListItem,
   type RangeError,
   type ScreenId,
+  type SettlementMode,
   type StartedSearch,
 } from "./range.js";
 import type { StatementScreen } from "./statement.js";
 import { renderStatement } from "./statementView.js";
 
 export interface RangeViewModel {
+  mode: SettlementMode;
   contractorQuery: string;
   contractorOpen: boolean;
   contractor: string;
@@ -49,19 +52,22 @@ export interface RangeViewModel {
 }
 
 
-function brand(): string {
+function brand(mode: SettlementMode): string {
   return (
     '<div class="brand"><img src="logo.png" alt="" width="36" height="36">' +
-    "<div><strong>Rozliczenia</strong><em>Na zgłoszenie</em></div></div>"
+    `<div><strong>Rozliczenia</strong><em>${escapeHtml(modeLabel(mode))}</em></div></div>`
   );
 }
 
-export function renderModes(): string {
+export function renderModes(mode: SettlementMode = "report"): string {
+  const reportOn = mode === "report";
+  const scheduleOn = mode === "schedule";
   return (
     '<div class="modes" role="group" aria-label="Tryb">' +
-    '<label class="mode is-on"><input type="checkbox" id="mode-na" checked> Na zgłoszenie</label>' +
-    '<label class="mode is-off" title="W tej wersji niedostępne">' +
-    '<input type="checkbox" id="mode-h" disabled> Harmonogram</label></div>'
+    `<label class="mode${reportOn ? " is-on" : " is-off"}">` +
+    `<input type="checkbox" id="mode-na"${reportOn ? " checked" : ""}> Na zgłoszenie</label>` +
+    `<label class="mode${scheduleOn ? " is-on" : " is-off"}">` +
+    `<input type="checkbox" id="mode-h"${scheduleOn ? " checked" : ""}> Harmonogram</label></div>`
   );
 }
 
@@ -242,10 +248,10 @@ function renderRangeScreen(model: RangeViewModel): string {
   const status = model.status ? `<p class="err">${escapeHtml(model.status)}</p>` : "";
   return (
     '<div class="setup" data-screen="range"><div class="setup-card">' +
-    brand() +
+    brand(model.mode) +
     "<h2>Zakres rozliczenia</h2>" +
     '<p class="setup-lead">Ustal, czego dotyczy to rozliczenie. Pozycje pojawią się na następnym ekranie.</p>' +
-    renderModes() +
+    renderModes(model.mode) +
     '<div class="filters setup-fields">' +
     contractorField(model) +
     dateFields(model) +
@@ -263,8 +269,8 @@ function renderStatementScreen(model: RangeViewModel): string {
   const label = model.applied ? rangeLabel(model.applied) : "";
   return (
     '<div class="statement" data-screen="statement"><div class="top">' +
-    brand() +
-    `<div class="range"><span>Na zgłoszenie</span><strong>${escapeHtml(label)}</strong></div>` +
+    brand(model.mode) +
+    `<div class="range"><span>${escapeHtml(modeLabel(model.mode))}</span><strong>${escapeHtml(label)}</strong></div>` +
     '<button type="button" class="btn-ghost" data-action="back">Zmień zakres</button>' +
     ratesButton() +
     "</div>" +

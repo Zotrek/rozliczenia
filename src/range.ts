@@ -247,8 +247,15 @@ export function openRatesWindow<T extends ScreenId>(screen: T): { screen: T; win
   return { screen, window: "rates" };
 }
 
-export function reportMode(): { report: true; schedule: false } {
-  return { report: true, schedule: false };
+export type SettlementMode = "report" | "schedule";
+
+export function modeLabel(mode: SettlementMode): string {
+  return mode === "schedule" ? "Harmonogram" : "Na zgłoszenie";
+}
+
+/** Jeden tryb naraz. Domyślnie Na zgłoszenie. */
+export function selectMode(mode: SettlementMode): { report: boolean; schedule: boolean } {
+  return { report: mode === "report", schedule: mode === "schedule" };
 }
 
 export function rangeLabel(query: StartedSearch): string {

@@ -21,7 +21,7 @@ Specyfikacja mówi wprost, że z zachowania nie wynika Symfony, Vue ani PostgreS
 
 | Warstwa | Propozycja | Rola |
 |---------|------------|------|
-| Źródło danych | Istniejący plik Google | Rejestr (pierwsza zakładka), Baza stawek, Lista podwykonawców |
+| Źródło danych | Istniejący plik Google | Rejestr (`Arkusz1` po nazwie), Baza stawek, Lista podwykonawców |
 | Zapis i odczyt | Rozszerzenie istniejącego Web App (`arkusz-mapa/google-apps-script/transport-log.gs`) | Lock, odczyt zestawienia, zapis edycji i zatwierdzenia. Nagłówki rejestru tylko przy dopisaniu protokołu. Nagłówki Bazy stawek przy pierwszym zapisie stawki |
 | Reguły kosztów | TypeScript, czyste funkcje, Vitest | Liczenie na ekranie. Te same funkcje da się odpalić w teście bez arkusza |
 | Ekran | Jedna strona HTML, style z makiety | Dwa ekrany: Zakres i Zestawienie. Okno Baza stawek, nie trzeci ekran |
@@ -88,11 +88,11 @@ Strona rozliczeń ma własne repozytorium. Workflow `rozliczenia-pages.yml` czyt
 
 ## Dane
 
-Nowej tabeli nie zakładamy. Kontrakt jest w specyfikacji: kolumny rejestru po numerze, nie po nagłówku. Baza stawek i Lista podwykonawców po nazwie zakładki.
+Nowej tabeli nie zakładamy. Kontrakt jest w specyfikacji: kolumny rejestru po numerze, nie po nagłówku. Rejestr, Baza stawek i Lista podwykonawców — po nazwie zakładki.
 
-### Rejestr — pierwsza zakładka
+### Rejestr — zakładka `Arkusz1`
 
-Kolumny 1–11 już zapisuje mapa. Kolumny 12–18 dopisuje się na końcu. Nagłówki w wierszu 1, gdy komórka pusta, wpisuje makro mapy, zanim pierwszy raz dopisze jakikolwiek wiersz protokołu, także bez trasy. W tym samym kroku, raz, lista `tak` / `nie` na kolumnie 18 i przekreślenie wiersza z `nie`. Aplikacja rozliczeń tych nagłówków nie wpisuje, także przy pierwszym odczycie. Brak nagłówka nie zmienia numeru kolumny. Dopóki po wdrożeniu nie zapisze się żadnego nowego protokołu, kolumny 18 nie ma. Brak kolumny znaczy to samo co pusta: transport się odbył.
+Makro szuka rejestru po nazwie (`REGISTER_SHEET_NAME`), nie po kolejności kart. Kolumny 1–11 już zapisuje mapa. Kolumny 12–18 dopisuje się na końcu. Nagłówki w wierszu 1, gdy komórka pusta, wpisuje makro mapy, zanim pierwszy raz dopisze jakikolwiek wiersz protokołu, także bez trasy. W tym samym kroku, raz, lista `tak` / `nie` na kolumnie 18 i przekreślenie wiersza z `nie`. Aplikacja rozliczeń tych nagłówków nie wpisuje, także przy pierwszym odczycie. Brak nagłówka nie zmienia numeru kolumny. Dopóki po wdrożeniu nie zapisze się żadnego nowego protokołu, kolumny 18 nie ma. Brak kolumny znaczy to samo co pusta: transport się odbył.
 
 | # | Pole | Kto pisze | Kiedy |
 |---|------|-----------|-------|

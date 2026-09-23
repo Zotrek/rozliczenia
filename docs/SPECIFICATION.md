@@ -122,9 +122,9 @@ Wszystkie dane są w **istniejącym** pliku Google, w którym leży Arkusz1. Now
 
 To ten sam dokument Google: `1hvSvy9c069SefhYH3rCUDtCViRhAoRQ6DDj_EIlmWNk` (`GOOGLE_TRANSPORT_SHEETS_ID`, opis w [arkusz-mapa/docs/TRANSPORT_SHEET.md](../../arkusz-mapa/docs/TRANSPORT_SHEET.md)).
 
-Rejestr transportów to **pierwsza zakładka** pliku. Tak bierze ją makro dziś i tak opisuje to [TRANSPORT_SHEET.md](../../arkusz-mapa/docs/TRANSPORT_SHEET.md). Nazwa „Arkusz1” to zwykła nazwa tej pierwszej zakładki w Google, nie klucz wyszukiwania. Przeniesienie jej za inną zakładkę psuje zapis protokołu. Kolejność pozostałych zakładek nie zmienia tego, która jest rejestrem.
+Rejestr transportów to zakładka **`Arkusz1`**. Makro szuka jej **po nazwie** (nie po kolejności kart) — tak opisuje to [TRANSPORT_SHEET.md](../../arkusz-mapa/docs/TRANSPORT_SHEET.md). Przestawienie kart w pliku nie psuje zapisu protokołu ani odczytu ostatniego transportu. Zmiana nazwy zakładki rejestru wymaga update skryptu (`REGISTER_SHEET_NAME`).
 
-Słowniki już istniejące (**Lista podwykonawców**, **Popraw adres**) oraz nowa **Baza stawek** są po nazwie. To nie jest rejestr. Ich nie szuka się jako pierwszej zakładki.
+Słowniki (**Lista podwykonawców**, **Popraw adres**, **Baza stawek**) też są po nazwie.
 
 Kolumny rejestru są po **kolejności**, nie po nazwie nagłówka. Numer kolumny jest umową zapisu i odczytu, w makrze i w aplikacji rozliczeń. Nagłówek w wierszu 1 jest dla człowieka: ma stać w tej samej kolumnie i tym samym tekstem. Wstawienie albo zamiana kolumny w środku zmienia znaczenie danych. Nowe pole dopisuje się zwykle na końcu — wyjątek: jednorazowa migracja V2 (komentarze na 19–20, stawki podjazdu/worka w 12–13) w [TRANSPORT_SHEET.md](../../arkusz-mapa/docs/TRANSPORT_SHEET.md).
 
@@ -132,7 +132,7 @@ Właścicielem wiersza nagłówków rejestru jest makro mapy, to samo, które do
 
 | Jak się znajduje | Zakładka | Rola |
 |------------------|----------|------|
-| Pierwsza w pliku | Rejestr, w Google zwykle Arkusz1 | Protokoły i rozliczenie. Jeden wiersz = jeden odbiór w sklepie |
+| Po nazwie | Arkusz1 | Protokoły i rozliczenie. Jeden wiersz = jeden odbiór w sklepie |
 | Po nazwie | Baza stawek | Stawki podjazdu i worka. Nic więcej |
 
 Brak zakładki o nazwie **Baza stawek** nie kończy się cichym brakiem zapisu. Zakładkę i wiersz nagłówków zakłada ten zapis, który jest pierwszy: mapa albo aplikacja rozliczeń. Druga strona używa już istniejącej. Nie wybiera innej zakładki „bo jest pierwsza” i nie zakłada drugiej o tej samej roli.

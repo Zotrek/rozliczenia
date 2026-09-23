@@ -148,6 +148,9 @@ beforeAll(() => {
             return [holder.register];
           },
           getSheetByName(name: string) {
+            if (name === "Arkusz1") {
+              return holder.register;
+            }
             if (name === "Baza stawek") {
               return holder.rates;
             }

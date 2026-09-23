@@ -52,6 +52,7 @@ import {
 import { rateContractorNames, rateSaveMessage, readAddressList, resolveStoreAddress, saveRateBody, storeAddressLabel } from "./rateWindow.js";
 
 const VIEW: RangeViewModel = {
+  mode: "report",
   contractorQuery: "",
   contractorOpen: false,
   contractor: "",
@@ -445,11 +446,13 @@ function onChange(event: Event): void {
     return;
   }
   if (el.id === "mode-na") {
-    el.checked = true;
+    VIEW.mode = "report";
+    paint();
     return;
   }
   if (el.id === "mode-h") {
-    el.checked = false;
+    VIEW.mode = "schedule";
+    paint();
     return;
   }
   if (el.dataset.toggle === "nofrom") {

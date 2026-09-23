@@ -2,7 +2,7 @@
 
 > **Task:** 0010_statystyki (= R8)  
 > **Last Updated:** 2026-09-23  
-> **Status:** step 3 complete (UI); smoke / CP4 pending
+> **Status:** step 4 partial — CP4 ✅; ręczny smoke czeka na wdrożenie `settlementStats`
 
 ## Decyzje produktowe (2026-09-23)
 
@@ -105,9 +105,10 @@
 - **CP1b:** `npm test` — 198 pass, 36 w `stats.test.ts` (2026-09-23) ✅
 - **CP2:** `arkusz-mapa` 608 pass + `rozliczenia` 208 pass (`statsRead.test.ts`) (2026-09-23) ✅
 - **CP3:** `rozliczenia` 221 pass (UI + `statsView.test.ts`) (2026-09-23) ✅
+- **CP4:** `rozliczenia` 221 + `arkusz-mapa` 608 — bez regresji (2026-09-23) ✅
 
 ## Otwarte (drobne)
 
 - Top N: stałe **5**.
 - „Ostatni kwartał”: poprzedni pełny kwartał (nie 90 dni).
-- Punkt 4: ręczny smoke z wdrożonym Web App.
+- **Smoke (punkt 4):** żywy Web App **nie** zna `settlementStats` (`unknown action`); `listContractors` OK. Wdrożyć nową wersję istniejącego Web App (ten sam URL; kod już w `transport-log.gs`). Potem lokalnie `?webapp=` albo Pages (workflow → `gh-pages`; Settings Pages powinno czytać `gh-pages`, nie `main`).

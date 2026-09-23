@@ -1,7 +1,7 @@
 # Tasks: Statystyki rozliczeń
 
 > **Task:** 0010_statystyki  
-> **Updated:** 2026-09-23 (step 3 UI done)
+> **Updated:** 2026-09-23 (step 4: CP4 pass; smoke blocked — Web App)
 
 ## 0. Makieta (zrobione)
 
@@ -46,7 +46,10 @@
 ## 4. Domknięcie
 
 - [ ] Ręczny smoke na Pages / lokalnym HTML z Web App (gdy action wdrożony)
-- [ ] **CHECKPOINT 4 (regresja):** `npm test` w `rozliczenia/` + `arkusz-mapa/` — brak regresji
+  - 2026-09-23: żywy Web App → `settlementStats` = `{"ok":false,"error":"unknown action"}` (baseline `listContractors` OK). Kod jest w repo `transport-log.gs`, brak nowej wersji wdrożenia.
+  - Pages `https://zotrek.github.io/rozliczenia/` = build z 2026-09-21 (bez UI Statystyk); Settings Pages wskazuje `main`, nie `gh-pages`.
+  - Po wdrożeniu GAS: smoke lokalnie `index.html?webapp=…` albo push + workflow Pages; checklista: Zakres→Statystyki→Powrót, filtry, Pokaż raport, KPI/tabele.
+- [x] **CHECKPOINT 4 (regresja):** `npm test` — `rozliczenia/` 221 pass + `arkusz-mapa/` 608 pass ✅
 
 ## Poza checklistą (nie robić)
 

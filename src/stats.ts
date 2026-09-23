@@ -5,6 +5,7 @@ import { resolveRate } from "./rates.js";
 import type { SettlementRateRow } from "./search.js";
 import {
   compareSheetDate,
+  hasSheetDateShape,
   parseSheetDate,
   type CalendarDate,
 } from "./sheetDate.js";
@@ -138,7 +139,6 @@ export interface ZeroBagPickup {
 /** Próg inkluzywnej długości okresu: ≤ → tygodnie, inaczej miesiące. */
 export const TIME_SERIES_WEEK_MAX_DAYS = 45;
 
-const SHEET_DATE = /^(\d{2})\.(\d{2})\.(\d{4})$/;
 const MS_DAY = 86_400_000;
 
 /** `CalendarDate` → tekst arkusza `dd.mm.yyyy`. */
@@ -628,7 +628,7 @@ function toSheetBound(text: string): string | null {
   if (trimmed === "") {
     return null;
   }
-  if (SHEET_DATE.test(trimmed)) {
+  if (hasSheetDateShape(trimmed)) {
     try {
       parseSheetDate(trimmed);
       return trimmed;

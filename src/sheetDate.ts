@@ -11,6 +11,11 @@ export interface CalendarDate {
   day: number;
 }
 
+/** Kształt `dd.mm.yyyy` bez sprawdzania kalendarza. */
+export function hasSheetDateShape(text: string): boolean {
+  return SHEET_DATE.test(text);
+}
+
 export function parseSheetDate(text: string): CalendarDate {
   const match = SHEET_DATE.exec(text);
   if (!match) {

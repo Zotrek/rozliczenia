@@ -756,6 +756,10 @@ function escapeHtml(text) {
  * Porównanie jest po dacie kalendarzowej. Pusty tekst jest starszy niż każda wpisana data.
  */
 const SHEET_DATE = /^(\d{2})\.(\d{2})\.(\d{4})$/;
+/** Kształt `dd.mm.yyyy` bez sprawdzania kalendarza. */
+function hasSheetDateShape(text) {
+    return SHEET_DATE.test(text);
+}
 function parseSheetDate(text) {
     const match = SHEET_DATE.exec(text);
     if (!match) {
@@ -2441,7 +2445,6 @@ function resolveRate(rates, shop, contractor, pickupDate) {
 
 /** Próg inkluzywnej długości okresu: ≤ → tygodnie, inaczej miesiące. */
 const TIME_SERIES_WEEK_MAX_DAYS = 45;
-const SHEET_DATE = /^(\d{2})\.(\d{2})\.(\d{4})$/;
 const MS_DAY = 86_400_000;
 /** `CalendarDate` → tekst arkusza `dd.mm.yyyy`. */
 function formatSheetDate(date) {
@@ -2835,7 +2838,7 @@ function toSheetBound(text) {
     if (trimmed === "") {
         return null;
     }
-    if (SHEET_DATE.test(trimmed)) {
+    if (hasSheetDateShape(trimmed)) {
         try {
             parseSheetDate(trimmed);
             return trimmed;

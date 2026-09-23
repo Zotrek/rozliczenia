@@ -1,8 +1,8 @@
 # ARCHITECTURE.md — Rozliczenia
 
-> **Status:** Zatwierdzone 2026-09-19. Kolejność prac jest w [`PLAN.md`](PLAN.md).  
-> **Ostatnia aktualizacja:** 2026-09-19  
-> **Na podstawie:** `rozliczenia/docs/SPECIFICATION.md`, makieta `rozliczenia/docs/makiety-tabeli.html`  
+> **Status:** Zatwierdzone 2026-09-19; uzupełnienie Statystyk 2026-09-23. Kolejność prac jest w [`PLAN.md`](PLAN.md).  
+> **Ostatnia aktualizacja:** 2026-09-23  
+> **Na podstawie:** `rozliczenia/docs/SPECIFICATION.md`, makiety `makiety-tabeli.html` i `makiety-statystyki.html`  
 > **Wzorzec wdrożenia:** Arkusz-mapa i Druga Mila (strona + Apps Script + ten sam plik Google). Nie Symfony, nie Vue, nie PostgreSQL.
 
 ---
@@ -24,7 +24,7 @@ Specyfikacja mówi wprost, że z zachowania nie wynika Symfony, Vue ani PostgreS
 | Źródło danych | Istniejący plik Google | Rejestr (`Arkusz1` po nazwie), Baza stawek, Lista podwykonawców |
 | Zapis i odczyt | Rozszerzenie istniejącego Web App (`arkusz-mapa/google-apps-script/transport-log.gs`) | Lock, odczyt zestawienia, zapis edycji i zatwierdzenia. Nagłówki rejestru tylko przy dopisaniu protokołu. Nagłówki Bazy stawek przy pierwszym zapisie stawki |
 | Reguły kosztów | TypeScript, czyste funkcje, Vitest | Liczenie na ekranie. Te same funkcje da się odpalić w teście bez arkusza |
-| Ekran | Jedna strona HTML, style z makiety | Dwa ekrany: Zakres i Zestawienie. Okno Baza stawek, nie trzeci ekran |
+| Ekran | Jedna strona HTML, style z makiet | Trzy widoki: Zakres, Zestawienie, Statystyki. Okno Baza stawek, nie osobny ekran |
 | Hosting | Własne repozytorium, GitHub Pages z `gh-pages` | Sekret `TRANSPORT_WEBAPP_URL` wchodzi do `index.html` w workflow. Nie ścieżka w Pages mapy |
 
 Vue i Symfony odpadają na tę wersję: nie ma encji do trzymania, a stawka podjazdu i worka zmieniona na zestawieniu **nie** idzie do bazy stawek. Kwota ostateczna powstaje dopiero przy Zatwierdź, z tego, co widać na ekranie. Osobna baza rozjechałaby się z arkuszem.
@@ -40,23 +40,29 @@ flowchart LR
   subgraph app [Strona rozliczen]
     App[Strona rozliczen]
     Engine[Silnik kosztow TS]
+    Stats[Agregacje stats TS]
   end
   subgraph gas [Apps Script Web App]
     Read[Odczyt zestawienia]
+    StatsRead[Odczyt statystyk]
     Write[Zapis edycji i Zatwierdz]
   end
   subgraph sheet [Jeden plik Google]
-    Rejestr[Pierwsza zakladka]
+    Rejestr[Arkusz1]
     Stawki[Baza stawek]
     Lista[Lista podwykonawcow]
   end
   Mapa[Arkusz-mapa]
   App --> Engine
+  App --> Stats
   App --> Read
+  App --> StatsRead
   App --> Write
   Read --> Rejestr
   Read --> Stawki
   Read --> Lista
+  StatsRead --> Rejestr
+  StatsRead --> Stawki
   Write --> Rejestr
   Write --> Stawki
   Mapa --> Rejestr
@@ -65,8 +71,8 @@ flowchart LR
 
 Podział odpowiedzialności:
 
-- **Przeglądarka** liczy koszt, grupuje trasy, trzyma stan ekranu, który nie ma kolumny: „tylko za liczbę worków”, przekreślenie „transport się nie odbył” przed zatwierdzeniem, podgląd stawki podjazdu i worka innej niż w bazie.
-- **Apps Script** jest jedynym miejscem zapisu. Nie liczy kosztu na nowo z bazy, bo część kwot żyje tylko na ekranie do Zatwierdź. Zapisuje to, co ekran już policzył, po sprawdzeniu, że wiersz wolno ruszyć.
+- **Przeglądarka** liczy koszt, grupuje trasy, trzyma stan ekranu, który nie ma kolumny: „tylko za liczbę worków”, przekreślenie „transport się nie odbył” przed zatwierdzeniem, podgląd stawki podjazdu i worka innej niż w bazie. Na Statystykach agreguje KPI i rankingi (czyste funkcje TS + Vitest).
+- **Apps Script** jest jedynym miejscem zapisu. Nie liczy kosztu na nowo z bazy, bo część kwot żyje tylko na ekranie do Zatwierdź. Zapisuje to, co ekran już policzył, po sprawdzeniu, że wiersz wolno ruszyć. Odczyt Statystyk nic nie zapisuje.
 - **Arkusz** jest stanem trwałym. Po Zatwierdź kolumny 16 i 17 się nie przeliczają.
 
 ---
@@ -153,6 +159,7 @@ Nowe akcje obok istniejących (`modalData`, `listReferenceData`, zapis protokoł
 | Akcja | Kierunek | Co robi |
 |-------|----------|---------|
 | `settlementSearch` | GET lub POST | Podwykonawca (nazwa krótka), data od (albo brak), data do. Zwraca wiersze rejestru w zakresie, które nie mają Rozliczony `tak` i nie mają transport `nie`, plus pasujące wiersze Bazy stawek. Każdy wiersz rejestru niesie numer wiersza arkusza i numer z kolumny 1 |
+| `settlementStats` | GET | Odczyt pod Statystyki: rozliczone w zakresie dat + nierozliczone (backlog / problemy ze stawkami); pola P/Q/I, status, data, podwykonawca, adres, snapshoty; dane do remisów; tryb gdy będzie w rejestrze. **Bez zapisu**, bez locka |
 | `listContractors` | GET | Lista podwykonawców: Nazwa i Dane do Worda. Można oprzeć na `listReferenceData`, jeśli pola już tam są |
 | `listStoreAddresses` | GET | Unikalne adresy z kolumny Adres sklepu rejestru. Okno stawek. Nie pinezki, nie kolumna Sklep. Nic nie zapisuje |
 | `routeNameProposal` | GET | Mapa. Czyta kolumnę 12 i zwraca zajęte nazwy. Propozycję `nazwa-dd.mm.rr-nn` liczy `routeName.ts`, nie skrypt. Gdy 01–99 są zajęte, funkcja zwraca pustą nazwę |
@@ -181,16 +188,17 @@ Odczyt nie wybiera kolumny po nagłówku. Zapis nie przesuwa kolumn 1–11. Każ
 
 ## Frontend
 
-Układ, kolory i typografia z `makiety-tabeli.html`. Pasek przełączników na górze makiety (podgląd ekranów) do aplikacji nie wchodzi. Wykresu nie ma.
+Układ, kolory i typografia z `makiety-tabeli.html` (Zakres / Zestawienie) oraz `makiety-statystyki.html` (Statystyki). Pasek przełączników na górze makiet (podgląd) do aplikacji nie wchodzi. Na Zestawieniu wykresu składu kosztów nie ma. Na Statystykach: słupki CSS (worki, koszty), bez Chart.js.
 
-Dwa ekrany:
+Trzy widoki + okno:
 
-1. **Zakres.** Karta na środku. Na zgłoszenie zaznaczone. Harmonogram widać i jest wyłączony. Podwykonawca z listy, zawężanie po Nazwa albo Dane do Worda. Tekstu spoza listy nie da się wybrać. Data początkowa, opcja bez daty początkowej, data końcowa wymagana. Szukaj nie startuje bez podwykonawcy, bez daty końcowej, ani gdy data początkowa jest późniejsza niż końcowa. Baza stawek na dole karty otwiera okno.
-2. **Zestawienie.** Po Szukaj. Zmień zakres wraca do karty. Liczba pozycji bez sklepów z rozwinięcia. Tabela. Stopka: Suma zestawienia, Suma zaznaczonych, numer faktury, Zatwierdź.
+1. **Zakres.** Karta na środku. Na zgłoszenie zaznaczone. Harmonogram widać i jest wyłączony. Podwykonawca z listy, zawężanie po Nazwa albo Dane do Worda. Tekstu spoza listy nie da się wybrać. Data początkowa, opcja bez daty początkowej, data końcowa wymagana. Szukaj nie startuje bez podwykonawcy, bez daty końcowej, ani gdy data początkowa jest późniejsza niż końcowa. Na dole: **Statystyki** (bez Szukaj) i **Baza stawek** (okno).
+2. **Zestawienie.** Po Szukaj. Zmień zakres wraca do karty. Liczba pozycji bez sklepów z rozwinięcia. Tabela. Stopka: Suma zestawienia, Suma zaznaczonych, numer faktury, Zatwierdź. Baza stawek w nagłówku. Statystyk stąd nie otwiera się.
+3. **Statystyki.** Z Zakresu; ← Powrót wraca na Zakres. Filtry okresu (bieżący miesiąc domyślnie, poprzednie miesiące, ostatni kwartał, dokładny zakres), podwykonawca, Pokaż raport. KPI, rankingi, serie czasowe (CSS), listy ze stronicowaniem 5, zwijanie sekcji (`localStorage`). Agregacje w `src/stats.ts` (+ planowany `statsView.ts`). Copy UI: język zarządu (SPEC § Statystyki).
 
-Kolumny od lewej: Rozliczone, Numer protokołu, Adres, Sklep, Data, Podjazd/Trasa, Liczba worków, Kwota za worek, Suma za worki, Koszt odbioru, Suma trasy, transport się odbył. Pusta komórka pokazuje „—”. Remis stawek widać na wierszu z błędem, nie w oknie Baza stawek. Wskazanie woła `resolveRateTie`.
+Kolumny Zestawienia od lewej: Rozliczone, Numer protokołu, Adres, Sklep, Data, Podjazd/Trasa, Liczba worków, Kwota za worek, Suma za worki, Koszt odbioru, Suma trasy, transport się odbył. Pusta komórka pokazuje „—”. Remis stawek widać na wierszu z błędem, nie w oknie Baza stawek. Wskazanie woła `resolveRateTie`.
 
-Ładowanie (wyszukanie, zapis stawek, zatwierdzenie poniżej 10 000 zł): tylko `rozliczenia/logo.png`, puls 1,2 s. Pod spodem krótki komunikat. Od 10 000 zł przy Zatwierdź: `rozliczenia/jednorozec-deba.gif`, cykl 1,7 s, minimum dwa cykle, dłużej jeśli zapis trwa dłużej.
+Ładowanie (wyszukanie, zapis stawek, zatwierdzenie poniżej 10 000 zł, **odczyt Statystyk**): tylko `rozliczenia/logo.png`, puls 1,2 s. Pod spodem krótki komunikat. Od 10 000 zł przy Zatwierdź: `rozliczenia/jednorozec-deba.gif`, cykl 1,7 s, minimum dwa cykle, dłużej jeśli zapis trwa dłużej.
 
 `rozliczenia/logo.png` i `rozliczenia/jednorozec-deba.gif` są w katalogu. `jednorozec-deba.html` to podgląd GIF-a. Cykl GIF-a trwa 1,71 s.
 

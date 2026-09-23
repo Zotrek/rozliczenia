@@ -1,7 +1,7 @@
 # PLAN.md — Kolejność prac
 
-> **Status:** Zatwierdzony 2026-09-19. Etap 0 zamknięty. M1–M6 zamknięte. W1: sekretu zapisu nie ma, nowa wersja Web App jeszcze nie weszła.  
-> **Ostatnia aktualizacja:** 2026-09-19  
+> **Status:** Zatwierdzony 2026-09-19. Etap 0 zamknięty. M1–M6 zamknięte. R1–R7 w toku / zamknięte wg `dev_docs`. R8 (Statystyki) = zadanie `0010_statystyki`. W1: sekretu zapisu nie ma, nowa wersja Web App jeszcze nie weszła.  
+> **Ostatnia aktualizacja:** 2026-09-23  
 > **Reguły:** [`SPECIFICATION.md`](SPECIFICATION.md). Ten plik ich nie powtarza.  
 > **Kontrakt techniczny:** [`ARCHITECTURE.md`](ARCHITECTURE.md). Stos, kolumny, akcje, klucz wiersza, gdzie leży kod.
 
@@ -30,8 +30,9 @@ Zapis pliku `.gs` w repozytorium nie zmienia żywej mapy. Żywy zapis mapy jest 
 | R5 | rozliczenia | Ekran Zakres | R1, R2 | Filtr niżej |
 | R6 | rozliczenia | Zestawienie, edycje, sumy, Zatwierdź | R1, R3, R4, R5 | Lista niżej. Logo i jednorożec z etapu 0 |
 | R7 | rozliczenia | Okno Baza stawek | M4, R6 | Listy: adres z rejestru, nazwa krótka z Listy podwykonawców. Te same pola i `saveRate` co M4 |
+| R8 | rozliczenia | Statystyki (KPI, rankingi, serie CSS, listy) | R1, R2, R5 | Makieta `makiety-statystyki.html`. Plan: `dev_docs/active/0010_statystyki/`. Odczyt `settlementStats`. Bez Chart.js |
 
-M1 można pisać razem z R1. M5 nie czeka na M2. M4 jest jedynym miejscem, w którym powstaje `saveRate`. R7 go woła.
+M1 można pisać razem z R1. M5 nie czeka na M2. M4 jest jedynym miejscem, w którym powstaje `saveRate`. R7 go woła. R8 nie czeka na R6/R7 (wejście z Zakresu).
 
 ---
 
@@ -140,7 +141,7 @@ Na żywy arkusz ta akcja wchodzi dopiero w W1, nie w M6. Sekretu zapisu nie ma: 
 - Podwykonawca z listy, zawężanie po Nazwa albo Dane do Worda. Tekstu spoza listy nie da się wybrać. Bez wyboru Szukaj nie startuje.
 - Data końcowa wymagana. Data początkowa późniejsza niż końcowa pokazuje błąd i nie startuje. Opcja bez daty początkowej czyści datę i przywraca ostatnią po zdjęciu.
 - Obie granice włącznie. Ten sam dzień w obu polach to ten jeden dzień.
-- Zmień zakres wraca na ten ekran. Baza stawek otwiera okno, nie trzeci ekran. Samo okno jest w R7.
+- Zmień zakres wraca na ten ekran. **Statystyki** obok Bazy stawek (wejście bez Szukaj) — widok w R8. Baza stawek otwiera okno, nie osobny ekran. Samo okno jest w R7.
 
 ### R6. Zestawienie
 
@@ -164,6 +165,16 @@ Sposób wyboru jest zaznaczony w architekturze: listy, bez wpisu ręcznego. Adre
 
 Te same pola i ta sama akcja `saveRate` co M4. Kolumny 14–17 się nie zmieniają. Remis nie jest w tym oknie.
 
+### R8. Statystyki
+
+Trzeci widok (tylko odczyt). Szczegóły: [`dev_docs/active/0010_statystyki/0010_statystyki-plan.md`](../dev_docs/active/0010_statystyki/0010_statystyki-plan.md) oraz SPEC § Statystyki.
+
+- Przycisk Statystyki na Zakresie; ← Powrót.
+- Filtry okresu + podwykonawca; Pokaż raport; pulsujące logo przy ładowaniu.
+- Agregacje pure TS (`stats.ts`) + Vitest; GET `settlementStats` (wdrożyć z W1 albo osobną wersją Web App).
+- KPI, worki/koszty w czasie (słupki CSS), rankingi sklepów i podwykonawców, odbiory bez worków, problemy ze stawkami (stronicowanie 5).
+- Zwijanie sekcji / `localStorage`. Copy UI pod odbiorcę nietechnicznego.
+
 ### W1. Wdrożenie akcji rozliczeń
 
 Sekret zapisu: **nie ma**. Ustalenie z 2026-09-19, przed wgraniem `approve`.
@@ -178,20 +189,21 @@ Nowa wersja **istniejącego** wdrożenia, ten sam URL. Nie drugie wdrożenie obo
 
 - Harmonogram. Checkbox jest w R5, reguł nie ma.
 - Cofanie rozliczenia i zmiana numeru faktury po zatwierdzeniu.
-- Wykresy.
+- Biblioteki wykresów (Chart.js itd.) i wykres składu kosztów na Zestawieniu. Słupki CSS na Statystykach są w R8.
+- Raport po fakturze; sklepy bez odbiorów; prognoza / trend.
 - Zmiana szablonu Word.
 - Ostrzeżenie, gdy ta sama nazwa trasy albo drugie Zatwierdź dzieli stawkę jeszcze raz. Specyfikacja tego nie blokuje. Test w R1 pokazuje, że dzielnik liczy sklepy widoczne w zestawieniu, nie że system odmawia.
 - Własny workflow Actions publikuje Pages z sekretu `TRANSPORT_WEBAPP_URL`. Adres nie leży na `main`.
-- Folder zadań w `dev_docs/`. Powstaje przy kodowaniu etapu, nie teraz.
 
 ---
 
 ## Zatwierdzenie
 
 - [x] Kolejność z tabeli: M1–M6, R1–R7 i W1
+- [x] R8 (Statystyki) dopisany 2026-09-23 — szczegóły w `0010_statystyki`
 - [x] R2 nic nie zapisuje, R4 jest jedynym zatwierdzeniem. Okno stawek: listy (adres z rejestru, nazwa krótka), nie pinezki mapy
 - [x] M6 jest warunkiem żywej mapy. W1 jest warunkiem żywych akcji rozliczeń. Sam commit `.gs` nie wystarcza
 - [x] Po M2 i po M5 przechodzi `npm test` w arkusz-mapa
 
 **Zatwierdzający:** zotrek  
-**Data:** 2026-09-19
+**Data:** 2026-09-19 (R8 dopisany 2026-09-23)

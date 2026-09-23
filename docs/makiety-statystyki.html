@@ -77,6 +77,50 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      position: relative;
+    }
+    .brand img {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      flex: none;
+    }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+      background: rgba(244, 247, 246, 0.72);
+    }
+    .overlay[hidden] { display: none !important; }
+    .overlay-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 22px;
+      background: rgba(255, 255, 255, 0.96);
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+    .overlay-panel img.pulse {
+      width: 64px;
+      height: 64px;
+      border-radius: 12px;
+      animation: logo-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes logo-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.12); opacity: 0.55; }
+    }
+    .overlay-panel .msg {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
     }
     .screen { display: none; flex: 1; min-height: 0; flex-direction: column; }
     .screen.is-on { display: flex; }
@@ -101,13 +145,6 @@
       box-shadow: var(--shadow);
     }
     .brand { display: flex; align-items: center; gap: 10px; }
-    .brand .mark {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      background: linear-gradient(145deg, var(--teal), var(--teal-deep));
-      flex: none;
-    }
     .brand strong { display: block; font-size: 15px; }
     .brand em { display: block; font-style: normal; font-size: 12px; color: var(--muted); font-weight: 600; }
     .setup-card h2 { margin: 14px 0 4px; font-size: 18px; }
@@ -241,7 +278,7 @@
     .period-label strong { color: var(--ink); }
     .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
     }
     @media (max-width: 900px) {
@@ -288,19 +325,62 @@
       display: flex;
       flex-wrap: wrap;
       gap: 8px 16px;
-      align-items: baseline;
+      align-items: center;
       justify-content: space-between;
       padding: 12px 14px;
       border-bottom: 1px solid var(--line);
       background: #f8fafc;
+      cursor: pointer;
+      user-select: none;
     }
+    .section-h:hover { background: #f1f5f9; }
     .section-h h2 { margin: 0; font-size: 14px; }
+    .section-h .head-text { flex: 1; min-width: 0; }
     .section-h p {
-      margin: 0;
+      margin: 2px 0 0;
       font-size: 12px;
       color: var(--muted);
       font-weight: 550;
     }
+    .section.is-collapsed .section-h { border-bottom: none; }
+    .section.is-collapsed .section-b { display: none; }
+    .fold-chev {
+      flex: none;
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--teal-deep);
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .table-fold-bar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 10px;
+      padding: 8px 10px;
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      background: #f8fafc;
+    }
+    .chart-split.is-stack .table-fold-bar { display: flex; }
+    .table-fold-bar button {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 650;
+      color: var(--teal-deep);
+    }
+    .table-fold-bar .muted { font-size: 12px; color: var(--muted); font-weight: 550; }
+    .chart-split.is-stack .table-pane.is-collapsed { display: none; }
+    .chart-split:not(.is-stack) .table-fold-bar { display: none; }
+    .chart-split:not(.is-stack) .table-pane { display: block; }
     .section-b { padding: 12px 14px; }
     .mode-split {
       display: grid;
@@ -383,6 +463,31 @@
     @media (max-width: 900px) {
       .bags-grid { grid-template-columns: 1fr; }
     }
+    .rank-block {
+      margin-bottom: 16px;
+    }
+    .rank-block:last-child { margin-bottom: 0; }
+    .rank-block > .metric {
+      margin: 0 0 8px;
+      font-size: 13px;
+      font-weight: 750;
+      color: var(--ink);
+    }
+    .rank-block > .metric span {
+      display: block;
+      margin-top: 2px;
+      font-size: 12px;
+      font-weight: 550;
+      color: var(--muted);
+    }
+    .rank-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 900px) {
+      .rank-pair { grid-template-columns: 1fr; }
+    }
     .avg-box {
       padding: 14px;
       border-radius: 12px;
@@ -460,6 +565,161 @@
     .money { font-variant-numeric: tabular-nums; font-weight: 650; }
     .money.hi { color: var(--orange-deep); }
     .money.lo { color: var(--teal-deep); }
+    .bags-time-chart {
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-start;
+      gap: 6px;
+      min-height: 140px;
+      padding: 8px 4px 0;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 12px;
+    }
+    .bags-time-chart.is-dense {
+      gap: 5px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .bags-time-chart.is-dense .bags-time-col {
+      flex: 0 0 40px;
+    }
+    .bags-time-chart.is-dense .bags-time-stack {
+      max-width: 28px;
+      height: 140px;
+    }
+    .bags-time-chart.is-dense .wk {
+      font-size: 10px;
+      transform: rotate(-35deg);
+      width: 3.2rem;
+      margin-top: 6px;
+      margin-bottom: 8px;
+    }
+    .bags-time-col {
+      flex: 0 0 52px;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .bags-time-stack {
+      width: 100%;
+      max-width: 36px;
+      height: 120px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 2px;
+    }
+    .bags-time-stack i {
+      display: block;
+      width: 100%;
+      border-radius: 4px 4px 2px 2px;
+      min-height: 0;
+    }
+    .bags-time-stack .s-na { background: var(--teal); }
+    .bags-time-stack .s-h { background: var(--orange); }
+    .bags-time-col .wk {
+      font-size: 11px;
+      font-weight: 650;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.2;
+    }
+    .bags-time-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 0 0 12px;
+      padding: 0;
+      list-style: none;
+      font-size: 12px;
+    }
+    .bags-time-legend i {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 99px;
+      margin-right: 4px;
+    }
+    .chart-split {
+      display: grid;
+      grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .chart-split.is-stack {
+      grid-template-columns: 1fr;
+    }
+    @media (max-width: 720px) {
+      .chart-split { grid-template-columns: 1fr; }
+    }
+    .chart-split .bags-time-chart {
+      margin-bottom: 0;
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .chart-split.is-stack .bags-time-chart {
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 12px;
+      padding-bottom: 4px;
+    }
+    .chart-split .table-pane {
+      overflow: auto;
+      max-height: 220px;
+    }
+    .chart-split.is-stack .table-pane {
+      max-height: none;
+    }
+    .demo-hint {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: var(--teal-deep);
+      font-weight: 650;
+    }
+    .bags-time-stack .s-cost { background: var(--teal-deep); border-radius: 4px 4px 2px 2px; }
+    .pager {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
+      border-top: 1px solid var(--line);
+      background: #f8fafc;
+    }
+    .pager .meta {
+      font-size: 12px;
+      font-weight: 650;
+      color: var(--muted);
+    }
+    .pager .nav {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pager button {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .pager button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .pager .page-label {
+      font-size: 12px;
+      font-weight: 750;
+      color: var(--ink);
+      min-width: 4.5rem;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -469,20 +729,29 @@
     <p class="lead">
       Na pierwszej stronie (<strong>Zakres</strong>) przycisk <strong>Statystyki</strong> obok Bazy stawek.
       Na Statystykach przycisk <strong>← Powrót</strong> wraca do Zakresu.
-      Ta sama nawigacja jest też w <a href="makiety-tabeli.html">makiety-tabeli.html</a>.
+      Chip <strong>Ostatni kwartał</strong> przełącza podgląd z większą ilością danych (więcej tygodni, gęstsze słupki).
+      Ta sama nawigacja jest też w <a href="makiety-tabeli.html">makiecie tabeli rozliczeń</a>.
     </p>
     <div class="chrome-row">
       <span>Ekran</span>
       <button type="button" class="is-on" data-chrome="range">1 · Zakres</button>
       <button type="button" data-chrome="stats">2 · Statystyki</button>
     </div>
+    <div class="chrome-row">
+      <span>Dane</span>
+      <button type="button" class="is-on" data-demo="current">Mało · bieżący miesiąc</button>
+      <button type="button" data-demo="quarter">Dużo · ostatni kwartał</button>
+      <button type="button" data-demo-loading>Pokaż ładowanie</button>
+    </div>
     <details>
-      <summary>Założenia tej makiety</summary>
+      <summary>Założenia tej makiety (dla zespołu)</summary>
       <ul>
-        <li>Wejście: Zakres → Statystyki (przycisk ghost, jak Baza stawek).</li>
-        <li>Powrót: Statystyki → Zakres (← Powrót w nagłówku).</li>
-        <li>Okres domyślny: bieżący miesiąc · worki: kol. Q · bez sklepów bez odbiorów.</li>
-        <li>Tryb Na zgłoszenie / Harmonogram — docelowo; dziś brak kolumny w rejestrze.</li>
+        <li>Wejście: Zakres → Statystyki; powrót ← Powrót.</li>
+        <li>Teksty na ekranie Statystyk pisane pod odbiorcę nietechnicznego (zarząd).</li>
+        <li>Okres domyślny: bieżący miesiąc; rankingi bez odbiorów z zerem worków.</li>
+        <li>Przy ładowaniu danych: nakładka z pulsującym logo (jak w rozliczeniach).</li>
+        <li>Listy „Odbiory bez worków” i „Problemy ze stawkami”: po 5 pozycji na stronę.</li>
+        <li>Bez Chart.js; słupki CSS; bez prognozy i sklepów bez odbiorów.</li>
       </ul>
     </details>
   </header>
@@ -495,14 +764,14 @@
         <div class="setup">
           <div class="setup-card">
             <div class="brand">
-              <div class="mark" aria-hidden="true"></div>
+              <img src="../logo.png" alt="" width="36" height="36">
               <div>
                 <strong>Rozliczenia</strong>
                 <em>Na zgłoszenie</em>
               </div>
             </div>
             <h2>Zakres rozliczenia</h2>
-            <p class="hint">Ustal, czego dotyczy to rozliczenie. Statystyki otwierasz bez Szukaj — osobny widok.</p>
+            <p class="hint">Wybierz podwykonawcę i daty, potem Szukaj — albo otwórz Statystyki (raport kosztów, bez wyszukiwania).</p>
             <div class="modes" role="group" aria-label="Tryb">
               <div class="mode is-on">Na zgłoszenie</div>
               <div class="mode is-off" title="W tej wersji niedostępne">Harmonogram</div>
@@ -534,7 +803,7 @@
       <div class="screen" id="screen-stats" data-screen="stats">
         <div class="top">
           <div class="brand">
-            <div class="mark" aria-hidden="true"></div>
+            <img src="../logo.png" alt="" width="36" height="36">
             <div>
               <strong>Rozliczenia</strong>
               <em>Statystyki</em>
@@ -584,163 +853,264 @@
             </select>
           </div>
 
-          <div class="field">
-            <label for="mode">Tryb</label>
-            <select id="mode">
-              <option selected>Wszystkie</option>
-              <option>Na zgłoszenie</option>
-              <option>Harmonogram</option>
-            </select>
-          </div>
-
-          <button type="button" class="btn-teal">Pokaż</button>
+          <button type="button" class="btn-teal" id="btn-show">Pokaż raport</button>
         </div>
 
         <div class="body">
+          <p class="demo-hint" id="demo-hint" hidden>Podgląd całego kwartału — dane pogrupowane tygodniami</p>
           <p class="period-label" id="period-label">
             Okres: <strong>1.09.2026 – 23.09.2026</strong> (bieżący miesiąc) · podwykonawca: <strong>Transport Plus</strong>
           </p>
 
-          <div class="kpi-grid">
+          <div class="kpi-grid" id="kpi-grid">
+            <div class="kpi">
+              <span>Liczba odbiorów</span>
+              <b data-kpi="pickups-n">156</b>
+              <em data-kpi="pickups-e">zrealizowane w okresie · każdy sklep osobno</em>
+            </div>
+            <div class="kpi">
+              <span>Obsłużone sklepy</span>
+              <b data-kpi="shops-n">89</b>
+              <em data-kpi="shops-e">różne sklepy w okresie</em>
+            </div>
             <div class="kpi warn">
-              <span>Backlog nierozliczonych</span>
-              <b>47</b>
-              <em>szacunek 12&nbsp;480,00&nbsp;zł</em>
+              <span>Problemy ze stawkami</span>
+              <b data-kpi="gaps-n">9</b>
+              <em data-kpi="gaps-e">6 bez stawki · 3 konflikty stawek</em>
             </div>
             <div class="kpi ok">
               <span>Rozliczone w okresie</span>
-              <b>128</b>
-              <em>suma 34&nbsp;210,00&nbsp;zł</em>
-            </div>
-            <div class="kpi">
-              <span>Średnia za worek (Q)</span>
-              <b>18,40&nbsp;zł</b>
-              <em>z 126 pozycji z workami &gt; 0</em>
+              <b data-kpi="settled-n">128</b>
+              <em data-kpi="settled-e">łącznie 34&nbsp;210,00&nbsp;zł</em>
             </div>
             <div class="kpi warn">
-              <span>Luki w stawkach</span>
-              <b>9</b>
-              <em>6 pustych snapshotów · 3 remisy</em>
+              <span>Do rozliczenia</span>
+              <b data-kpi="backlog-n">47</b>
+              <em data-kpi="backlog-e">szacunkowo 12&nbsp;480,00&nbsp;zł</em>
+            </div>
+            <div class="kpi">
+              <span>Średni koszt za worek</span>
+              <b data-kpi="avg-q">18,40&nbsp;zł</b>
+              <em data-kpi="avg-e">ze 126 odbiorów, w których zabrano worki</em>
             </div>
           </div>
 
-          <section class="section">
-            <div class="section-h">
-              <h2>Na zgłoszenie vs Harmonogram</h2>
-              <p>Udział w rozliczonych kosztach w okresie</p>
+          <section class="section" data-fold="bags">
+            <div class="section-h" data-fold-toggle="bags">
+              <div class="head-text">
+                <h2>Ile worków zabrano w czasie</h2>
+                <p id="bags-time-sub">Suma worków z zrealizowanych odbiorów · tygodniami · według sposobu zlecenia</p>
+              </div>
+              <button type="button" class="fold-chev" aria-label="Zwiń sekcję">▾</button>
             </div>
             <div class="section-b">
-              <div class="split-bar" aria-hidden="true">
-                <i class="c-na" style="width: 78%"></i>
-                <i class="c-h" style="width: 22%"></i>
-              </div>
-              <ul class="split-legend">
-                <li><i class="c-na"></i> Na zgłoszenie — 78% · 26&nbsp;680,00&nbsp;zł · 96 poz.</li>
-                <li><i class="c-h"></i> Harmonogram — 22% · 7&nbsp;530,00&nbsp;zł · 32 poz.</li>
+              <ul class="bags-time-legend">
+                <li><i class="c-na" style="background: var(--teal)"></i> Na zgłoszenie</li>
+                <li><i class="c-h" style="background: var(--orange)"></i> Harmonogram</li>
               </ul>
-              <div class="mode-split">
-                <div class="mode-card is-na">
-                  <div class="label">Na zgłoszenie</div>
-                  <div class="vals">
-                    <div><span>Pozycje</span><strong>96</strong></div>
-                    <div><span>Koszt</span><strong>26&nbsp;680&nbsp;zł</strong></div>
-                    <div><span>Śr. Q</span><strong>19,10&nbsp;zł</strong></div>
+              <div class="chart-split" id="bags-split">
+                <div class="bags-time-chart" id="bags-time-chart" aria-hidden="true"></div>
+                <div>
+                  <div class="table-fold-bar" id="bags-table-bar">
+                    <span class="muted">Tabela z liczbami</span>
+                    <button type="button" data-table-fold="bags">Pokaż tabelę</button>
                   </div>
-                </div>
-                <div class="mode-card is-h">
-                  <div class="label">Harmonogram</div>
-                  <div class="vals">
-                    <div><span>Pozycje</span><strong>32</strong></div>
-                    <div><span>Koszt</span><strong>7&nbsp;530&nbsp;zł</strong></div>
-                    <div><span>Śr. Q</span><strong>16,20&nbsp;zł</strong></div>
+                  <div class="table-pane" id="bags-table-pane" data-table="bags">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th id="bags-time-col0">Tydzień</th>
+                          <th class="num">Na zgłoszenie</th>
+                          <th class="num">Harmonogram</th>
+                          <th class="num">Razem</th>
+                        </tr>
+                      </thead>
+                      <tbody id="bags-time-body"></tbody>
+                    </table>
                   </div>
                 </div>
               </div>
               <p class="note">
-                Uwaga: w obecnym rejestrze nie ma kolumny trybu.
-                Do czasu Harmonogramu ten blok = 100% „Na zgłoszenie” albo ukryty.
+                Na razie wszystkie worki widać jako „Na zgłoszenie”. Podział na harmonogram pojawi się, gdy w danych będzie rozróżnienie sposobu zlecenia.
               </p>
             </div>
           </section>
 
-          <section class="section">
-            <div class="section-h">
-              <h2>Koszt odbioru per worek (kol. Q)</h2>
-              <p>Tylko rozliczone, odbyte, worki &gt; 0 · top 5</p>
+          <section class="section" data-fold="costs">
+            <div class="section-h" data-fold-toggle="costs">
+              <div class="head-text">
+                <h2>Ile zapłacono w czasie</h2>
+                <p id="cost-time-sub">Suma kosztów już rozliczonych · tygodniami · według sposobu zlecenia</p>
+              </div>
+              <button type="button" class="fold-chev" aria-label="Zwiń sekcję">▾</button>
             </div>
             <div class="section-b">
-              <div class="bags-grid">
+              <ul class="bags-time-legend">
+                <li><i class="c-na" style="background: var(--teal)"></i> Na zgłoszenie</li>
+                <li><i class="c-h" style="background: var(--orange)"></i> Harmonogram</li>
+              </ul>
+              <div class="chart-split" id="cost-split">
+                <div class="bags-time-chart" id="cost-time-chart" aria-hidden="true"></div>
+                <div>
+                  <div class="table-fold-bar" id="cost-table-bar">
+                    <span class="muted">Tabela z kwotami</span>
+                    <button type="button" data-table-fold="costs">Pokaż tabelę</button>
+                  </div>
+                  <div class="table-pane" id="cost-table-pane" data-table="costs">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Tydzień</th>
+                          <th class="num">Na zgłoszenie</th>
+                          <th class="num">Harmonogram</th>
+                          <th class="num">Razem</th>
+                        </tr>
+                      </thead>
+                      <tbody id="cost-time-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <p class="note">
+                Jak wyżej: do czasu rozróżnienia w danych całość kosztów jest w „Na zgłoszenie”.
+              </p>
+            </div>
+          </section>
+
+          <section class="section" data-fold="q">
+            <div class="section-h" data-fold-toggle="q">
+              <div class="head-text">
+                <h2>Koszt w przeliczeniu na worek</h2>
+                <p>Tylko rozliczone odbiory, w których zabrano worki · 5 najdroższych i 5 najtańszych sklepów</p>
+              </div>
+              <button type="button" class="fold-chev" aria-label="Zwiń sekcję">▾</button>
+            </div>
+            <div class="section-b">
+              <div class="bags-grid" id="q-section">
                 <div class="avg-box">
-                  <span>Średnia Q</span>
-                  <b>18,40&nbsp;zł</b>
-                  <em>126 pozycji</em>
+                  <span>Średni koszt za worek</span>
+                  <b id="q-avg-big">18,40&nbsp;zł</b>
+                  <em id="q-avg-sub">126 odbiorów</em>
                 </div>
                 <div class="rank hi">
-                  <h3>Najdroższe</h3>
+                  <h3>Najdroższe sklepy</h3>
                   <table>
                     <thead>
                       <tr>
                         <th>Sklep</th>
-                        <th class="num">Q</th>
-                        <th>Tryb</th>
+                        <th class="num">Koszt za worek</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      <tr>
-                        <td class="shop">ul. Lipowa 12, Kraków<span class="sub">12.09 · 4 worki · EcoRide</span></td>
-                        <td class="num money hi">42,50&nbsp;zł</td>
-                        <td><span class="tag tag-na">Na zgłoszenie</span></td>
-                      </tr>
-                      <tr>
-                        <td class="shop">al. 3 Maja 8, Tarnów<span class="sub">08.09 · 2 worki · Transport Plus</span></td>
-                        <td class="num money hi">38,00&nbsp;zł</td>
-                        <td><span class="tag tag-h">Harmonogram</span></td>
-                      </tr>
-                      <tr>
-                        <td class="shop">ul. Kolejowa 3, Bochnia<span class="sub">15.09 · 3 worki · Transport Plus</span></td>
-                        <td class="num money hi">35,20&nbsp;zł</td>
-                        <td><span class="tag tag-na">Na zgłoszenie</span></td>
-                      </tr>
-                    </tbody>
+                    <tbody id="q-hi-body"></tbody>
                   </table>
                 </div>
                 <div class="rank lo">
-                  <h3>Najtańsze</h3>
+                  <h3>Najtańsze sklepy</h3>
                   <table>
                     <thead>
                       <tr>
                         <th>Sklep</th>
-                        <th class="num">Q</th>
-                        <th>Tryb</th>
+                        <th class="num">Koszt za worek</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      <tr>
-                        <td class="shop">ul. Zielona 2, Kraków<span class="sub">10.09 · 12 worków · Transport Plus</span></td>
-                        <td class="num money lo">6,20&nbsp;zł</td>
-                        <td><span class="tag tag-h">Harmonogram</span></td>
-                      </tr>
-                      <tr>
-                        <td class="shop">ul. Długa 44, Skawina<span class="sub">14.09 · 8 worków · EcoRide</span></td>
-                        <td class="num money lo">7,50&nbsp;zł</td>
-                        <td><span class="tag tag-na">Na zgłoszenie</span></td>
-                      </tr>
-                      <tr>
-                        <td class="shop">os. Piastów 7, Kraków<span class="sub">05.09 · 10 worków · Transport Plus</span></td>
-                        <td class="num money lo">8,10&nbsp;zł</td>
-                        <td><span class="tag tag-h">Harmonogram</span></td>
-                      </tr>
-                    </tbody>
+                    <tbody id="q-lo-body"></tbody>
                   </table>
                 </div>
               </div>
             </div>
           </section>
 
-          <section class="section">
-            <div class="section-h">
-              <h2>Luki w stawkach</h2>
-              <p>Puste snapshoty albo remis w Bazie stawek · nierozliczone</p>
+          <section class="section" data-fold="contractors">
+            <div class="section-h" data-fold-toggle="contractors">
+              <div class="head-text">
+                <h2>Podwykonawcy — kto jest droższy, kto tańszy</h2>
+                <p>Średnie z rozliczonych odbiorów z workami · 5 najwyższych i 5 najniższych · najlepiej przy wyborze „Wszyscy”</p>
+              </div>
+              <button type="button" class="fold-chev" aria-label="Zwiń sekcję">▾</button>
+            </div>
+            <div class="section-b">
+              <div class="rank-block">
+                <p class="metric">
+                  W przeliczeniu na sklep
+                  <span>Ile średnio kosztuje jeden odbiór u danego podwykonawcy (tylko gdy zabrano worki)</span>
+                </p>
+                <div class="rank-pair">
+                  <div class="rank hi">
+                    <h3>Najdrożsi</h3>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Podwykonawca</th>
+                          <th class="num">Średni koszt odbioru</th>
+                          <th class="num">Odbiory</th>
+                        </tr>
+                      </thead>
+                      <tbody id="ctr-shop-hi-body"></tbody>
+                    </table>
+                  </div>
+                  <div class="rank lo">
+                    <h3>Najtańsi</h3>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Podwykonawca</th>
+                          <th class="num">Średni koszt odbioru</th>
+                          <th class="num">Odbiory</th>
+                        </tr>
+                      </thead>
+                      <tbody id="ctr-shop-lo-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <div class="rank-block">
+                <p class="metric">
+                  W przeliczeniu na worek
+                  <span>Ile średnio kosztuje jeden worek u danego podwykonawcy</span>
+                </p>
+                <div class="rank-pair">
+                  <div class="rank hi">
+                    <h3>Najdrożsi</h3>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Podwykonawca</th>
+                          <th class="num">Średni koszt za worek</th>
+                          <th class="num">Odbiory</th>
+                        </tr>
+                      </thead>
+                      <tbody id="ctr-bag-hi-body"></tbody>
+                    </table>
+                  </div>
+                  <div class="rank lo">
+                    <h3>Najtańsi</h3>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Podwykonawca</th>
+                          <th class="num">Średni koszt za worek</th>
+                          <th class="num">Odbiory</th>
+                        </tr>
+                      </thead>
+                      <tbody id="ctr-bag-lo-body"></tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <p class="note">
+                Odbiory, w których <strong>nie zabrano żadnego worka</strong>, nie wchodzą do tych średnich ani do rankingu sklepów powyżej.
+                Gdy wybrany jest jeden podwykonawca, w tabeli widać tylko jego wynik.
+              </p>
+            </div>
+          </section>
+
+          <section class="section" data-fold="empty-bags">
+            <div class="section-h" data-fold-toggle="empty-bags">
+              <div class="head-text">
+                <h2>Odbiory bez worków</h2>
+                <p>Zrealizowane w okresie, ale bez zabranych worków · także jeszcze nierozliczone · po 5 na stronę</p>
+              </div>
+              <button type="button" class="fold-chev" aria-label="Zwiń sekcję">▾</button>
             </div>
             <div class="section-b" style="padding: 0;">
               <table>
@@ -748,37 +1118,65 @@
                   <tr>
                     <th>Sklep</th>
                     <th>Podwykonawca</th>
-                    <th>Data</th>
-                    <th>Problem</th>
-                    <th>Tryb</th>
+                    <th>Data odbioru</th>
+                    <th>Czy rozliczone</th>
+                    <th class="num">Koszt odbioru</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <tr>
-                    <td class="shop">ul. Nowa 5, Kraków<span class="sub">Biedronka · Nowa Huta</span></td>
-                    <td>Transport Plus</td>
-                    <td>18.09.2026</td>
-                    <td><span class="tag tag-gap">Brak stawki podjazdu</span></td>
-                    <td><span class="tag tag-na">Na zgłoszenie</span></td>
-                  </tr>
-                  <tr>
-                    <td class="shop">al. Pokoju 22, Kraków</td>
-                    <td>EcoRide</td>
-                    <td>11.09.2026</td>
-                    <td><span class="tag tag-tie">Remis w Bazie stawek</span></td>
-                    <td><span class="tag tag-h">Harmonogram</span></td>
-                  </tr>
-                  <tr>
-                    <td class="shop">ul. Przemysłowa 9, Niepołomice</td>
-                    <td>Transport Plus</td>
-                    <td>20.09.2026</td>
-                    <td><span class="tag tag-gap">Brak stawki worka</span></td>
-                    <td><span class="tag tag-na">Na zgłoszenie</span></td>
-                  </tr>
-                </tbody>
+                <tbody id="empty-bags-body"></tbody>
               </table>
+              <div class="pager" id="empty-bags-pager" hidden>
+                <span class="meta" data-pager-meta></span>
+                <div class="nav">
+                  <button type="button" data-pager-prev>← Poprzednia</button>
+                  <span class="page-label" data-pager-page></span>
+                  <button type="button" data-pager-next>Następna →</button>
+                </div>
+              </div>
+              <p class="note" style="margin: 10px 12px 12px;">
+                Te odbiory nie wchodzą do rankingów kosztów za worek ani do porównania podwykonawców.
+                Lista pokazuje po 5 pozycji na stronę.
+              </p>
             </div>
           </section>
+
+          <section class="section" data-fold="gaps">
+            <div class="section-h" data-fold-toggle="gaps">
+              <div class="head-text">
+                <h2>Problemy ze stawkami</h2>
+                <p>Odbiory jeszcze nierozliczone, przy których brakuje stawki albo w bazie jest więcej niż jedna · po 5 na stronę</p>
+              </div>
+              <button type="button" class="fold-chev" aria-label="Zwiń sekcję">▾</button>
+            </div>
+            <div class="section-b" style="padding: 0;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Sklep</th>
+                    <th>Podwykonawca</th>
+                    <th>Data odbioru</th>
+                    <th>Na czym polega problem</th>
+                  </tr>
+                </thead>
+                <tbody id="gaps-body"></tbody>
+              </table>
+              <div class="pager" id="gaps-pager" hidden>
+                <span class="meta" data-pager-meta></span>
+                <div class="nav">
+                  <button type="button" data-pager-prev>← Poprzednia</button>
+                  <span class="page-label" data-pager-page></span>
+                  <button type="button" data-pager-next>Następna →</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="overlay" id="loading-overlay" hidden role="status" aria-live="polite" aria-busy="true">
+        <div class="overlay-panel">
+          <img class="pulse" src="../logo.png" alt="" width="64" height="64">
+          <div class="msg" id="loading-msg">Ładuję dane…</div>
         </div>
       </div>
     </div>
@@ -791,6 +1189,335 @@
         stats: document.getElementById("screen-stats")
       };
       var chromeBtns = document.querySelectorAll("[data-chrome]");
+      var demoBtns = document.querySelectorAll("[data-demo]");
+      var chips = document.querySelectorAll("[data-period]");
+      var monthPick = document.getElementById("month-pick");
+      var exact = document.getElementById("exact-range");
+      var label = document.getElementById("period-label");
+      var demoHint = document.getElementById("demo-hint");
+      var chartEl = document.getElementById("bags-time-chart");
+      var bodyEl = document.getElementById("bags-time-body");
+      var bagsSub = document.getElementById("bags-time-sub");
+      var bagsSplit = document.getElementById("bags-split");
+      var costChartEl = document.getElementById("cost-time-chart");
+      var costBodyEl = document.getElementById("cost-time-body");
+      var costSub = document.getElementById("cost-time-sub");
+      var costSplit = document.getElementById("cost-split");
+
+      var labels = {
+        current: "Okres: <strong>1.09.2026 – 23.09.2026</strong> (bieżący miesiąc) · podwykonawca: <strong>Transport Plus</strong>",
+        prev: "Okres: <strong>1.08.2026 – 31.08.2026</strong> (sierpień 2026) · podwykonawca: <strong>Transport Plus</strong>",
+        quarter: "Okres: <strong>1.04.2026 – 30.06.2026</strong> (ostatni kwartał) · podwykonawca: <strong>Transport Plus</strong>",
+        exact: "Okres: <strong>dokładny zakres od–do</strong> · podwykonawca: <strong>Transport Plus</strong>"
+      };
+
+      var kpi = {
+        current: {
+          "backlog-n": "47",
+          "backlog-e": "szacunkowo 12\u00a0480,00\u00a0zł",
+          "pickups-n": "156",
+          "pickups-e": "zrealizowane w okresie · każdy sklep osobno",
+          "shops-n": "89",
+          "shops-e": "różne sklepy w okresie",
+          "settled-n": "128",
+          "settled-e": "łącznie 34\u00a0210,00\u00a0zł",
+          "avg-q": "18,40\u00a0zł",
+          "avg-e": "ze 126 odbiorów, w których zabrano worki",
+          "gaps-n": "9",
+          "gaps-e": "6 bez stawki · 3 konflikty stawek"
+        },
+        prev: {
+          "backlog-n": "47",
+          "backlog-e": "szacunkowo 12\u00a0480,00\u00a0zł",
+          "pickups-n": "198",
+          "pickups-e": "zrealizowane w okresie · każdy sklep osobno",
+          "shops-n": "102",
+          "shops-e": "różne sklepy w okresie",
+          "settled-n": "162",
+          "settled-e": "łącznie 41\u00a0900,00\u00a0zł",
+          "avg-q": "17,90\u00a0zł",
+          "avg-e": "ze 158 odbiorów, w których zabrano worki",
+          "gaps-n": "11",
+          "gaps-e": "7 bez stawki · 4 konflikty stawek"
+        },
+        quarter: {
+          "backlog-n": "47",
+          "backlog-e": "szacunkowo 12\u00a0480,00\u00a0zł",
+          "pickups-n": "612",
+          "pickups-e": "zrealizowane w okresie · każdy sklep osobno",
+          "shops-n": "214",
+          "shops-e": "różne sklepy w okresie",
+          "settled-n": "486",
+          "settled-e": "łącznie 128\u00a0740,00\u00a0zł",
+          "avg-q": "17,60\u00a0zł",
+          "avg-e": "ze 471 odbiorów, w których zabrano worki",
+          "gaps-n": "23",
+          "gaps-e": "15 bez stawki · 8 konfliktów stawek"
+        },
+        exact: {
+          "backlog-n": "47",
+          "backlog-e": "szacunkowo 12\u00a0480,00\u00a0zł",
+          "pickups-n": "—",
+          "pickups-e": "wybierz daty od–do i kliknij Pokaż raport",
+          "shops-n": "—",
+          "shops-e": "—",
+          "settled-n": "—",
+          "settled-e": "wybierz daty od–do i kliknij Pokaż raport",
+          "avg-q": "—",
+          "avg-e": "—",
+          "gaps-n": "—",
+          "gaps-e": "—"
+        }
+      };
+
+      var bagsMonth = [
+        { label: "1–7.09", full: "1–7.09.2026", na: 84, h: 36 },
+        { label: "8–14.09", full: "8–14.09.2026", na: 110, h: 44 },
+        { label: "15–21.09", full: "15–21.09.2026", na: 140, h: 56 },
+        { label: "22–23.09", full: "22–23.09.2026", na: 76, h: 24 }
+      ];
+
+      var bagsPrev = [
+        { label: "1–7.08", full: "1–7.08.2026", na: 92, h: 40 },
+        { label: "8–14.08", full: "8–14.08.2026", na: 118, h: 48 },
+        { label: "15–21.08", full: "15–21.08.2026", na: 131, h: 52 },
+        { label: "22–28.08", full: "22–28.08.2026", na: 125, h: 50 },
+        { label: "29–31.08", full: "29–31.08.2026", na: 58, h: 22 }
+      ];
+
+      var bagsQuarter = [
+        { label: "30.03–5.04", full: "30.03–5.04.2026", na: 98, h: 38 },
+        { label: "6–12.04", full: "6–12.04.2026", na: 112, h: 44 },
+        { label: "13–19.04", full: "13–19.04.2026", na: 128, h: 51 },
+        { label: "20–26.04", full: "20–26.04.2026", na: 105, h: 42 },
+        { label: "27.04–3.05", full: "27.04–3.05.2026", na: 134, h: 55 },
+        { label: "4–10.05", full: "4–10.05.2026", na: 141, h: 58 },
+        { label: "11–17.05", full: "11–17.05.2026", na: 156, h: 62 },
+        { label: "18–24.05", full: "18–24.05.2026", na: 149, h: 60 },
+        { label: "25–31.05", full: "25–31.05.2026", na: 138, h: 54 },
+        { label: "1–7.06", full: "1–7.06.2026", na: 162, h: 66 },
+        { label: "8–14.06", full: "8–14.06.2026", na: 171, h: 70 },
+        { label: "15–21.06", full: "15–21.06.2026", na: 158, h: 64 },
+        { label: "22–28.06", full: "22–28.06.2026", na: 145, h: 59 }
+      ];
+
+      var costsMonth = [
+        { label: "1–7.09", full: "1–7.09.2026", na: 4800, h: 1400 },
+        { label: "8–14.09", full: "8–14.09.2026", na: 6900, h: 2200 },
+        { label: "15–21.09", full: "15–21.09.2026", na: 9200, h: 3200 },
+        { label: "22–23.09", full: "22–23.09.2026", na: 4900, h: 1610 }
+      ];
+
+      var costsPrev = [
+        { label: "1–7.08", full: "1–7.08.2026", na: 5800, h: 2000 },
+        { label: "8–14.08", full: "8–14.08.2026", na: 7100, h: 2300 },
+        { label: "15–21.08", full: "15–21.08.2026", na: 7600, h: 2600 },
+        { label: "22–28.08", full: "22–28.08.2026", na: 7300, h: 2500 },
+        { label: "29–31.08", full: "29–31.08.2026", na: 3500, h: 1200 }
+      ];
+
+      var costsQuarter = [
+        { label: "30.03–5.04", full: "30.03–5.04.2026", na: 6200, h: 2000 },
+        { label: "6–12.04", full: "6–12.04.2026", na: 6900, h: 2200 },
+        { label: "13–19.04", full: "13–19.04.2026", na: 7800, h: 2600 },
+        { label: "20–26.04", full: "20–26.04.2026", na: 6600, h: 2200 },
+        { label: "27.04–3.05", full: "27.04–3.05.2026", na: 8400, h: 2800 },
+        { label: "4–10.05", full: "4–10.05.2026", na: 8800, h: 3000 },
+        { label: "11–17.05", full: "11–17.05.2026", na: 9400, h: 3200 },
+        { label: "18–24.05", full: "18–24.05.2026", na: 9000, h: 3100 },
+        { label: "25–31.05", full: "25–31.05.2026", na: 8200, h: 2700 },
+        { label: "1–7.06", full: "1–7.06.2026", na: 9800, h: 3300 },
+        { label: "8–14.06", full: "8–14.06.2026", na: 10300, h: 3500 },
+        { label: "15–21.06", full: "15–21.06.2026", na: 9200, h: 3200 },
+        { label: "22–28.06", full: "22–28.06.2026", na: 8500, h: 2840 }
+      ];
+
+      var qRanks = {
+        current: {
+          avg: "18,40\u00a0zł",
+          sub: "126 odbiorów",
+          hi: [
+            { shop: "ul. Lipowa 12, Kraków", sub: "12.09 · 4 worki · EcoRide", q: 42.5 },
+            { shop: "al. 3 Maja 8, Tarnów", sub: "08.09 · 2 worki · Transport Plus", q: 38 },
+            { shop: "ul. Kolejowa 3, Bochnia", sub: "15.09 · 3 worki · Transport Plus", q: 35.2 },
+            { shop: "Rynek 4, Wieliczka", sub: "03.09 · 1 worek · EcoRide", q: 31 },
+            { shop: "ul. Sportowa 19, Niepołomice", sub: "19.09 · 5 worków · Transport Plus", q: 29.8 }
+          ],
+          lo: [
+            { shop: "ul. Zielona 2, Kraków", sub: "10.09 · 12 worków · Transport Plus", q: 6.2 },
+            { shop: "ul. Długa 44, Skawina", sub: "14.09 · 8 worków · EcoRide", q: 7.5 },
+            { shop: "os. Piastów 7, Kraków", sub: "05.09 · 10 worków · Transport Plus", q: 8.1 },
+            { shop: "ul. Wesoła 1, Myślenice", sub: "21.09 · 6 worków · EcoRide", q: 9 },
+            { shop: "ul. Polna 15, Krzeszowice", sub: "02.09 · 7 worków · Transport Plus", q: 9.4 }
+          ]
+        },
+        quarter: {
+          avg: "17,60\u00a0zł",
+          sub: "471 odbiorów",
+          hi: [
+            { shop: "ul. Lipowa 12, Kraków", sub: "12.05 · 3 worki · EcoRide", q: 48.2 },
+            { shop: "al. Pokoju 22, Kraków", sub: "03.06 · 2 worki · Transport Plus", q: 44.0 },
+            { shop: "ul. Nowa 5, Kraków", sub: "18.04 · 4 worki · EcoRide", q: 41.5 },
+            { shop: "al. 3 Maja 8, Tarnów", sub: "22.05 · 2 worki · Transport Plus", q: 39.1 },
+            { shop: "ul. Krakowska 100, Skawina", sub: "09.06 · 1 worek · EcoRide", q: 37.8 }
+          ],
+          lo: [
+            { shop: "ul. Zielona 2, Kraków", sub: "trasa · 40 worków", q: 5.1 },
+            { shop: "os. Piastów 7, Kraków", sub: "trasa · 28 worków", q: 5.8 },
+            { shop: "ul. Długa 44, Skawina", sub: "11.05 · 14 worków", q: 6.4 },
+            { shop: "ul. Polna 15, Krzeszowice", sub: "02.04 · 11 worków", q: 7.0 },
+            { shop: "ul. Wesoła 1, Myślenice", sub: "19.06 · 9 worków", q: 7.6 }
+          ]
+        }
+      };
+      qRanks.prev = qRanks.current;
+      qRanks.exact = qRanks.current;
+
+      var contractorRanks = {
+        current: {
+          shopHi: [
+            { name: "EcoRide", avg: 86.4, n: 28 },
+            { name: "GreenHaul", avg: 72.1, n: 14 },
+            { name: "Transport Plus", avg: 58.3, n: 84 }
+          ],
+          shopLo: [
+            { name: "Transport Plus", avg: 58.3, n: 84 },
+            { name: "GreenHaul", avg: 72.1, n: 14 },
+            { name: "EcoRide", avg: 86.4, n: 28 }
+          ],
+          bagHi: [
+            { name: "EcoRide", avg: 24.8, n: 28 },
+            { name: "GreenHaul", avg: 19.2, n: 14 },
+            { name: "Transport Plus", avg: 16.1, n: 84 }
+          ],
+          bagLo: [
+            { name: "Transport Plus", avg: 16.1, n: 84 },
+            { name: "GreenHaul", avg: 19.2, n: 14 },
+            { name: "EcoRide", avg: 24.8, n: 28 }
+          ]
+        },
+        quarter: {
+          shopHi: [
+            { name: "EcoRide", avg: 91.2, n: 96 },
+            { name: "GreenHaul", avg: 74.5, n: 52 },
+            { name: "CityBags", avg: 69.8, n: 31 },
+            { name: "Transport Plus", avg: 55.4, n: 292 },
+            { name: "LokalRide", avg: 48.0, n: 18 }
+          ],
+          shopLo: [
+            { name: "LokalRide", avg: 48.0, n: 18 },
+            { name: "Transport Plus", avg: 55.4, n: 292 },
+            { name: "CityBags", avg: 69.8, n: 31 },
+            { name: "GreenHaul", avg: 74.5, n: 52 },
+            { name: "EcoRide", avg: 91.2, n: 96 }
+          ],
+          bagHi: [
+            { name: "EcoRide", avg: 26.1, n: 96 },
+            { name: "CityBags", avg: 21.4, n: 31 },
+            { name: "GreenHaul", avg: 18.9, n: 52 },
+            { name: "Transport Plus", avg: 15.8, n: 292 },
+            { name: "LokalRide", avg: 14.2, n: 18 }
+          ],
+          bagLo: [
+            { name: "LokalRide", avg: 14.2, n: 18 },
+            { name: "Transport Plus", avg: 15.8, n: 292 },
+            { name: "GreenHaul", avg: 18.9, n: 52 },
+            { name: "CityBags", avg: 21.4, n: 31 },
+            { name: "EcoRide", avg: 26.1, n: 96 }
+          ]
+        }
+      };
+      contractorRanks.prev = contractorRanks.current;
+      contractorRanks.exact = contractorRanks.current;
+
+      var emptyBags = {
+        current: [
+          { shop: "ul. Boczna 3, Kraków", sub: "Żabka", who: "Transport Plus", date: "07.09.2026", settled: false, p: null },
+          { shop: "al. Solidarności 11, Tarnów", sub: "Biedronka", who: "EcoRide", date: "12.09.2026", settled: true, p: 25 },
+          { shop: "ul. Leśna 8, Niepołomice", sub: "Lewiatan", who: "Transport Plus", date: "18.09.2026", settled: false, p: null },
+          { shop: "os. Kolorowe 2, Kraków", sub: "Carrefour Express", who: "GreenHaul", date: "21.09.2026", settled: true, p: 20 },
+          { shop: "ul. Wiosenna 4, Skawina", sub: "Dino", who: "Transport Plus", date: "09.09.2026", settled: false, p: null },
+          { shop: "Rynek 2, Wieliczka", sub: "ABC", who: "EcoRide", date: "14.09.2026", settled: true, p: 22 },
+          { shop: "ul. Sportowa 1, Bochnia", sub: "Żabka", who: "GreenHaul", date: "22.09.2026", settled: false, p: null }
+        ],
+        quarter: [
+          { shop: "ul. Boczna 3, Kraków", sub: "Żabka", who: "Transport Plus", date: "07.04.2026", settled: true, p: 25 },
+          { shop: "al. Solidarności 11, Tarnów", sub: "Biedronka", who: "EcoRide", date: "19.04.2026", settled: true, p: 30 },
+          { shop: "ul. Leśna 8, Niepołomice", sub: "Lewiatan", who: "Transport Plus", date: "03.05.2026", settled: false, p: null },
+          { shop: "os. Kolorowe 2, Kraków", sub: "Carrefour Express", who: "GreenHaul", date: "14.05.2026", settled: true, p: 20 },
+          { shop: "ul. Polna 2, Skawina", sub: "Dino", who: "CityBags", date: "28.05.2026", settled: false, p: null },
+          { shop: "Rynek 9, Myślenice", sub: "ABC", who: "LokalRide", date: "11.06.2026", settled: true, p: 18 },
+          { shop: "ul. Krakowska 50, Bochnia", sub: "Żabka", who: "Transport Plus", date: "22.06.2026", settled: false, p: null },
+          { shop: "ul. Lipowa 1, Kraków", sub: "Biedronka", who: "EcoRide", date: "02.04.2026", settled: true, p: 25 },
+          { shop: "al. 3 Maja 2, Tarnów", sub: "Lewiatan", who: "Transport Plus", date: "15.05.2026", settled: false, p: null },
+          { shop: "ul. Kolejowa 9, Niepołomice", sub: "Dino", who: "GreenHaul", date: "08.06.2026", settled: true, p: 20 },
+          { shop: "os. Piastów 3, Kraków", sub: "Żabka", who: "CityBags", date: "25.04.2026", settled: false, p: null },
+          { shop: "ul. Wesoła 8, Myślenice", sub: "ABC", who: "LokalRide", date: "30.06.2026", settled: true, p: 18 }
+        ]
+      };
+      emptyBags.prev = emptyBags.current;
+      emptyBags.exact = emptyBags.current;
+
+      var rateGaps = {
+        current: [
+          { shop: "ul. Nowa 5, Kraków", sub: "Biedronka · Nowa Huta", who: "Transport Plus", date: "18.09.2026", kind: "gap", label: "Brak stawki za dojazd" },
+          { shop: "al. Pokoju 22, Kraków", sub: "", who: "EcoRide", date: "11.09.2026", kind: "tie", label: "Konflikt: kilka stawek w bazie" },
+          { shop: "ul. Przemysłowa 9, Niepołomice", sub: "", who: "Transport Plus", date: "20.09.2026", kind: "gap", label: "Brak stawki za worek" },
+          { shop: "ul. Długa 10, Skawina", sub: "Lewiatan", who: "GreenHaul", date: "05.09.2026", kind: "gap", label: "Brak stawki za dojazd" },
+          { shop: "os. Centrum 4, Kraków", sub: "Żabka", who: "Transport Plus", date: "15.09.2026", kind: "tie", label: "Konflikt: kilka stawek w bazie" },
+          { shop: "ul. Zielona 18, Bochnia", sub: "Dino", who: "EcoRide", date: "22.09.2026", kind: "gap", label: "Brak stawki za worek" },
+          { shop: "Rynek 1, Wieliczka", sub: "ABC", who: "GreenHaul", date: "09.09.2026", kind: "gap", label: "Brak stawki za dojazd" },
+          { shop: "ul. Polna 7, Krzeszowice", sub: "", who: "Transport Plus", date: "19.09.2026", kind: "tie", label: "Konflikt: kilka stawek w bazie" },
+          { shop: "al. Solidarności 3, Tarnów", sub: "Biedronka", who: "EcoRide", date: "03.09.2026", kind: "gap", label: "Brak stawki za worek" }
+        ],
+        quarter: [
+          { shop: "ul. Nowa 5, Kraków", sub: "Biedronka · Nowa Huta", who: "Transport Plus", date: "18.04.2026", kind: "gap", label: "Brak stawki za dojazd" },
+          { shop: "al. Pokoju 22, Kraków", sub: "", who: "EcoRide", date: "11.05.2026", kind: "tie", label: "Konflikt: kilka stawek w bazie" },
+          { shop: "ul. Przemysłowa 9, Niepołomice", sub: "", who: "Transport Plus", date: "20.06.2026", kind: "gap", label: "Brak stawki za worek" },
+          { shop: "ul. Długa 10, Skawina", sub: "Lewiatan", who: "GreenHaul", date: "05.04.2026", kind: "gap", label: "Brak stawki za dojazd" },
+          { shop: "os. Centrum 4, Kraków", sub: "Żabka", who: "Transport Plus", date: "15.05.2026", kind: "tie", label: "Konflikt: kilka stawek w bazie" },
+          { shop: "ul. Zielona 18, Bochnia", sub: "Dino", who: "EcoRide", date: "22.04.2026", kind: "gap", label: "Brak stawki za worek" },
+          { shop: "Rynek 1, Wieliczka", sub: "ABC", who: "GreenHaul", date: "09.06.2026", kind: "gap", label: "Brak stawki za dojazd" },
+          { shop: "ul. Polna 7, Krzeszowice", sub: "", who: "Transport Plus", date: "19.05.2026", kind: "tie", label: "Konflikt: kilka stawek w bazie" },
+          { shop: "al. Solidarności 3, Tarnów", sub: "Biedronka", who: "EcoRide", date: "03.04.2026", kind: "gap", label: "Brak stawki za worek" },
+          { shop: "ul. Lipowa 12, Kraków", sub: "", who: "CityBags", date: "28.05.2026", kind: "gap", label: "Brak stawki za dojazd" },
+          { shop: "ul. Kolejowa 3, Bochnia", sub: "Carrefour Express", who: "LokalRide", date: "12.06.2026", kind: "tie", label: "Konflikt: kilka stawek w bazie" },
+          { shop: "os. Piastów 7, Kraków", sub: "Żabka", who: "Transport Plus", date: "01.04.2026", kind: "gap", label: "Brak stawki za worek" },
+          { shop: "ul. Wesoła 1, Myślenice", sub: "", who: "GreenHaul", date: "30.06.2026", kind: "gap", label: "Brak stawki za dojazd" }
+        ]
+      };
+      rateGaps.prev = rateGaps.current;
+      rateGaps.exact = rateGaps.current;
+
+      var PAGE_SIZE = 5;
+      var pagerState = {
+        emptyBags: { page: 1, period: "current" },
+        gaps: { page: 1, period: "current" }
+      };
+
+      var loadOverlay = document.getElementById("loading-overlay");
+      var loadMsg = document.getElementById("loading-msg");
+      var loadTimer = null;
+
+      function setLoading(on, message) {
+        if (loadTimer) {
+          clearTimeout(loadTimer);
+          loadTimer = null;
+        }
+        if (loadMsg && message) loadMsg.textContent = message;
+        if (loadOverlay) {
+          loadOverlay.hidden = !on;
+          loadOverlay.setAttribute("aria-busy", on ? "true" : "false");
+        }
+      }
+
+      function withLoading(period, message) {
+        setLoading(true, message || "Ładuję dane…");
+        loadTimer = setTimeout(function () {
+          applyPeriod(period);
+          setLoading(false);
+        }, 900);
+      }
 
       function show(name) {
         Object.keys(screens).forEach(function (key) {
@@ -801,39 +1528,391 @@
         });
       }
 
+      function setKpi(period) {
+        var row = kpi[period] || kpi.current;
+        Object.keys(row).forEach(function (key) {
+          var el = document.querySelector('[data-kpi="' + key + '"]');
+          if (el) el.innerHTML = row[key];
+        });
+      }
+
+      function fmtPln(n) {
+        return n.toLocaleString("pl-PL") + "\u00a0zł";
+      }
+
+      function renderBags(rows, dense) {
+        var max = 1;
+        rows.forEach(function (r) {
+          var t = r.na + r.h;
+          if (t > max) max = t;
+        });
+        chartEl.classList.toggle("is-dense", !!dense);
+        bagsSplit.classList.toggle("is-stack", !!dense);
+        chartEl.innerHTML = rows.map(function (r) {
+          var naH = Math.round((r.na / max) * 100);
+          var hH = Math.round((r.h / max) * 100);
+          return (
+            '<div class="bags-time-col">' +
+            '<div class="bags-time-stack">' +
+            '<i class="s-h" style="height:' + hH + '%"></i>' +
+            '<i class="s-na" style="height:' + naH + '%"></i>' +
+            "</div>" +
+            '<span class="wk">' + r.label + "</span>" +
+            "</div>"
+          );
+        }).join("");
+        bodyEl.innerHTML = rows.map(function (r) {
+          return (
+            "<tr><td>" + r.full + "</td>" +
+            '<td class="num">' + r.na + "</td>" +
+            '<td class="num">' + r.h + "</td>" +
+            '<td class="num"><strong>' + (r.na + r.h) + "</strong></td></tr>"
+          );
+        }).join("");
+        syncTableFold("bags", !!dense);
+      }
+
+      function renderCosts(rows, dense) {
+        var max = 1;
+        rows.forEach(function (r) {
+          var t = r.na + r.h;
+          if (t > max) max = t;
+        });
+        costChartEl.classList.toggle("is-dense", !!dense);
+        costSplit.classList.toggle("is-stack", !!dense);
+        costChartEl.innerHTML = rows.map(function (r) {
+          var naH = Math.round((r.na / max) * 100);
+          var hH = Math.round((r.h / max) * 100);
+          return (
+            '<div class="bags-time-col">' +
+            '<div class="bags-time-stack">' +
+            '<i class="s-h" style="height:' + hH + '%"></i>' +
+            '<i class="s-na" style="height:' + naH + '%"></i>' +
+            "</div>" +
+            '<span class="wk">' + r.label + "</span>" +
+            "</div>"
+          );
+        }).join("");
+        costBodyEl.innerHTML = rows.map(function (r) {
+          return (
+            "<tr><td>" + r.full + "</td>" +
+            '<td class="num">' + fmtPln(r.na) + "</td>" +
+            '<td class="num">' + fmtPln(r.h) + "</td>" +
+            '<td class="num"><strong>' + fmtPln(r.na + r.h) + "</strong></td></tr>"
+          );
+        }).join("");
+        syncTableFold("costs", !!dense);
+      }
+
+      var LS_PREFIX = "rozliczenia.stats.fold.";
+
+      function lsGet(key) {
+        try { return localStorage.getItem(LS_PREFIX + key); } catch (e) { return null; }
+      }
+      function lsSet(key, val) {
+        try { localStorage.setItem(LS_PREFIX + key, val); } catch (e) { /* ignore */ }
+      }
+
+      function setSectionFold(id, collapsed) {
+        var sec = document.querySelector('[data-fold="' + id + '"]');
+        if (!sec) return;
+        sec.classList.toggle("is-collapsed", collapsed);
+        var chev = sec.querySelector(".fold-chev");
+        if (chev) {
+          chev.textContent = collapsed ? "▸" : "▾";
+          chev.setAttribute("aria-label", collapsed ? "Rozwiń sekcję" : "Zwiń sekcję");
+        }
+        lsSet("section." + id, collapsed ? "closed" : "open");
+      }
+
+      function restoreSections() {
+        document.querySelectorAll("[data-fold]").forEach(function (sec) {
+          var id = sec.getAttribute("data-fold");
+          var saved = lsGet("section." + id);
+          setSectionFold(id, saved === "closed");
+        });
+      }
+
+      function syncTableFold(id, stacked) {
+        var pane = document.querySelector('[data-table="' + id + '"]');
+        var btn = document.querySelector('[data-table-fold="' + id + '"]');
+        if (!pane || !btn) return;
+        if (!stacked) {
+          pane.classList.remove("is-collapsed");
+          return;
+        }
+        var saved = lsGet("table." + id);
+        var collapsed = saved == null ? true : saved === "closed";
+        pane.classList.toggle("is-collapsed", collapsed);
+        btn.textContent = collapsed ? "Pokaż tabelę" : "Ukryj tabelę";
+      }
+
+      function toggleTableFold(id) {
+        var pane = document.querySelector('[data-table="' + id + '"]');
+        var btn = document.querySelector('[data-table-fold="' + id + '"]');
+        if (!pane || !btn) return;
+        var collapse = !pane.classList.contains("is-collapsed");
+        pane.classList.toggle("is-collapsed", collapse);
+        btn.textContent = collapse ? "Pokaż tabelę" : "Ukryj tabelę";
+        lsSet("table." + id, collapse ? "closed" : "open");
+      }
+
+      document.querySelectorAll("[data-fold-toggle]").forEach(function (head) {
+        head.addEventListener("click", function (e) {
+          if (e.target.closest("a")) return;
+          var id = head.getAttribute("data-fold-toggle");
+          var sec = document.querySelector('[data-fold="' + id + '"]');
+          if (!sec) return;
+          setSectionFold(id, !sec.classList.contains("is-collapsed"));
+        });
+      });
+      document.querySelectorAll("[data-table-fold]").forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          toggleTableFold(btn.getAttribute("data-table-fold"));
+        });
+      });
+
+      restoreSections();
+
+      function renderQ(period) {
+        var data = qRanks[period] || qRanks.current;
+        document.getElementById("q-avg-big").innerHTML = data.avg;
+        document.getElementById("q-avg-sub").textContent = data.sub;
+        function rowHtml(item, cls) {
+          return (
+            "<tr><td class=\"shop\">" + item.shop +
+            '<span class="sub">' + item.sub + "</span></td>" +
+            '<td class="num money ' + cls + '">' +
+            item.q.toFixed(2).replace(".", ",") + "\u00a0zł</td></tr>"
+          );
+        }
+        document.getElementById("q-hi-body").innerHTML = data.hi.map(function (x) {
+          return rowHtml(x, "hi");
+        }).join("");
+        document.getElementById("q-lo-body").innerHTML = data.lo.map(function (x) {
+          return rowHtml(x, "lo");
+        }).join("");
+      }
+
+      function renderContractors(period) {
+        var data = contractorRanks[period] || contractorRanks.current;
+        function rowHtml(item, cls) {
+          return (
+            "<tr><td class=\"shop\">" + item.name + "</td>" +
+            '<td class="num money ' + cls + '">' +
+            item.avg.toFixed(2).replace(".", ",") + "\u00a0zł</td>" +
+            '<td class="num">' + item.n + "</td></tr>"
+          );
+        }
+        document.getElementById("ctr-shop-hi-body").innerHTML = data.shopHi.map(function (x) {
+          return rowHtml(x, "hi");
+        }).join("");
+        document.getElementById("ctr-shop-lo-body").innerHTML = data.shopLo.map(function (x) {
+          return rowHtml(x, "lo");
+        }).join("");
+        document.getElementById("ctr-bag-hi-body").innerHTML = data.bagHi.map(function (x) {
+          return rowHtml(x, "hi");
+        }).join("");
+        document.getElementById("ctr-bag-lo-body").innerHTML = data.bagLo.map(function (x) {
+          return rowHtml(x, "lo");
+        }).join("");
+      }
+
+      function renderEmptyBags(period, resetPage) {
+        if (resetPage || pagerState.emptyBags.period !== period) {
+          pagerState.emptyBags.page = 1;
+          pagerState.emptyBags.period = period;
+        }
+        var rows = emptyBags[period] || emptyBags.current;
+        var page = pagerState.emptyBags.page;
+        var pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+        if (page > pages) page = pages;
+        pagerState.emptyBags.page = page;
+        var slice = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+        document.getElementById("empty-bags-body").innerHTML = slice.map(function (r) {
+          var status = r.settled
+            ? '<span class="tag tag-na">Tak — rozliczone</span>'
+            : '<span class="tag tag-h">Nie — do rozliczenia</span>';
+          var cost = r.p == null
+            ? "—"
+            : r.p.toFixed(2).replace(".", ",") + "\u00a0zł";
+          return (
+            "<tr><td class=\"shop\">" + r.shop +
+            '<span class="sub">' + r.sub + "</span></td>" +
+            "<td>" + r.who + "</td>" +
+            "<td>" + r.date + "</td>" +
+            "<td>" + status + "</td>" +
+            '<td class="num">' + cost + "</td></tr>"
+          );
+        }).join("");
+        updatePager("empty-bags-pager", rows.length, page, pages);
+      }
+
+      function renderGaps(period, resetPage) {
+        if (resetPage || pagerState.gaps.period !== period) {
+          pagerState.gaps.page = 1;
+          pagerState.gaps.period = period;
+        }
+        var rows = rateGaps[period] || rateGaps.current;
+        var page = pagerState.gaps.page;
+        var pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+        if (page > pages) page = pages;
+        pagerState.gaps.page = page;
+        var slice = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+        document.getElementById("gaps-body").innerHTML = slice.map(function (r) {
+          var tag = r.kind === "tie" ? "tag-tie" : "tag-gap";
+          var sub = r.sub ? '<span class="sub">' + r.sub + "</span>" : "";
+          return (
+            "<tr><td class=\"shop\">" + r.shop + sub + "</td>" +
+            "<td>" + r.who + "</td>" +
+            "<td>" + r.date + "</td>" +
+            '<td><span class="tag ' + tag + '">' + r.label + "</span></td></tr>"
+          );
+        }).join("");
+        updatePager("gaps-pager", rows.length, page, pages);
+      }
+
+      function updatePager(id, total, page, pages) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.hidden = total <= PAGE_SIZE;
+        var from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+        var to = Math.min(page * PAGE_SIZE, total);
+        var meta = el.querySelector("[data-pager-meta]");
+        var label = el.querySelector("[data-pager-page]");
+        var prev = el.querySelector("[data-pager-prev]");
+        var next = el.querySelector("[data-pager-next]");
+        if (meta) meta.textContent = total === 0
+          ? "Brak wierszy"
+          : ("Pozycje " + from + "–" + to + " z " + total + " · po " + PAGE_SIZE + " na stronę");
+        if (label) label.textContent = page + " / " + pages;
+        if (prev) prev.disabled = page <= 1;
+        if (next) next.disabled = page >= pages;
+      }
+
+      function bindPagers() {
+        var emptyPager = document.getElementById("empty-bags-pager");
+        if (emptyPager) {
+          emptyPager.querySelector("[data-pager-prev]").addEventListener("click", function () {
+            if (pagerState.emptyBags.page > 1) {
+              pagerState.emptyBags.page -= 1;
+              renderEmptyBags(pagerState.emptyBags.period, false);
+            }
+          });
+          emptyPager.querySelector("[data-pager-next]").addEventListener("click", function () {
+            pagerState.emptyBags.page += 1;
+            renderEmptyBags(pagerState.emptyBags.period, false);
+          });
+        }
+        var gapsPager = document.getElementById("gaps-pager");
+        if (gapsPager) {
+          gapsPager.querySelector("[data-pager-prev]").addEventListener("click", function () {
+            if (pagerState.gaps.page > 1) {
+              pagerState.gaps.page -= 1;
+              renderGaps(pagerState.gaps.period, false);
+            }
+          });
+          gapsPager.querySelector("[data-pager-next]").addEventListener("click", function () {
+            pagerState.gaps.page += 1;
+            renderGaps(pagerState.gaps.period, false);
+          });
+        }
+      }
+      bindPagers();
+
+      function applyPeriod(p) {
+        chips.forEach(function (b) {
+          b.classList.toggle("is-on", b.getAttribute("data-period") === p);
+        });
+        demoBtns.forEach(function (b) {
+          var d = b.getAttribute("data-demo");
+          b.classList.toggle("is-on", (p === "quarter" && d === "quarter") || (p !== "quarter" && d === "current"));
+        });
+        monthPick.classList.toggle("is-on", p === "prev");
+        exact.classList.toggle("is-on", p === "exact");
+        label.innerHTML = labels[p] || labels.current;
+        demoHint.hidden = p !== "quarter";
+        setKpi(p);
+        renderQ(p);
+        renderContractors(p);
+        renderEmptyBags(p, true);
+        renderGaps(p, true);
+        if (p === "quarter") {
+          bagsSub.textContent = "Suma worków z zrealizowanych odbiorów · 13 tygodni II kwartału · według sposobu zlecenia · przewiń słupki w bok";
+          costSub.textContent = "Suma kosztów już rozliczonych · 13 tygodni II kwartału · według sposobu zlecenia · przewiń słupki w bok";
+          renderBags(bagsQuarter, true);
+          renderCosts(costsQuarter, true);
+        } else if (p === "prev") {
+          bagsSub.textContent = "Suma worków z zrealizowanych odbiorów · tygodniami (sierpień) · według sposobu zlecenia";
+          costSub.textContent = "Suma kosztów już rozliczonych · tygodniami (sierpień) · według sposobu zlecenia";
+          renderBags(bagsPrev, false);
+          renderCosts(costsPrev, false);
+        } else {
+          bagsSub.textContent = "Suma worków z zrealizowanych odbiorów · tygodniami · według sposobu zlecenia";
+          costSub.textContent = "Suma kosztów już rozliczonych · tygodniami · według sposobu zlecenia";
+          renderBags(bagsMonth, false);
+          renderCosts(costsMonth, false);
+        }
+      }
+
       document.querySelectorAll("[data-go]").forEach(function (btn) {
         btn.addEventListener("click", function () {
-          show(btn.getAttribute("data-go"));
+          var target = btn.getAttribute("data-go");
+          show(target);
+          if (target === "stats") {
+            var on = document.querySelector(".chip.is-on");
+            withLoading(on ? on.getAttribute("data-period") : "current", "Ładuję statystyki…");
+          }
         });
       });
       chromeBtns.forEach(function (btn) {
         btn.addEventListener("click", function () {
-          show(btn.getAttribute("data-chrome"));
+          var target = btn.getAttribute("data-chrome");
+          show(target);
+          if (target === "stats") {
+            var on = document.querySelector(".chip.is-on");
+            withLoading(on ? on.getAttribute("data-period") : "current", "Ładuję statystyki…");
+          }
         });
       });
-
-      if (location.hash === "#stats") show("stats");
-
-      var chips = document.querySelectorAll("[data-period]");
-      var monthPick = document.getElementById("month-pick");
-      var exact = document.getElementById("exact-range");
-      var label = document.getElementById("period-label");
-      var labels = {
-        current: "Okres: <strong>1.09.2026 – 23.09.2026</strong> (bieżący miesiąc) · podwykonawca: <strong>Transport Plus</strong>",
-        prev: "Okres: <strong>1.08.2026 – 31.08.2026</strong> (sierpień 2026) · podwykonawca: <strong>Transport Plus</strong>",
-        quarter: "Okres: <strong>1.04.2026 – 30.06.2026</strong> (ostatni kwartał) · podwykonawca: <strong>Transport Plus</strong>",
-        exact: "Okres: <strong>dokładny zakres od–do</strong> · podwykonawca: <strong>Transport Plus</strong>"
-      };
+      demoBtns.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var demo = btn.getAttribute("data-demo");
+          show("stats");
+          withLoading(demo === "quarter" ? "quarter" : "current", "Ładuję dane…");
+        });
+      });
       chips.forEach(function (btn) {
         btn.addEventListener("click", function () {
-          chips.forEach(function (b) { b.classList.remove("is-on"); });
-          btn.classList.add("is-on");
-          var p = btn.getAttribute("data-period");
-          monthPick.classList.toggle("is-on", p === "prev");
-          exact.classList.toggle("is-on", p === "exact");
-          label.innerHTML = labels[p] || labels.current;
+          withLoading(btn.getAttribute("data-period"), "Ładuję dane…");
         });
       });
+      var btnShow = document.getElementById("btn-show");
+      if (btnShow) {
+        btnShow.addEventListener("click", function () {
+          var on = document.querySelector(".chip.is-on");
+          withLoading(on ? on.getAttribute("data-period") : "current", "Ładuję dane…");
+        });
+      }
+      var demoLoad = document.querySelector("[data-demo-loading]");
+      if (demoLoad) {
+        demoLoad.addEventListener("click", function () {
+          show("stats");
+          setLoading(true, "Ładuję dane…");
+        });
+      }
+
+      if (location.hash === "#stats") show("stats");
+      if (location.hash === "#quarter") {
+        show("stats");
+        withLoading("quarter", "Ładuję dane…");
+      } else if (location.hash === "#loading") {
+        show("stats");
+        setLoading(true, "Ładuję dane…");
+      } else {
+        applyPeriod("current");
+      }
     })();
   </script>
 </body>

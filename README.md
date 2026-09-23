@@ -1,6 +1,8 @@
 # Rozliczenia
 
-Osobna strona rozliczania kosztów odbiorów. Czyta ten sam rejestr co mapa plomb, liczy koszt w przeglądarce i przy Zatwierdź dopisuje status, numer faktury i kwoty. Nie jest częścią witryny `arkusz-mapa`: workflow mapy zastępuje całą gałąź `gh-pages`.
+Osobna strona rozliczania kosztów odbiorów. Czyta ten sam rejestr co mapa plomb, liczy koszt w przeglądarce i przy Zatwierdź dopisuje status, numer faktury i kwoty. Widoki: **Zakres**, **Zestawienie**, **Statystyki** (raport odczytowy). Nie jest częścią witryny `arkusz-mapa`: workflow mapy zastępuje całą gałąź `gh-pages`.
+
+Dokumentacja: [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/PLAN.md`](docs/PLAN.md) (etap R8 = Statystyki). Makiety: [`docs/makiety-tabeli.html`](docs/makiety-tabeli.html), [`docs/makiety-statystyki.html`](docs/makiety-statystyki.html).
 
 ## Lokalny build
 

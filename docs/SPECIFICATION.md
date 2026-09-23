@@ -1,9 +1,9 @@
 # SPECIFICATION.md — Rozliczanie kosztów odbiorów
 
-> **Status:** Faza 1 — specyfikacja biznesowa (bez architektury i bez implementacji)  
-> **Ostatnia aktualizacja:** 2026-09-19  
+> **Status:** Faza 1 — specyfikacja biznesowa  
+> **Ostatnia aktualizacja:** 2026-09-23  
 > **Właściciel:** Zespół Zwrotka  
-> **Źródło:** Wytyczne „Aplikacja do rozliczania kosztów odbiorów” + doprecyzowanie względem rejestru transportów Arkusz-mapa + makieta `rozliczenia/docs/makiety-tabeli.html`
+> **Źródło:** Wytyczne „Aplikacja do rozliczania kosztów odbiorów” + doprecyzowanie względem rejestru transportów Arkusz-mapa + makiety `rozliczenia/docs/makiety-tabeli.html` i `rozliczenia/docs/makiety-statystyki.html`
 
 ---
 
@@ -11,9 +11,9 @@
 
 **Co chcemy osiągnąć?**
 
-Osobna aplikacja do rozliczania kosztów odbiorów realizowanych przez podwykonawców i do przypisania tych kosztów do faktury. To nowa aplikacja, nie widok mapy: praca odbywa się na tabeli. Układ dwóch ekranów jest w makiecie. Wykresów nie ma.
+Osobna aplikacja do rozliczania kosztów odbiorów realizowanych przez podwykonawców i do przypisania tych kosztów do faktury. To nowa aplikacja, nie widok mapy: główna praca odbywa się na tabeli. Są **trzy widoki**: Zakres, Zestawienie (po Szukaj) oraz **Statystyki** (raport odczytowy). Baza stawek to okno, nie osobny ekran. Na Zestawieniu wykresów nie ma. Na Statystykach są proste słupki CSS (bez bibliotek wykresów).
 
-Aplikacja nie służy do wpisywania odbiorów. Dane odbioru powstają przy generowaniu protokołu w Arkusz-mapa i leżą na zakładce **Arkusz1**. Tutaj użytkownik wyszukuje nierozliczone pozycje, widzi składniki kosztu, może zmienić stawki i zatwierdza rozliczenie.
+Aplikacja nie służy do wpisywania odbiorów. Dane odbioru powstają przy generowaniu protokołu w Arkusz-mapa i leżą na zakładce **Arkusz1**. Tutaj użytkownik wyszukuje nierozliczone pozycje, widzi składniki kosztu, może zmienić stawki i zatwierdza rozliczenie — albo otwiera Statystyki, żeby zobaczyć KPI i rankingi bez zatwierdzania.
 
 **Dlaczego to robimy?**
 
@@ -27,7 +27,7 @@ Koszt podjazdu, worków i trasy ma być liczony z danych już zapisanych przy pr
 |---------|------|----------|----------|
 | Osoba generująca protokół | Arkusz-mapa | Oznaczyć, że odbiór jest z trasy, podać nazwę trasy i stawkę | Zaznacza „odbiór z trasy”, zostawia ostatnią nazwę albo wpisuje inną, pobiera Word |
 | Osoba utrzymująca stawki | Arkusz-mapa albo aplikacja rozliczeń | Dodać lub zmienić stawkę podjazdu i worka dla sklepu i podwykonawcy | Zapisuje kwoty do bazy stawek z mapy albo z aplikacji rozliczeń |
-| Osoba rozliczająca | Aplikacja rozliczeń | Zebrać nierozliczone odbiory podwykonawcy, w razie potrzeby poprawić stawkę i przypisać jeden numer faktury | Wybiera podwykonawcę i datę końcową, zaznacza wiersze, klika Zatwierdź |
+| Osoba rozliczająca | Aplikacja rozliczeń | Zebrać nierozliczone odbiory podwykonawcy, w razie potrzeby poprawić stawkę i przypisać jeden numer faktury; albo przejrzeć Statystyki | Wybiera podwykonawcę i datę końcową, zaznacza wiersze, klika Zatwierdź; albo otwiera Statystyki z Zakresu |
 
 ---
 
@@ -35,14 +35,15 @@ Koszt podjazdu, worków i trasy ma być liczony z danych już zapisanych przy pr
 
 Dwa obszary aplikacji docelowo:
 
-1. **Na zgłoszenie** — ta specyfikacja.
+1. **Na zgłoszenie** — ta specyfikacja (Zakres, Zestawienie, Statystyki, Baza stawek).
 2. **Harmonogram** — założenia później. W filtrze jest checkbox, ale nie da się go zaznaczyć. Nie ma reguł ani kolumn tego modułu. Wspólne dane to Arkusz1, żeby później nie zakładać drugiego pliku.
 3. **Baza stawek** — wprowadzanie i edycja kwoty za podjazd i za worek. Robi to Arkusz-mapa i aplikacja rozliczeń, ta sama zakładka.
 
 Poza zakresem, świadomie:
 
 - Cofanie rozliczenia i edycja numeru faktury po zatwierdzeniu. W tej wersji tego nie ma.
-- Wykresy i inne wizualizacje składu kosztów. Makieta ich nie ma.
+- Biblioteki wykresów (Chart.js itd.) i wykres składu kosztów na Zestawieniu. Na Statystykach dozwolone są proste słupki CSS.
+- Raport po numerze faktury; lista sklepów bez odbiorów (np. 2 tygodnie); prognoza / trend na przyszłe tygodnie.
 - Wybór technologii aplikacji rozliczeń. Z zachowania nie wynika Symfony, Vue ani PostgreSQL.
 
 ---
@@ -283,21 +284,23 @@ Usuwanie wiersza stawki nie jest w tej wersji, poza rozstrzygnięciem remisu: [B
 
 ## Moduł „Na zgłoszenie”
 
-Aplikacja rozliczeń jest nowa i osobna od mapy Arkusz-mapa. Nie pokazuje mapy. Główna praca to tabela pozycji do rozliczenia, filtr, edycja stawek i zatwierdzenie.
+Aplikacja rozliczeń jest nowa i osobna od mapy Arkusz-mapa. Nie pokazuje mapy. Główna praca to tabela pozycji do rozliczenia, filtr, edycja stawek i zatwierdzenie. Osobny widok **Statystyki** jest tylko do odczytu — [Statystyki](#statystyki).
 
-Pola, kolumny, checkboxy i sumy opisane niżej są wymagane. Układ ekranu jest w [Układ ekranu](#układ-ekranu). Wykresu nie wolno dodać przy implementacji.
+Pola, kolumny, checkboxy i sumy opisane niżej są wymagane. Układ ekranu jest w [Układ ekranu](#układ-ekranu). Na Zestawieniu wykresu składu kosztów nie wolno dodać. Na Statystykach dozwolone są proste słupki CSS (bez Chart.js i podobnych).
 
-Gdy cokolwiek się ładuje — wyszukanie, zapis stawek, zatwierdzenie poniżej 10 000 zł — widać tylko ikonę z `rozliczenia/logo.png`, bez spinnera i bez napisu obok znaku. To paragon z pomarańczowym haczykiem. Nie ma wersji z napisem ani innych znaków. Ikona pulsuje tak jak logo ładowania w Arkusz-mapa: 1,2 s, `ease-in-out`, w kółko. Na początku i na końcu cyklu skala 1 i pełna krycie. W środku skala 1,12 i krycie 0,55. Pod ikoną krótki komunikat, co trwa. Jednorożec nie zastępuje tego znaku, poza zatwierdzeniem od 10 000 zł.
+Gdy cokolwiek się ładuje — wyszukanie, zapis stawek, zatwierdzenie poniżej 10 000 zł, **odczyt Statystyk** — widać tylko ikonę z `rozliczenia/logo.png`, bez spinnera i bez napisu obok znaku. To paragon z pomarańczowym haczykiem. Nie ma wersji z napisem ani innych znaków. Ikona pulsuje tak jak logo ładowania w Arkusz-mapa: 1,2 s, `ease-in-out`, w kółko. Na początku i na końcu cyklu skala 1 i pełna krycie. W środku skala 1,12 i krycie 0,55. Pod ikoną krótki komunikat, co trwa (np. „Ładuję dane…”). Jednorożec nie zastępuje tego znaku, poza zatwierdzeniem od 10 000 zł.
 
 ### Układ ekranu
 
-Układ jest w makiecie `rozliczenia/docs/makiety-tabeli.html`. Pasek przełączników na górze tej strony nie wchodzi do aplikacji. Kolory, odstępy i typografia biorą się z makiety. Wykresu składu kosztów nie ma.
+Układ Zakresu i Zestawienia jest w makiecie `rozliczenia/docs/makiety-tabeli.html`. Układ Statystyk — w `rozliczenia/docs/makiety-statystyki.html`. Pasek przełączników na górze stron makiet nie wchodzi do aplikacji. Kolory, odstępy i typografia biorą się z makiet. Teksty na Statystykach mają być zrozumiałe bez znajomości kolumn arkusza (język zarządu).
 
-Dwa osobne ekrany. Tabeli na pierwszym nie ma.
+Trzy widoki aplikacji + okno Bazy stawek. Tabeli na Zakresie nie ma. Na Zestawieniu wykresu składu kosztów nie ma.
 
-**Zakres.** Na środku karta. Ikona, nazwa Rozliczenia i tryb Na zgłoszenie. Pod spodem dwa tryby: Na zgłoszenie zaznaczony, Harmonogram widać i nie da się go zaznaczyć. Potem podwykonawca, data początkowa, data końcowa i Szukaj. Baza stawek jest na dole karty. Otwiera okno, nie trzeci ekran. Sklep i podwykonawca są listami, bez wpisu ręcznego: adres z kolumny Adres sklepu rejestru, nazwa krótka z Listy podwykonawców. To nie są pinezki mapy.
+**Zakres.** Na środku karta. Ikona, nazwa Rozliczenia i tryb Na zgłoszenie. Pod spodem dwa tryby: Na zgłoszenie zaznaczony, Harmonogram widać i nie da się go zaznaczyć. Potem podwykonawca, data początkowa, data końcowa i Szukaj. Na dole karty: **Statystyki** (wejście bez Szukaj) oraz **Baza stawek**. Baza stawek otwiera okno, nie osobny ekran. Sklep i podwykonawca są listami, bez wpisu ręcznego: adres z kolumny Adres sklepu rejestru, nazwa krótka z Listy podwykonawców. To nie są pinezki mapy.
 
-**Zestawienie.** Po Szukaj. W nagłówku ikona, zakres (podwykonawca i daty) oraz przycisk Zmień zakres, który wraca do ekranu Zakres. Obok jest Baza stawek. Pod nagłówkiem liczba pozycji w zestawieniu, bez sklepów z rozwinięcia trasy. Potem tabela. Na dole Suma zestawienia, Suma zaznaczonych, numer faktury i Zatwierdź.
+**Zestawienie.** Po Szukaj. W nagłówku ikona, zakres (podwykonawca i daty) oraz przycisk Zmień zakres, który wraca do ekranu Zakres. Obok jest Baza stawek. Przycisku Statystyki na Zestawieniu nie ma. Pod nagłówkiem liczba pozycji w zestawieniu, bez sklepów z rozwinięcia trasy. Potem tabela. Na dole Suma zestawienia, Suma zaznaczonych, numer faktury i Zatwierdź.
+
+**Statystyki.** Z Zakresu. W nagłówku ikona, nazwa Rozliczenia / Statystyki oraz **← Powrót** (wraca do Zakresu). Filtry okresu i podwykonawcy, potem KPI i sekcje raportów. Szczegóły: [Statystyki](#statystyki).
 
 Opcja **tylko za liczbę worków** stoi pod nazwą sklepu przy odbiorze zwykłym, nie w osobnej kolumnie. Na wierszu trasy jej nie ma.
 
@@ -437,6 +440,46 @@ W trakcie zapisu poniżej 10 000 zł widać to samo pulsujące logo co przy każ
 - **Koszt odbioru** — kwota jednego sklepu na ekranie, jak wyżej. Przy trasie na zgrupowanym wierszu zamiast niej jest **Suma trasy**.
 - **Suma zestawienia** — suma kwot wierszy aktualnie pokazanych, także niezaznaczonych. Wiersz sklepu liczy Koszt odbioru. Wiersz trasy liczy Suma trasy, raz, bez doliczania sklepów z rozwinięcia.
 - **Suma zaznaczonych** — to samo, tylko dla wierszy z checkboxem. Aktualizuje się przy zaznaczaniu, jeszcze przed Zatwierdź.
+
+---
+
+## Statystyki
+
+Widok tylko do odczytu. Bez zatwierdzania, bez edycji kosztów i bez okna Bazy stawek. Makieta: `rozliczenia/docs/makiety-statystyki.html`. Wejście: przycisk **Statystyki** na Zakresie (bez Szukaj). Wyjście: **← Powrót** → Zakres.
+
+Teksty na ekranie mają być jasne dla osoby nietechnicznej (np. zarząd): bez liter kolumn arkusza i bez angielskiego żargonu.
+
+### Filtry
+
+| Opcja | Zachowanie |
+|-------|------------|
+| **Bieżący miesiąc** (domyślnie) | od 1. dnia bieżącego miesiąca do dziś (włącznie) |
+| **Poprzednie miesiące** | pełny miesiąc kalendarzowy z listy |
+| **Ostatni kwartał** | pełny poprzedni kwartał kalendarzowy względem dziś |
+| **Dokładny zakres** | od–do (włącznie) |
+
+Dodatkowo: **podwykonawca** (Wszyscy / jeden). Przycisk **Pokaż raport** odświeża dane. W trakcie odczytu — pulsujące logo jak przy Szukaj.
+
+### Bloki raportów
+
+1. **Liczba odbiorów** — zrealizowane w okresie (transport się odbył); każdy sklep osobno; także jeszcze nierozliczone.
+2. **Obsłużone sklepy** — liczba różnych adresów sklepów wśród tych odbiorów.
+3. **Problemy ze stawkami** (KPI) — liczba nierozliczonych z brakiem zapisanej stawki albo konfliktem (kilka stawek w bazie); podział „bez stawki” / „konflikty”.
+4. **Rozliczone w okresie** — liczba + łącznie **Koszt odbioru**.
+5. **Do rozliczenia** — liczba nierozliczonych (odbyte) + szacunek PLN (silnik kosztów jak w zestawieniu). Bez filtra okresu: cały otwarty backlog dla wybranego podwykonawcy (lub wszyscy).
+6. **Średni koszt za worek** — średnia z **Koszt odbioru per worek**; tylko rozliczone, zrealizowane, w których zabrano worki.
+7. **Ile worków zabrano w czasie** — suma ilości worków w tygodniach (lub miesiącach przy długim okresie); rozdział Na zgłoszenie / Harmonogram; tabela + słupki CSS.
+8. **Ile zapłacono w czasie** — suma kosztów rozliczonych w tych samych okresach; ten sam rozdział trybu; tabela + słupki CSS.
+9. **Koszt w przeliczeniu na worek** — 5 najdroższych i 5 najtańszych sklepów (tylko rozliczone z workami).
+10. **Podwykonawcy — kto jest droższy, kto tańszy** — średni koszt odbioru (w przeliczeniu na sklep) oraz średni koszt za worek; top 5; bez odbiorów z zerem worków; pełny sens przy „Wszyscy”.
+11. **Odbiory bez worków** — zrealizowane w okresie z zerową ilością worków (także nierozliczone); **5 pozycji na stronę**.
+12. **Problemy ze stawkami** (tabela szczegółów) — sklep, podwykonawca, data, opis problemu; **5 pozycji na stronę**.
+
+Sekcje da się zwijać; stan w `localStorage`. Przy długim okresie tabela pod wykresem startuje zwinięta.
+
+Do czasu kolumny trybu w rejestrze seria Harmonogram = 0 (wszystko widać jako Na zgłoszenie).
+
+Świadomie poza Statystykami: raport po fakturze, sklepy bez odbiorów, prognoza, porównanie „backlog vs rozliczone” jako osobny wykres, Chart.js.
 
 ---
 

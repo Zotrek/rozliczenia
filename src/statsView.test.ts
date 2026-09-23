@@ -11,9 +11,12 @@ import {
 } from "./stats.js";
 import {
   defaultStatsView,
+  loadSectionsCollapsed,
   loadTablesCollapsed,
+  readStatsFold,
   renderStatsScreen,
   STATS_FOLD_LS_PREFIX,
+  writeStatsFold,
 } from "./statsView.js";
 import { readSettlementStats } from "./statement.js";
 import { statsParams } from "./range.js";
@@ -247,5 +250,31 @@ describe("loadTablesCollapsed", () => {
     expect(loadTablesCollapsed(storage, ["bags"], { bags: false }).bags).toBe(false);
     storage.setItem(STATS_FOLD_LS_PREFIX + "table.bags", "open");
     expect(loadTablesCollapsed(storage, ["bags"], { bags: true }).bags).toBe(false);
+  });
+});
+
+describe("stats fold storage", () => {
+  it("test_readWriteStatsFold_and_loadSectionsCollapsed", () => {
+    const memory = new Map<string, string>();
+    const storage = {
+      getItem: (k: string) => memory.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        memory.set(k, v);
+      },
+      removeItem: (k: string) => {
+        memory.delete(k);
+      },
+      clear: () => memory.clear(),
+      key: () => null,
+      length: 0,
+    } as Storage;
+    expect(readStatsFold(null, "section.bags")).toBeNull();
+    writeStatsFold(null, "section.bags", "closed");
+    writeStatsFold(storage, "section.bags", "closed");
+    expect(readStatsFold(storage, "section.bags")).toBe("closed");
+    expect(loadSectionsCollapsed(storage, ["bags", "costs"])).toEqual({
+      bags: true,
+      costs: false,
+    });
   });
 });

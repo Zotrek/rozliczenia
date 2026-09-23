@@ -19,7 +19,10 @@ import {
   formatSheetDate,
   inSheetDateRange,
   listZeroBagPickups,
+  monthOptionLabel,
   previousQuarterPeriod,
+  rateGapLabel,
+  statsPeriodKindLabel,
   timeBucketGranularity,
   type StatsRow,
 } from "./stats.js";
@@ -720,5 +723,22 @@ describe("aggregateContractorRanks / listZeroBagPickups", () => {
       settled: true,
       receptionCost: 1_500,
     });
+  });
+});
+
+describe("labels", () => {
+  it("test_monthOptionLabel_and_statsPeriodKindLabel", () => {
+    expect(monthOptionLabel("2026-09")).toBe("wrzesień 2026");
+    expect(monthOptionLabel("bad")).toBe("bad");
+    expect(statsPeriodKindLabel("current")).toBe("bieżący miesiąc");
+    expect(statsPeriodKindLabel("quarter")).toBe("ostatni kwartał");
+    expect(statsPeriodKindLabel("prev", "2026-08")).toBe("sierpień 2026");
+    expect(statsPeriodKindLabel("exact")).toBe("dokładny zakres");
+  });
+
+  it("test_rateGapLabel_kinds", () => {
+    expect(rateGapLabel("emptyPickup")).toBe("Brak stawki za dojazd");
+    expect(rateGapLabel("emptyBag")).toBe("Brak stawki za worek");
+    expect(rateGapLabel("tie")).toBe("Konflikt: kilka stawek w bazie");
   });
 });

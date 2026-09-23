@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { costPerBag, divRoundHalfUp, toGrosze } from "./money.js";
+import { costPerBag, divRoundHalfUp, mulGrosze, toGrosze } from "./money.js";
 
 describe("divRoundHalfUp", () => {
   it("test_divRoundHalfUp_100zl_three_shops_3333_grosze", () => {
@@ -35,5 +35,18 @@ describe("toGrosze", () => {
     expect(toGrosze(20)).toBe(2_000);
     expect(toGrosze(33.33)).toBe(3_333);
     expect(toGrosze(0)).toBe(0);
+  });
+});
+
+describe("mulGrosze", () => {
+  it("test_mulGrosze_integer_count_multiplies_unit", () => {
+    expect(mulGrosze(3, 1_000)).toBe(3_000);
+    expect(mulGrosze(0, 1_000)).toBe(0);
+    expect(mulGrosze(3, 0)).toBe(0);
+  });
+
+  it("test_mulGrosze_fractional_count_rounds_half_up", () => {
+    expect(mulGrosze(0.5, 1)).toBe(1);
+    expect(mulGrosze(1.5, 1_000)).toBe(1_500);
   });
 });

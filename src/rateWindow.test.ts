@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { rateContractorNames, rateSaveMessage, readAddressList, resolveStoreAddress, saveRateBody, storeAddressLabel, addressWithCommaAfterLocality } from "./rateWindow.js";
+import { rateContractorNames, rateSaveMessage, readAddressList, resolveStoreAddress, saveRateBody, storeAddressLabel, addressWithCommaAfterLocality, matchingStoreAddresses } from "./rateWindow.js";
 
 const gsPath = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -187,5 +187,23 @@ describe("listStoreAddresses w transport-log.gs", () => {
       { adres: "ul. B", sklep: "Sklep B" },
       { adres: "ul. C", sklep: "Sklep C" },
     ]);
+  });
+});
+
+describe("matchingStoreAddresses", () => {
+  const items = [
+    { address: "Sklepowa 1", shop: "Alpha" },
+    { address: "Lipowa 2", shop: "Beta" },
+  ];
+
+  it("test_matchingStoreAddresses_browsing_or_empty_returns_all", () => {
+    expect(matchingStoreAddresses(items, "xyz", true)).toEqual(items);
+    expect(matchingStoreAddresses(items, "", false)).toEqual(items);
+  });
+
+  it("test_matchingStoreAddresses_fragment_of_address_or_shop", () => {
+    expect(matchingStoreAddresses(items, "lip", false)).toEqual([items[1]]);
+    expect(matchingStoreAddresses(items, "alp", false)).toEqual([items[0]]);
+    expect(matchingStoreAddresses(items, "zzz", false)).toEqual([]);
   });
 });

@@ -16,6 +16,7 @@ import {
   rangeLabel,
   readWebAppUrl,
   selectMode,
+  modeLabel,
   resolveContractorText,
   resolveListText,
   screenAfterApprove,
@@ -191,6 +192,8 @@ describe("screens", () => {
     expect(openRatesWindow("stats")).toEqual({ screen: "stats", window: "rates" });
     expect(selectMode("report")).toEqual({ report: true, schedule: false });
     expect(selectMode("schedule")).toEqual({ report: false, schedule: true });
+    expect(modeLabel("report")).toBe("Na zgłoszenie");
+    expect(modeLabel("schedule")).toBe("Harmonogram");
   });
 });
 

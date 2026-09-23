@@ -11,17 +11,38 @@ import {
   attachDecision,
   bagsBody,
   buildApprove,
+  canPressApprove,
+  commitAttach,
+  commitBags,
   commitDetach,
+  commitRouteRate,
   currentStatement,
+  detachBody,
+  findRow,
+  formatAmountInput,
   freshStatement,
+  groszeToZlotyText,
+  lineHasTie,
   parseAmountText,
+  parseBagText,
+  positionLabel,
   readSettlement,
   routeRateBody,
   routeSelectionKey,
+  selectedKeys,
+  selectedLineCount,
   setBagRate,
   setBagsOnly,
   setDidNotHappen,
   setPickup,
+  setRouteBagRate,
+  skippedCount,
+  statementSums,
+  tieBody,
+  toggleOpen,
+  toggleSelected,
+  withoutTiedRates,
+  writeError,
   type StatementScreen,
 } from "./statement.js";
 
@@ -284,5 +305,141 @@ describe("readSettlement", () => {
       expect(read.rows[0].pickupRate).toBeNull();
       expect(read.rates[0].sheetRow).toBe(8);
     }
+  });
+});
+
+describe("labels and parsers", () => {
+  it("test_positionLabel_polish_plural", () => {
+    expect(positionLabel(1)).toBe("1 pozycja w zestawieniu");
+    expect(positionLabel(2)).toBe("2 pozycje w zestawieniu");
+    expect(positionLabel(5)).toBe("5 pozycji w zestawieniu");
+    expect(positionLabel(22)).toBe("22 pozycje w zestawieniu");
+    expect(positionLabel(12)).toBe("12 pozycji w zestawieniu");
+  });
+
+  it("test_formatAmountInput_and_groszeToZlotyText", () => {
+    expect(formatAmountInput(3_333)).toBe("33,33");
+    expect(groszeToZlotyText(3_333)).toBe("33.33");
+    expect(groszeToZlotyText(0)).toBe("0.00");
+  });
+
+  it("test_parseBagText_empty_count_and_bad", () => {
+    expect(parseBagText("")).toEqual({ kind: "empty" });
+    expect(parseBagText("6")).toEqual({ kind: "count", value: 6 });
+    expect(parseBagText("1.5")).toEqual({ kind: "count", value: 1.5 });
+    expect(parseBagText("-1").kind).toBe("bad");
+    expect(parseBagText("x").kind).toBe("bad");
+  });
+
+  it("test_canPressApprove_needs_invoice_and_selection", () => {
+    expect(canPressApprove("", 1)).toBe(false);
+    expect(canPressApprove("FV/1", 0)).toBe(false);
+    expect(canPressApprove(" FV/1 ", 2)).toBe(true);
+  });
+});
+
+describe("selection and open routes", () => {
+  it("test_toggleSelected_and_selectedKeys", () => {
+    const base = screen([row({ sheetRow: 2 })]);
+    const on = toggleSelected(base, "2\t2");
+    expect(selectedKeys(on.selected).has("2\t2")).toBe(true);
+    const off = toggleSelected(on, "2\t2");
+    expect(off.selected["2\t2"]).toBeUndefined();
+  });
+
+  it("test_toggleOpen_and_selectedLineCount", () => {
+    const base = screen(
+      [
+        row({ sheetRow: 2, address: "A", routeName: "trasa", routeRate: 15_000 }),
+        row({ sheetRow: 3, address: "B", routeName: "trasa", routeRate: 15_000 }),
+      ],
+      [rate({ sheetRow: 2, shop: "A" }), rate({ sheetRow: 3, shop: "B" })],
+    );
+    const open = toggleOpen(base, "trasa");
+    expect(open.openRoutes.trasa).toBe(true);
+    expect(toggleOpen(open, "trasa").openRoutes.trasa).toBeUndefined();
+    const statement = currentStatement(base);
+    expect(selectedLineCount(statement, { [routeSelectionKey("trasa")]: true })).toBe(1);
+  });
+});
+
+describe("route edits and commits", () => {
+  it("test_setRouteBagRate_skips_didNotHappen_shops", () => {
+    const base = setDidNotHappen(
+      screen(
+        [
+          row({ sheetRow: 2, address: "A", routeName: "trasa", routeRate: 15_000, bagCount: 1 }),
+          row({ sheetRow: 3, address: "B", routeName: "trasa", routeRate: 15_000, bagCount: 1 }),
+        ],
+        [rate({ sheetRow: 2, shop: "A" }), rate({ sheetRow: 3, shop: "B" })],
+      ),
+      2,
+      "2",
+      true,
+    );
+    const next = setRouteBagRate(base, "trasa", 250);
+    expect(next.screenByRow["2\t2"]?.bagAmount).toBeUndefined();
+    expect(next.screenByRow["3\t3"]?.bagAmount).toBe(250);
+  });
+
+  it("test_commitBags_and_commitRouteRate_update_rows", () => {
+    const base = screen(
+      [
+        row({ sheetRow: 2, address: "A", routeName: "trasa", routeRate: 15_000, bagCount: 1 }),
+        row({ sheetRow: 3, address: "B", routeName: "trasa", routeRate: 15_000, bagCount: 2 }),
+      ],
+      [rate({ sheetRow: 2, shop: "A" }), rate({ sheetRow: 3, shop: "B" })],
+    );
+    expect(commitBags(base, 2, "2", 9).rows[0].bagCount).toBe(9);
+    expect(commitRouteRate(base, "trasa", 20_000).rows.every((r) => r.routeRate === 20_000)).toBe(true);
+  });
+
+  it("test_commitAttach_propagates_rate_and_clears_draft", () => {
+    const base = {
+      ...screen([row({ sheetRow: 2, routeName: "" }), row({ sheetRow: 3, routeName: "nowa", routeRate: 1_000 })]),
+      leftRoute: { "2\t2": "stara" },
+      routeDraft: { "2\t2": { name: "nowa", rate: "50" } },
+      routeDraftError: { "2\t2": "x" },
+    };
+    const next = commitAttach(base, 2, "2", "nowa", 5_000);
+    expect(next?.rows[0].routeName).toBe("nowa");
+    expect(next?.rows[0].routeRate).toBe(5_000);
+    expect(next?.rows[1].routeRate).toBe(5_000);
+    expect(next?.leftRoute["2\t2"]).toBeUndefined();
+    expect(next?.routeDraft["2\t2"]).toBeUndefined();
+    expect(next?.routeDraftError["2\t2"]).toBeUndefined();
+  });
+
+  it("test_findRow_detachBody_tieBody_withoutTiedRates", () => {
+    const rows = [row({ sheetRow: 2, transportNumber: "P2", routeName: "trasa" })];
+    expect(findRow(rows, 2, "P2")?.transportNumber).toBe("P2");
+    expect(findRow(rows, 2, "x")).toBeNull();
+    expect(detachBody(rows[0])).toEqual({
+      action: "detachRoute",
+      sheetRow: 2,
+      transportNumber: "P2",
+    });
+    expect(tieBody(8)).toEqual({ action: "resolveRateTie", sheetRow: 8 });
+    const rates = [
+      rate({ sheetRow: 8, shop: "A", validFrom: "01.01.2026" }),
+      rate({ sheetRow: 9, shop: "A", validFrom: "01.01.2026", pickupAmount: 3_000 }),
+      rate({ sheetRow: 10, shop: "A", validFrom: "01.06.2026" }),
+    ];
+    expect(withoutTiedRates(rates, 8).map((r) => r.sheetRow)).toEqual([8, 10]);
+  });
+
+  it("test_statementSums_skippedCount_writeError_lineHasTie", () => {
+    const base = screen([row({ sheetRow: 2, bagCount: 1, bagRate: 1_000 })], [
+      rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 }),
+    ]);
+    const selected = toggleSelected(base, "2\t2");
+    expect(statementSums(selected)).toEqual({ total: 3_000, selected: 3_000 });
+    expect(skippedCount({ pominiete: [1, 2] })).toBe(2);
+    expect(skippedCount({})).toBe(0);
+    expect(writeError("bags")).toBe(STATEMENT_ERROR.badBags);
+    expect(writeError("key")).toBe(STATEMENT_ERROR.stale);
+    expect(writeError("unknown")).toBe(STATEMENT_ERROR.write);
+    const statement = currentStatement(base);
+    expect(lineHasTie(statement.lines[0])).toBe(false);
   });
 });

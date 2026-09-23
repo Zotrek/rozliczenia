@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Makieta — Statystyki rozliczeń</title>
+  <style>
+    :root {
+      --bg: #e7eeee;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: rgba(148, 163, 184, 0.45);
+      --teal: #0d9488;
+      --teal-deep: #0f766e;
+      --teal-soft: rgba(13, 148, 136, 0.12);
+      --orange: #ea580c;
+      --orange-deep: #c2410c;
+      --rose: #e11d48;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.06);
+      --font: system-ui, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: var(--font);
+      color: var(--ink);
+      background: var(--bg);
+    }
+    button, input, select { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 2px;
+    }
+    .chrome {
+      flex: none;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      padding: 12px 18px 14px;
+    }
+    .kicker {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--teal-deep);
+    }
+    .chrome h1 { margin: 2px 0 4px; font-size: 18px; }
+    .chrome .lead { margin: 0 0 8px; max-width: 56rem; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .chrome-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+    .chrome-row span { font-size: 12px; font-weight: 700; color: var(--muted); min-width: 4.5rem; }
+    .chrome button {
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .chrome button.is-on { background: var(--teal); border-color: var(--teal); color: #fff; }
+    details { margin-top: 6px; font-size: 13px; color: #334155; max-width: 56rem; }
+    details summary { cursor: pointer; color: var(--teal-deep); font-weight: 650; }
+    details ul { margin: 6px 0 0; padding-left: 18px; }
+    .stage { flex: 1; min-height: 0; padding: 12px 16px 16px; }
+    .app {
+      max-width: 1100px;
+      margin: 0 auto;
+      min-height: calc(100vh - 220px);
+      background: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .screen { display: none; flex: 1; min-height: 0; flex-direction: column; }
+    .screen.is-on { display: flex; }
+
+    /* —— Zakres (pierwsza strona) —— */
+    .setup {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      background:
+        radial-gradient(ellipse at top, rgba(13, 148, 136, 0.08), transparent 55%),
+        #fff;
+    }
+    .setup-card {
+      width: min(420px, 100%);
+      padding: 22px 22px 18px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand .mark {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: linear-gradient(145deg, var(--teal), var(--teal-deep));
+      flex: none;
+    }
+    .brand strong { display: block; font-size: 15px; }
+    .brand em { display: block; font-style: normal; font-size: 12px; color: var(--muted); font-weight: 600; }
+    .setup-card h2 { margin: 14px 0 4px; font-size: 18px; }
+    .setup-card > .hint {
+      margin: 0 0 12px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 550;
+      line-height: 1.4;
+    }
+    .modes {
+      display: flex;
+      padding: 3px;
+      border-radius: 10px;
+      background: rgba(148, 163, 184, 0.16);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      margin: 0 0 14px;
+    }
+    .mode {
+      flex: 1;
+      text-align: center;
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+    }
+    .mode.is-on { background: var(--teal); color: #fff; }
+    .mode.is-off { color: #94a3b8; }
+    .setup-fields { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+    .field input, .field select {
+      font-weight: 550;
+      color: var(--ink);
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.55);
+      background: #fff;
+      width: 100%;
+    }
+    .btn-teal, .btn-ghost {
+      border-radius: 10px;
+      padding: 9px 14px;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .btn-teal { border: none; background: var(--teal); color: #fff; width: 100%; }
+    .btn-teal:hover { background: var(--teal-deep); }
+    .btn-ghost {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+    }
+    .btn-ghost:hover { background: var(--teal-soft); border-color: transparent; color: var(--teal-deep); }
+    .setup-foot {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .setup-foot .btn-ghost { flex: 1 1 auto; min-width: 7.5rem; }
+
+    /* —— Statystyki —— */
+    .top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .top .brand { margin-right: auto; }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: flex-end;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #f8fafc;
+    }
+    .filters .field input,
+    .filters .field select { min-width: 9rem; width: auto; }
+    .filters .btn-teal { width: auto; }
+    .period-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .chip {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 650;
+      color: #334155;
+    }
+    .chip.is-on {
+      background: var(--teal-soft);
+      border-color: transparent;
+      color: var(--teal-deep);
+    }
+    .exact-range { display: none; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    .exact-range.is-on { display: flex; }
+    .month-pick { display: none; }
+    .month-pick.is-on { display: flex; }
+    .body {
+      flex: 1;
+      overflow: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .period-label {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 650;
+    }
+    .period-label strong { color: var(--ink); }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    @media (max-width: 900px) {
+      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .kpi {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+    .kpi span {
+      display: block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .kpi b {
+      display: block;
+      font-size: 22px;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
+    }
+    .kpi em {
+      display: block;
+      margin-top: 4px;
+      font-style: normal;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 550;
+    }
+    .kpi.warn b { color: var(--orange-deep); }
+    .kpi.ok b { color: var(--teal-deep); }
+    .section {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .section-h {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: #f8fafc;
+    }
+    .section-h h2 { margin: 0; font-size: 14px; }
+    .section-h p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 550;
+    }
+    .section-b { padding: 12px 14px; }
+    .mode-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    @media (max-width: 640px) {
+      .mode-split { grid-template-columns: 1fr; }
+    }
+    .mode-card {
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    .mode-card.is-na { background: var(--teal-soft); border-color: transparent; }
+    .mode-card.is-h { background: #ffedd5; border-color: transparent; }
+    .mode-card .label {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .mode-card.is-na .label { color: var(--teal-deep); }
+    .mode-card.is-h .label { color: #9a3412; }
+    .mode-card .vals {
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 18px;
+      font-variant-numeric: tabular-nums;
+    }
+    .mode-card .vals strong { font-size: 18px; }
+    .mode-card .vals span { display: block; font-size: 11px; color: var(--muted); font-weight: 650; }
+    .split-bar {
+      display: flex;
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #e2e8f0;
+      margin-bottom: 8px;
+    }
+    .split-bar i { display: block; height: 100%; }
+    .c-na { background: var(--teal); }
+    .c-h { background: var(--orange); }
+    .split-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-size: 12px;
+      color: #334155;
+    }
+    .split-legend i {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 99px;
+      margin-right: 4px;
+    }
+    .note {
+      margin: 10px 0 0;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: #fff7ed;
+      color: #9a3412;
+      font-size: 12px;
+      font-weight: 550;
+      line-height: 1.4;
+    }
+    .bags-grid {
+      display: grid;
+      grid-template-columns: 180px 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 900px) {
+      .bags-grid { grid-template-columns: 1fr; }
+    }
+    .avg-box {
+      padding: 14px;
+      border-radius: 12px;
+      background: var(--teal-soft);
+      text-align: center;
+    }
+    .avg-box span {
+      display: block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--teal-deep);
+    }
+    .avg-box b {
+      display: block;
+      margin-top: 6px;
+      font-size: 28px;
+      font-variant-numeric: tabular-nums;
+      color: var(--teal-deep);
+    }
+    .avg-box em {
+      display: block;
+      margin-top: 4px;
+      font-style: normal;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .rank h3 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .rank.hi h3 { color: var(--orange-deep); }
+    .rank.lo h3 { color: var(--teal-deep); }
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      font-size: 11px;
+      letter-spacing: 0.02em;
+      color: var(--muted);
+      background: #f8fafc;
+      font-weight: 700;
+    }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.shop { font-weight: 700; white-space: normal; }
+    .sub { display: block; font-size: 12px; font-weight: 550; color: var(--muted); }
+    .tag {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .tag-na { background: var(--teal-soft); color: var(--teal-deep); }
+    .tag-h { background: #ffedd5; color: #9a3412; }
+    .tag-gap { background: #ffe4e6; color: var(--rose); }
+    .tag-tie { background: #fef3c7; color: #92400e; }
+    tr:last-child td { border-bottom: none; }
+    .money { font-variant-numeric: tabular-nums; font-weight: 650; }
+    .money.hi { color: var(--orange-deep); }
+    .money.lo { color: var(--teal-deep); }
+  </style>
+</head>
+<body>
+  <header class="chrome">
+    <div class="kicker">Makieta · przed implementacją</div>
+    <h1>Statystyki — wejście z Zakresu i powrót</h1>
+    <p class="lead">
+      Na pierwszej stronie (<strong>Zakres</strong>) przycisk <strong>Statystyki</strong> obok Bazy stawek.
+      Na Statystykach przycisk <strong>← Powrót</strong> wraca do Zakresu.
+      Ta sama nawigacja jest też w <a href="makiety-tabeli.html">makiety-tabeli.html</a>.
+    </p>
+    <div class="chrome-row">
+      <span>Ekran</span>
+      <button type="button" class="is-on" data-chrome="range">1 · Zakres</button>
+      <button type="button" data-chrome="stats">2 · Statystyki</button>
+    </div>
+    <details>
+      <summary>Założenia tej makiety</summary>
+      <ul>
+        <li>Wejście: Zakres → Statystyki (przycisk ghost, jak Baza stawek).</li>
+        <li>Powrót: Statystyki → Zakres (← Powrót w nagłówku).</li>
+        <li>Okres domyślny: bieżący miesiąc · worki: kol. Q · bez sklepów bez odbiorów.</li>
+        <li>Tryb Na zgłoszenie / Harmonogram — docelowo; dziś brak kolumny w rejestrze.</li>
+      </ul>
+    </details>
+  </header>
+
+  <main class="stage">
+    <div class="app" id="app">
+
+      <!-- Ekran 1: Zakres -->
+      <div class="screen is-on" id="screen-range" data-screen="range">
+        <div class="setup">
+          <div class="setup-card">
+            <div class="brand">
+              <div class="mark" aria-hidden="true"></div>
+              <div>
+                <strong>Rozliczenia</strong>
+                <em>Na zgłoszenie</em>
+              </div>
+            </div>
+            <h2>Zakres rozliczenia</h2>
+            <p class="hint">Ustal, czego dotyczy to rozliczenie. Statystyki otwierasz bez Szukaj — osobny widok.</p>
+            <div class="modes" role="group" aria-label="Tryb">
+              <div class="mode is-on">Na zgłoszenie</div>
+              <div class="mode is-off" title="W tej wersji niedostępne">Harmonogram</div>
+            </div>
+            <div class="setup-fields">
+              <div class="field">
+                <label for="r-who">Podwykonawca</label>
+                <input id="r-who" type="text" value="Transport Plus" readonly>
+              </div>
+              <div class="field">
+                <label for="r-from">Data początkowa</label>
+                <input id="r-from" type="date" value="2026-09-01">
+              </div>
+              <div class="field">
+                <label for="r-to">Data końcowa</label>
+                <input id="r-to" type="date" value="2026-09-23">
+              </div>
+            </div>
+            <button type="button" class="btn-teal" disabled title="Makieta: Szukaj prowadzi do Zestawienia (makiety-tabeli)">Szukaj</button>
+            <div class="setup-foot">
+              <button type="button" class="btn-ghost" data-go="stats">Statystyki</button>
+              <button type="button" class="btn-ghost" disabled title="Makieta: okno Baza stawek w makiety-tabeli">Baza stawek</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ekran 2: Statystyki -->
+      <div class="screen" id="screen-stats" data-screen="stats">
+        <div class="top">
+          <div class="brand">
+            <div class="mark" aria-hidden="true"></div>
+            <div>
+              <strong>Rozliczenia</strong>
+              <em>Statystyki</em>
+            </div>
+          </div>
+          <button type="button" class="btn-ghost" data-go="range">← Powrót</button>
+        </div>
+
+        <div class="filters">
+          <div class="field" style="flex: 1 1 100%;">
+            <span>Okres</span>
+            <div class="period-chips" role="group" aria-label="Okres">
+              <button type="button" class="chip is-on" data-period="current">Bieżący miesiąc</button>
+              <button type="button" class="chip" data-period="prev">Poprzednie miesiące</button>
+              <button type="button" class="chip" data-period="quarter">Ostatni kwartał</button>
+              <button type="button" class="chip" data-period="exact">Dokładny zakres</button>
+            </div>
+          </div>
+
+          <div class="field month-pick" id="month-pick">
+            <label for="month">Miesiąc</label>
+            <select id="month">
+              <option>sierpień 2026</option>
+              <option>lipiec 2026</option>
+              <option>czerwiec 2026</option>
+              <option>maj 2026</option>
+            </select>
+          </div>
+
+          <div class="exact-range" id="exact-range">
+            <div class="field">
+              <label for="from">Od</label>
+              <input id="from" type="date" value="2026-09-01">
+            </div>
+            <div class="field">
+              <label for="to">Do</label>
+              <input id="to" type="date" value="2026-09-23">
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="who">Podwykonawca</label>
+            <select id="who">
+              <option>Wszyscy</option>
+              <option selected>Transport Plus</option>
+              <option>EcoRide</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="mode">Tryb</label>
+            <select id="mode">
+              <option selected>Wszystkie</option>
+              <option>Na zgłoszenie</option>
+              <option>Harmonogram</option>
+            </select>
+          </div>
+
+          <button type="button" class="btn-teal">Pokaż</button>
+        </div>
+
+        <div class="body">
+          <p class="period-label" id="period-label">
+            Okres: <strong>1.09.2026 – 23.09.2026</strong> (bieżący miesiąc) · podwykonawca: <strong>Transport Plus</strong>
+          </p>
+
+          <div class="kpi-grid">
+            <div class="kpi warn">
+              <span>Backlog nierozliczonych</span>
+              <b>47</b>
+              <em>szacunek 12&nbsp;480,00&nbsp;zł</em>
+            </div>
+            <div class="kpi ok">
+              <span>Rozliczone w okresie</span>
+              <b>128</b>
+              <em>suma 34&nbsp;210,00&nbsp;zł</em>
+            </div>
+            <div class="kpi">
+              <span>Średnia za worek (Q)</span>
+              <b>18,40&nbsp;zł</b>
+              <em>z 126 pozycji z workami &gt; 0</em>
+            </div>
+            <div class="kpi warn">
+              <span>Luki w stawkach</span>
+              <b>9</b>
+              <em>6 pustych snapshotów · 3 remisy</em>
+            </div>
+          </div>
+
+          <section class="section">
+            <div class="section-h">
+              <h2>Na zgłoszenie vs Harmonogram</h2>
+              <p>Udział w rozliczonych kosztach w okresie</p>
+            </div>
+            <div class="section-b">
+              <div class="split-bar" aria-hidden="true">
+                <i class="c-na" style="width: 78%"></i>
+                <i class="c-h" style="width: 22%"></i>
+              </div>
+              <ul class="split-legend">
+                <li><i class="c-na"></i> Na zgłoszenie — 78% · 26&nbsp;680,00&nbsp;zł · 96 poz.</li>
+                <li><i class="c-h"></i> Harmonogram — 22% · 7&nbsp;530,00&nbsp;zł · 32 poz.</li>
+              </ul>
+              <div class="mode-split">
+                <div class="mode-card is-na">
+                  <div class="label">Na zgłoszenie</div>
+                  <div class="vals">
+                    <div><span>Pozycje</span><strong>96</strong></div>
+                    <div><span>Koszt</span><strong>26&nbsp;680&nbsp;zł</strong></div>
+                    <div><span>Śr. Q</span><strong>19,10&nbsp;zł</strong></div>
+                  </div>
+                </div>
+                <div class="mode-card is-h">
+                  <div class="label">Harmonogram</div>
+                  <div class="vals">
+                    <div><span>Pozycje</span><strong>32</strong></div>
+                    <div><span>Koszt</span><strong>7&nbsp;530&nbsp;zł</strong></div>
+                    <div><span>Śr. Q</span><strong>16,20&nbsp;zł</strong></div>
+                  </div>
+                </div>
+              </div>
+              <p class="note">
+                Uwaga: w obecnym rejestrze nie ma kolumny trybu.
+                Do czasu Harmonogramu ten blok = 100% „Na zgłoszenie” albo ukryty.
+              </p>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-h">
+              <h2>Koszt odbioru per worek (kol. Q)</h2>
+              <p>Tylko rozliczone, odbyte, worki &gt; 0 · top 5</p>
+            </div>
+            <div class="section-b">
+              <div class="bags-grid">
+                <div class="avg-box">
+                  <span>Średnia Q</span>
+                  <b>18,40&nbsp;zł</b>
+                  <em>126 pozycji</em>
+                </div>
+                <div class="rank hi">
+                  <h3>Najdroższe</h3>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Sklep</th>
+                        <th class="num">Q</th>
+                        <th>Tryb</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td class="shop">ul. Lipowa 12, Kraków<span class="sub">12.09 · 4 worki · EcoRide</span></td>
+                        <td class="num money hi">42,50&nbsp;zł</td>
+                        <td><span class="tag tag-na">Na zgłoszenie</span></td>
+                      </tr>
+                      <tr>
+                        <td class="shop">al. 3 Maja 8, Tarnów<span class="sub">08.09 · 2 worki · Transport Plus</span></td>
+                        <td class="num money hi">38,00&nbsp;zł</td>
+                        <td><span class="tag tag-h">Harmonogram</span></td>
+                      </tr>
+                      <tr>
+                        <td class="shop">ul. Kolejowa 3, Bochnia<span class="sub">15.09 · 3 worki · Transport Plus</span></td>
+                        <td class="num money hi">35,20&nbsp;zł</td>
+                        <td><span class="tag tag-na">Na zgłoszenie</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="rank lo">
+                  <h3>Najtańsze</h3>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Sklep</th>
+                        <th class="num">Q</th>
+                        <th>Tryb</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td class="shop">ul. Zielona 2, Kraków<span class="sub">10.09 · 12 worków · Transport Plus</span></td>
+                        <td class="num money lo">6,20&nbsp;zł</td>
+                        <td><span class="tag tag-h">Harmonogram</span></td>
+                      </tr>
+                      <tr>
+                        <td class="shop">ul. Długa 44, Skawina<span class="sub">14.09 · 8 worków · EcoRide</span></td>
+                        <td class="num money lo">7,50&nbsp;zł</td>
+                        <td><span class="tag tag-na">Na zgłoszenie</span></td>
+                      </tr>
+                      <tr>
+                        <td class="shop">os. Piastów 7, Kraków<span class="sub">05.09 · 10 worków · Transport Plus</span></td>
+                        <td class="num money lo">8,10&nbsp;zł</td>
+                        <td><span class="tag tag-h">Harmonogram</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-h">
+              <h2>Luki w stawkach</h2>
+              <p>Puste snapshoty albo remis w Bazie stawek · nierozliczone</p>
+            </div>
+            <div class="section-b" style="padding: 0;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Sklep</th>
+                    <th>Podwykonawca</th>
+                    <th>Data</th>
+                    <th>Problem</th>
+                    <th>Tryb</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="shop">ul. Nowa 5, Kraków<span class="sub">Biedronka · Nowa Huta</span></td>
+                    <td>Transport Plus</td>
+                    <td>18.09.2026</td>
+                    <td><span class="tag tag-gap">Brak stawki podjazdu</span></td>
+                    <td><span class="tag tag-na">Na zgłoszenie</span></td>
+                  </tr>
+                  <tr>
+                    <td class="shop">al. Pokoju 22, Kraków</td>
+                    <td>EcoRide</td>
+                    <td>11.09.2026</td>
+                    <td><span class="tag tag-tie">Remis w Bazie stawek</span></td>
+                    <td><span class="tag tag-h">Harmonogram</span></td>
+                  </tr>
+                  <tr>
+                    <td class="shop">ul. Przemysłowa 9, Niepołomice</td>
+                    <td>Transport Plus</td>
+                    <td>20.09.2026</td>
+                    <td><span class="tag tag-gap">Brak stawki worka</span></td>
+                    <td><span class="tag tag-na">Na zgłoszenie</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      var screens = {
+        range: document.getElementById("screen-range"),
+        stats: document.getElementById("screen-stats")
+      };
+      var chromeBtns = document.querySelectorAll("[data-chrome]");
+
+      function show(name) {
+        Object.keys(screens).forEach(function (key) {
+          screens[key].classList.toggle("is-on", key === name);
+        });
+        chromeBtns.forEach(function (btn) {
+          btn.classList.toggle("is-on", btn.getAttribute("data-chrome") === name);
+        });
+      }
+
+      document.querySelectorAll("[data-go]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          show(btn.getAttribute("data-go"));
+        });
+      });
+      chromeBtns.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          show(btn.getAttribute("data-chrome"));
+        });
+      });
+
+      if (location.hash === "#stats") show("stats");
+
+      var chips = document.querySelectorAll("[data-period]");
+      var monthPick = document.getElementById("month-pick");
+      var exact = document.getElementById("exact-range");
+      var label = document.getElementById("period-label");
+      var labels = {
+        current: "Okres: <strong>1.09.2026 – 23.09.2026</strong> (bieżący miesiąc) · podwykonawca: <strong>Transport Plus</strong>",
+        prev: "Okres: <strong>1.08.2026 – 31.08.2026</strong> (sierpień 2026) · podwykonawca: <strong>Transport Plus</strong>",
+        quarter: "Okres: <strong>1.04.2026 – 30.06.2026</strong> (ostatni kwartał) · podwykonawca: <strong>Transport Plus</strong>",
+        exact: "Okres: <strong>dokładny zakres od–do</strong> · podwykonawca: <strong>Transport Plus</strong>"
+      };
+      chips.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          chips.forEach(function (b) { b.classList.remove("is-on"); });
+          btn.classList.add("is-on");
+          var p = btn.getAttribute("data-period");
+          monthPick.classList.toggle("is-on", p === "prev");
+          exact.classList.toggle("is-on", p === "exact");
+          label.innerHTML = labels[p] || labels.current;
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

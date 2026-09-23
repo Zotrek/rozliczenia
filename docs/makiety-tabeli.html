@@ -385,7 +385,7 @@
     .picker-list button:hover { background: var(--teal-soft); }
     .picker-empty { margin: 4px 0 0; }
     .setup .btn-teal { margin-top: 8px; }
-    .setup-foot { display: flex; justify-content: flex-end; margin-top: 12px; }
+    .setup-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
     .range { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin-right: auto; }
     .range span { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
     .range strong { font-size: 14px; font-weight: 700; }
@@ -432,6 +432,7 @@
             <li>Ekran 2 pokazuje pozycje, sumy i zatwierdzenie. Zakres widać w nagłówku, zmiana wraca do ekranu 1.</li>
             <li>Bez wykresu. „Tylko za liczbę worków” stoi pod nazwą sklepu, nie na trasie.</li>
             <li>Baza stawek jest oknem. Sklep to lista adresów z rejestru, podwykonawca to nazwa krótka z Listy podwykonawców. Nie pinezki mapy.</li>
+            <li>Na ekranie Zakres jest przycisk <strong>Statystyki</strong> (obok Bazy stawek) — makieta: <a href="makiety-statystyki.html">makiety-statystyki.html</a>.</li>
             <li>Remis stawek jest na wierszu z błędem w zestawieniu, nie w tym oknie. Makieta tego nie rysuje.</li>
           </ul>
         </div>
@@ -781,6 +782,9 @@
     function ratesBtn() {
       return '<button type="button" class="btn-ghost" data-action="rates">Baza stawek</button>';
     }
+    function statsBtn() {
+      return '<button type="button" class="btn-ghost" data-action="stats" title="Makieta: otwiera widok Statystyki">Statystyki</button>';
+    }
     function dash() {
       return '<span class="muted">—</span>';
     }
@@ -1045,7 +1049,7 @@
         + modes()
         + '<div class="filters setup-fields">' + filterFields() + '</div>'
         + '<button type="button" class="btn-teal" data-action="search">Szukaj</button>'
-        + '<div class="setup-foot">' + ratesBtn() + '</div>'
+        + '<div class="setup-foot">' + statsBtn() + ratesBtn() + '</div>'
         + '</div></div>';
     }
     function screenData() {
@@ -1186,6 +1190,8 @@
       } else if (action === 'rates') {
         state.ratesOpen = true;
         paint();
+      } else if (action === 'stats') {
+        window.location.href = 'makiety-statystyki.html#stats';
       } else if (action === 'close-rates') {
         state.ratesOpen = false;
         paint();

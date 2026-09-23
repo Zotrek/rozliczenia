@@ -27,6 +27,8 @@ export type RangeError = keyof typeof RANGE_ERROR;
 
 export type ScreenId = "range" | "statement" | "stats";
 
+export type SettlementMode = "report" | "schedule";
+
 export interface RangeFields {
   /** Nazwa krótka z listy albo pusty tekst, gdy wpis nie jest pozycją listy. */
   contractor: string;
@@ -52,6 +54,8 @@ export interface StartedSearch {
   dataOd?: string;
   /** Tekst `dd.mm.yyyy`. Granica włącznie. */
   dataDo: string;
+  /** Domyślnie Na zgłoszenie. Harmonogram czyta Baza cen + odebrane. */
+  tryb?: SettlementMode;
 }
 
 export interface BlockedSearch {
@@ -183,6 +187,7 @@ export function fieldsForSearch(draft: RangeDraft): RangeFields {
 export function startSearch(
   fields: RangeFields,
   list: readonly ContractorListItem[],
+  mode: SettlementMode = "report",
 ): StartedSearch | BlockedSearch {
   const picked = selectedContractor(list, fields.contractor);
   if (!picked) {
@@ -197,9 +202,9 @@ export function startSearch(
     if (!dataOd || compareSheetDate(dataOd, dataDo) > 0) {
       return { ok: false, error: "order" };
     }
-    return { ok: true, podwykonawca: picked.nazwa, dataOd, dataDo };
+    return { ok: true, podwykonawca: picked.nazwa, dataOd, dataDo, tryb: mode };
   }
-  return { ok: true, podwykonawca: picked.nazwa, dataDo };
+  return { ok: true, podwykonawca: picked.nazwa, dataDo, tryb: mode };
 }
 
 /** Czy para dat sama z siebie blokuje Szukaj. Pusta data końcowa to inny błąd. */
@@ -257,8 +262,6 @@ export function openRatesWindow<T extends ScreenId>(screen: T): { screen: T; win
   return { screen, window: "rates" };
 }
 
-export type SettlementMode = "report" | "schedule";
-
 export function modeLabel(mode: SettlementMode): string {
   return mode === "schedule" ? "Harmonogram" : "Na zgłoszenie";
 }
@@ -281,6 +284,9 @@ export function searchParams(query: StartedSearch): Record<string, string> {
   };
   if (query.dataOd) {
     params.dataOd = query.dataOd;
+  }
+  if (query.tryb === "schedule") {
+    params.tryb = "harmonogram";
   }
   return params;
 }

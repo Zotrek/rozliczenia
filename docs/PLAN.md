@@ -137,7 +137,7 @@ Na żywy arkusz ta akcja wchodzi dopiero w W1, nie w M6. Sekretu zapisu nie ma: 
 
 ### R5. Zakres
 
-- Na zgłoszenie włączone. Harmonogram widać i nie da się go zaznaczyć.
+- Na zgłoszenie włączone. Harmonogram da się zaznaczyć (MVP: Szukaj z `tryb=harmonogram`).
 - Podwykonawca z listy, zawężanie po Nazwa albo Dane do Worda. Tekstu spoza listy nie da się wybrać. Bez wyboru Szukaj nie startuje.
 - Data końcowa wymagana. Data początkowa późniejsza niż końcowa pokazuje błąd i nie startuje. Opcja bez daty początkowej czyści datę i przywraca ostatnią po zdjęciu.
 - Obie granice włącznie. Ten sam dzień w obu polach to ten jeden dzień.
@@ -187,7 +187,7 @@ Nowa wersja **istniejącego** wdrożenia, ten sam URL. Nie drugie wdrożenie obo
 
 ## Poza kolejką
 
-- Harmonogram. Checkbox jest w R5, reguł nie ma.
+- Zatwierdź / numer faktury dla Harmonogramu (MVP: tylko podgląd).
 - Cofanie rozliczenia i zmiana numeru faktury po zatwierdzeniu.
 - Biblioteki wykresów (Chart.js itd.) i wykres składu kosztów na Zestawieniu. Słupki CSS na Statystykach są w R8.
 - Raport po fakturze; sklepy bez odbiorów; prognoza / trend.

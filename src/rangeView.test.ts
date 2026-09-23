@@ -36,6 +36,8 @@ function model(over: Partial<RangeViewModel> = {}): RangeViewModel {
     ratesPickup: "",
     ratesBag: "",
     ratesFrom: "",
+    ratesDays: "",
+    ratesTarget: "stawki",
     ratesMessage: "",
     ratesMessageOk: false,
     stats: emptyStats({ year: 2026, month: 9, day: 23 }),
@@ -79,6 +81,28 @@ describe("renderApp", () => {
     expect(html).toContain('role="dialog"');
     expect(html).not.toContain('data-screen="rates"');
     expect(html).toContain("Baza stawek");
+    expect(html).toContain("Baza cen harmonogram");
+    expect(html).toContain('data-action="rates-tab"');
+  });
+
+  it("test_renderApp_rates_harmonogram_tab_shows_days_field", () => {
+    const html = renderApp(model({ ratesOpen: true, ratesTarget: "harmonogram", ratesDays: "pn, cz" }));
+    expect(html).toContain("Baza cen harmonogram");
+    expect(html).toContain('data-rate="days"');
+    expect(html).toContain("pn, cz");
+    expect(html).toContain("Zapisz stawkę harmonogramu");
+  });
+
+  it("test_renderApp_schedule_statement_hides_approve", () => {
+    const html = renderApp(
+      model({
+        mode: "schedule",
+        screen: "statement",
+        applied: APPLIED,
+      }),
+    );
+    expect(html).not.toContain('data-action="approve"');
+    expect(html).toContain("Zatwierdzenie faktury w tej wersji niedostępne");
   });
 
   it("test_renderApp_change_range_is_on_the_statement_screen", () => {

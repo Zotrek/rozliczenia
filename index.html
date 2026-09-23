@@ -245,6 +245,27 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   gap: 8px;
 }
 .modal-panel h2 { margin: 0; font-size: 16px; }
+.rates-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.rates-tab {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #64748b;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.rates-tab.is-on {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 .modal-actions .btn-ghost, .modal-actions .btn-teal { width: auto; margin-top: 0; }
 :root { --orange: #ea580c; --orange-deep: #c2410c; --rose: #e11d48; }
@@ -919,7 +940,7 @@ function fieldsForSearch(draft) {
  * ani gdy data początkowa jest późniejsza niż końcowa.
  * Obie granice wychodzą jako ten sam dzień kalendarzowy, włącznie.
  */
-function startSearch(fields, list) {
+function startSearch(fields, list, mode = "report") {
     const picked = selectedContractor(list, fields.contractor);
     if (!picked) {
         return { ok: false, error: "contractor" };
@@ -933,9 +954,9 @@ function startSearch(fields, list) {
         if (!dataOd || compareSheetDate(dataOd, dataDo) > 0) {
             return { ok: false, error: "order" };
         }
-        return { ok: true, podwykonawca: picked.nazwa, dataOd, dataDo };
+        return { ok: true, podwykonawca: picked.nazwa, dataOd, dataDo, tryb: mode };
     }
-    return { ok: true, podwykonawca: picked.nazwa, dataDo };
+    return { ok: true, podwykonawca: picked.nazwa, dataDo, tryb: mode };
 }
 /** Czy para dat sama z siebie blokuje Szukaj. Pusta data końcowa to inny błąd. */
 function blocksOnOrder(from, to, noFrom) {
@@ -1003,6 +1024,9 @@ function searchParams(query) {
     };
     if (query.dataOd) {
         params.dataOd = query.dataOd;
+    }
+    if (query.tryb === "schedule") {
+        params.tryb = "harmonogram";
     }
     return params;
 }
@@ -1151,8 +1175,7 @@ function storeAddressLabel(item) {
     }
     return address;
 }
-/** Pola `saveRate` jak na mapie. Listy wybiera widok, tu jest tylko body. */
-function saveRateBody(input) {
+function buildRateBody(input, mode, extra) {
     const shop = input.shop.trim();
     const contractor = input.contractor.trim();
     if (shop === "" || contractor === "") {
@@ -1170,14 +1193,25 @@ function saveRateBody(input) {
     return {
         ok: true,
         body: {
-            mode: "saveRate",
+            mode,
             sklep: shop,
             podwykonawca: contractor,
             kwotaPodjazd: input.pickup,
             kwotaWorek: input.bag,
             odKiedy,
+            ...(extra ?? {}),
         },
     };
+}
+/** Pola `saveRate` jak na mapie. Listy wybiera widok, tu jest tylko body. */
+function saveRateBody(input) {
+    return buildRateBody(input, "saveRate");
+}
+/** Pola `saveRateHarmonogram` jak na mapie (+ dni transportu). */
+function saveRateHarmonogramBody(input) {
+    return buildRateBody(input, "saveRateHarmonogram", {
+        dniOdbiorow: input.days.trim(),
+    });
 }
 function rateSaveMessage(code) {
     if (code === "tie") {
@@ -2173,18 +2207,22 @@ function readRateRow(value) {
 
 
 const DASH = '<span class="muted">—</span>';
-function renderStatement(screen, status = "") {
+function renderStatement(screen, status = "", options = {}) {
+    const allowApprove = options.allowApprove !== false;
     const statement = currentStatement(screen);
     const selectedSum = sumSelected(statement, selectedKeys(screen.selected));
     const count = selectedLineCount(statement, screen.selected);
     const note = status ? `<p class="err">${escapeHtml(status)}</p>` : "";
+    const emptyHint = allowApprove
+        ? "Brak nierozliczonych odbiorów tego podwykonawcy w podanym zakresie."
+        : "Brak dni podjazdu tego podwykonawcy w podanym zakresie (Baza cen harmonogram).";
     const body = statement.lines.length === 0
-        ? '<div class="blank"><strong>Brak pozycji.</strong><p>Brak nierozliczonych odbiorów tego podwykonawcy w podanym zakresie.</p></div>'
+        ? `<div class="blank"><strong>Brak pozycji.</strong><p>${emptyHint}</p></div>`
         : table(screen, statement.lines);
     return (`<div class="center-h">${escapeHtml(positionLabel(statement.lines.length))}</div>` +
         note +
         body +
-        footer(screen.invoice, statement.total, selectedSum, count));
+        footer(screen.invoice, statement.total, selectedSum, count, allowApprove));
 }
 function table(screen, lines) {
     const rows = [];
@@ -2292,7 +2330,13 @@ function childRow(screen, shop, sharedBagRate) {
         `<td><div class="trip-stack">${tripBox(shop)}${detachButton(shop)}</div></td>` +
         "</tr>");
 }
-function footer(invoice, total, selected, count) {
+function footer(invoice, total, selected, count, allowApprove) {
+    if (!allowApprove) {
+        return ('<footer class="footer">' +
+            `<div class="stat"><span>Suma zestawienia</span><b data-out="sum-all">${formatPln(total)}</b></div>` +
+            '<p class="note">Tryb Harmonogram: podgląd kosztów. Zatwierdzenie faktury w tej wersji niedostępne.</p>' +
+            "</footer>");
+    }
     const enabled = canPressApprove(invoice, count);
     return ('<footer class="footer">' +
         `<div class="stat"><span>Suma zestawienia</span><b data-out="sum-all">${formatPln(total)}</b></div>` +
@@ -3509,6 +3553,14 @@ function dateFields(model) {
 function ratesButton() {
     return '<button type="button" class="btn-ghost" data-action="rates">Baza stawek</button>';
 }
+function ratesTabs(target) {
+    const stawkiOn = target === "stawki";
+    const harmOn = target === "harmonogram";
+    return ('<div class="rates-tabs" role="tablist" aria-label="Źródło stawek">' +
+        `<button type="button" role="tab" class="rates-tab${stawkiOn ? " is-on" : ""}" data-action="rates-tab" data-target="stawki" aria-selected="${stawkiOn ? "true" : "false"}">Baza stawek</button>` +
+        `<button type="button" role="tab" class="rates-tab${harmOn ? " is-on" : ""}" data-action="rates-tab" data-target="harmonogram" aria-selected="${harmOn ? "true" : "false"}">Baza cen harmonogram</button>` +
+        "</div>");
+}
 function renderRangeScreen(model) {
     const note = model.webappMissing
         ? '<p class="callout">Brak adresu Web App. Dopisz ?webapp= do adresu tej strony.</p>'
@@ -3533,33 +3585,44 @@ function renderRangeScreen(model) {
 }
 function renderStatementScreen(model) {
     const label = model.applied ? rangeLabel(model.applied) : "";
+    const schedule = model.mode === "schedule";
     return ('<div class="statement" data-screen="statement"><div class="top">' +
         brand(model.mode) +
         `<div class="range"><span>${escapeHtml(modeLabel(model.mode))}</span><strong>${escapeHtml(label)}</strong></div>` +
         '<button type="button" class="btn-ghost" data-action="back">Zmień zakres</button>' +
         ratesButton() +
         "</div>" +
-        renderStatement(model.statement, model.status) +
+        renderStatement(model.statement, model.status, { allowApprove: !schedule }) +
         "</div>");
 }
 function renderRatesDialog(model) {
     const messageClass = model.ratesMessageOk ? "note" : "err";
+    const harm = model.ratesTarget === "harmonogram";
+    const title = harm ? "Baza cen harmonogram" : "Baza stawek";
+    const daysField = harm
+        ? '<label class="field"><span>Dni transportu</span>' +
+            `<input type="text" data-rate="days" data-keep="days" autocomplete="off" spellcheck="false" placeholder="np. pn, cz" value="${escapeHtml(model.ratesDays)}">` +
+            '<span class="note">Dni tygodnia z transportem (np. pn, cz).</span></label>'
+        : "";
+    const saveLabel = harm ? "Zapisz stawkę harmonogramu" : "Zapisz stawkę";
     return ('<div class="modal" data-window="rates">' +
         '<div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="rates-title">' +
-        '<h2 id="rates-title">Baza stawek</h2>' +
+        `<h2 id="rates-title">${escapeHtml(title)}</h2>` +
+        ratesTabs(model.ratesTarget) +
         rateCombo("Sklep", "shop", model.ratesShopQuery, model.ratesShopOpen, "Nazwa sklepu lub adres", renderRateShopList(model)) +
         rateCombo("Podwykonawca", "contractor", model.ratesContractorQuery, model.ratesContractorOpen, "— wybierz podwykonawcę —", renderRateContractorList(model)) +
         '<label class="field"><span>Kwota za podjazd</span>' +
         `<input type="text" inputmode="decimal" data-rate="pickup" data-keep="pickup" autocomplete="off" value="${escapeHtml(model.ratesPickup)}"></label>` +
         '<label class="field"><span>Kwota za worek</span>' +
         `<input type="text" inputmode="decimal" data-rate="bag" data-keep="bag" autocomplete="off" value="${escapeHtml(model.ratesBag)}"></label>` +
+        daysField +
         '<label class="field"><span>Od kiedy obowiązuje</span>' +
         `<input type="date" data-rate="from" data-keep="from" value="${escapeHtml(model.ratesFrom)}">` +
         '<span class="note">Puste znaczy od zawsze.</span></label>' +
         `<p data-rates-message class="${messageClass}"${model.ratesMessage ? "" : " hidden"}>${escapeHtml(model.ratesMessage)}</p>` +
         '<div class="modal-actions">' +
         '<button type="button" class="btn-ghost" data-action="close-rates">Zamknij</button>' +
-        '<button type="button" class="btn-teal" data-action="save-rates">Zapisz stawkę</button>' +
+        `<button type="button" class="btn-teal" data-action="save-rates">${escapeHtml(saveLabel)}</button>` +
         "</div></div></div>");
 }
 function renderLoading(message, unicorn) {
@@ -3626,6 +3689,8 @@ const VIEW = {
     ratesPickup: "",
     ratesBag: "",
     ratesFrom: "",
+    ratesDays: "",
+    ratesTarget: "stawki",
     ratesMessage: "",
     ratesMessageOk: false,
     stats: emptyStats(todayCalendar()),
@@ -3716,7 +3781,7 @@ async function runSearch() {
         from: VIEW.from,
         to: VIEW.to,
         noFrom: VIEW.noFrom,
-    }), VIEW.contractors);
+    }), VIEW.contractors, VIEW.mode);
     if (!started.ok) {
         VIEW.error = started.error;
         VIEW.contractorOpen = false;
@@ -3813,6 +3878,13 @@ function onClick(event) {
     }
     else if (action === "rates") {
         void openRates();
+    }
+    else if (action === "rates-tab") {
+        const target = el.dataset.target === "harmonogram" ? "harmonogram" : "stawki";
+        VIEW.ratesTarget = target;
+        VIEW.ratesMessage = "";
+        VIEW.ratesMessageOk = false;
+        paint();
     }
     else if (action === "close-rates") {
         VIEW.ratesOpen = false;
@@ -3928,12 +4000,15 @@ function onInput(event) {
         typeRateField(el);
         return;
     }
-    if (el.dataset.rate === "pickup" || el.dataset.rate === "bag" || el.dataset.rate === "from") {
+    if (el.dataset.rate === "pickup" || el.dataset.rate === "bag" || el.dataset.rate === "from" || el.dataset.rate === "days") {
         if (el.dataset.rate === "pickup") {
             VIEW.ratesPickup = el.value;
         }
         else if (el.dataset.rate === "bag") {
             VIEW.ratesBag = el.value;
+        }
+        else if (el.dataset.rate === "days") {
+            VIEW.ratesDays = el.value;
         }
         else {
             VIEW.ratesFrom = el.value;
@@ -4444,13 +4519,16 @@ async function openRates() {
 }
 async function saveRates() {
     commitRateFields();
-    const built = saveRateBody({
+    const common = {
         shop: VIEW.ratesShop,
         contractor: VIEW.ratesContractor,
         pickup: VIEW.ratesPickup,
         bag: VIEW.ratesBag,
         from: VIEW.ratesFrom,
-    });
+    };
+    const built = VIEW.ratesTarget === "harmonogram"
+        ? saveRateHarmonogramBody({ ...common, days: VIEW.ratesDays })
+        : saveRateBody(common);
     if (!built.ok) {
         VIEW.ratesMessage = rateSaveMessage(built.error);
         VIEW.ratesMessageOk = false;
@@ -4465,7 +4543,7 @@ async function saveRates() {
     }
     VIEW.loading = true;
     VIEW.loadKind = "logo";
-    VIEW.loadMessage = "Zapisuję stawkę…";
+    VIEW.loadMessage = VIEW.ratesTarget === "harmonogram" ? "Zapisuję stawkę harmonogramu…" : "Zapisuję stawkę…";
     paint();
     try {
         const result = await postSheet(built.body);
@@ -4477,9 +4555,11 @@ async function saveRates() {
         VIEW.ratesPickup = "";
         VIEW.ratesBag = "";
         VIEW.ratesFrom = "";
-        VIEW.ratesMessage = "Zapisano stawkę.";
+        VIEW.ratesDays = "";
+        VIEW.ratesMessage =
+            VIEW.ratesTarget === "harmonogram" ? "Zapisano stawkę harmonogramu." : "Zapisano stawkę.";
         VIEW.ratesMessageOk = true;
-        if (VIEW.screen === "statement") {
+        if (VIEW.screen === "statement" && VIEW.mode === "report") {
             const refreshed = await reloadStatement();
             if (!refreshed) {
                 VIEW.status = STATEMENT_ERROR.refresh;

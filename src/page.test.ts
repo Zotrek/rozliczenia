@@ -43,6 +43,7 @@ describe("page wiring", () => {
       "stats-table-fold",
       "stats-page",
       "rates",
+      "rates-tab",
       "close-rates",
       "save-rates",
       "expand",
@@ -102,6 +103,8 @@ describe("page wiring", () => {
     expect(functionBody("commitEdit")).toContain("commitRouteRate(");
     expect(functionBody("runApprove")).toContain("buildApprove(");
     expect(functionBody("saveRates")).toContain("saveRateBody(");
+    expect(functionBody("saveRates")).toContain("saveRateHarmonogramBody(");
+    expect(functionBody("onClick")).toContain('action === "rates-tab"');
   });
 });
 

@@ -53,7 +53,7 @@ import {
   withoutTiedRates,
   writeError,
 } from "./statement.js";
-import { rateContractorNames, rateSaveMessage, readAddressList, resolveStoreAddress, saveRateBody, storeAddressLabel } from "./rateWindow.js";
+import { rateContractorNames, rateSaveMessage, readAddressList, resolveStoreAddress, saveRateBody, saveRateHarmonogramBody, storeAddressLabel } from "./rateWindow.js";
 import {
   buildStatsReport,
   chartShouldStack,
@@ -103,6 +103,8 @@ const VIEW: RangeViewModel = {
   ratesPickup: "",
   ratesBag: "",
   ratesFrom: "",
+  ratesDays: "",
+  ratesTarget: "stawki",
   ratesMessage: "",
   ratesMessageOk: false,
   stats: emptyStats(todayCalendar()),
@@ -207,6 +209,7 @@ async function runSearch(): Promise<void> {
       noFrom: VIEW.noFrom,
     }),
     VIEW.contractors,
+    VIEW.mode,
   );
   if (!started.ok) {
     VIEW.error = started.error;
@@ -295,6 +298,12 @@ function onClick(event: MouseEvent): void {
     shiftStatsPage(el.dataset.pager ?? "", el.dataset.dir ?? "");
   } else if (action === "rates") {
     void openRates();
+  } else if (action === "rates-tab") {
+    const target = el.dataset.target === "harmonogram" ? "harmonogram" : "stawki";
+    VIEW.ratesTarget = target;
+    VIEW.ratesMessage = "";
+    VIEW.ratesMessageOk = false;
+    paint();
   } else if (action === "close-rates") {
     VIEW.ratesOpen = false;
     VIEW.ratesMessage = "";
@@ -411,11 +420,13 @@ function onInput(event: Event): void {
     typeRateField(el);
     return;
   }
-  if (el.dataset.rate === "pickup" || el.dataset.rate === "bag" || el.dataset.rate === "from") {
+  if (el.dataset.rate === "pickup" || el.dataset.rate === "bag" || el.dataset.rate === "from" || el.dataset.rate === "days") {
     if (el.dataset.rate === "pickup") {
       VIEW.ratesPickup = el.value;
     } else if (el.dataset.rate === "bag") {
       VIEW.ratesBag = el.value;
+    } else if (el.dataset.rate === "days") {
+      VIEW.ratesDays = el.value;
     } else {
       VIEW.ratesFrom = el.value;
     }
@@ -943,13 +954,17 @@ async function openRates(): Promise<void> {
 
 async function saveRates(): Promise<void> {
   commitRateFields();
-  const built = saveRateBody({
+  const common = {
     shop: VIEW.ratesShop,
     contractor: VIEW.ratesContractor,
     pickup: VIEW.ratesPickup,
     bag: VIEW.ratesBag,
     from: VIEW.ratesFrom,
-  });
+  };
+  const built =
+    VIEW.ratesTarget === "harmonogram"
+      ? saveRateHarmonogramBody({ ...common, days: VIEW.ratesDays })
+      : saveRateBody(common);
   if (!built.ok) {
     VIEW.ratesMessage = rateSaveMessage(built.error);
     VIEW.ratesMessageOk = false;
@@ -964,7 +979,7 @@ async function saveRates(): Promise<void> {
   }
   VIEW.loading = true;
   VIEW.loadKind = "logo";
-  VIEW.loadMessage = "Zapisuję stawkę…";
+  VIEW.loadMessage = VIEW.ratesTarget === "harmonogram" ? "Zapisuję stawkę harmonogramu…" : "Zapisuję stawkę…";
   paint();
   try {
     const result = await postSheet(built.body);
@@ -976,9 +991,11 @@ async function saveRates(): Promise<void> {
     VIEW.ratesPickup = "";
     VIEW.ratesBag = "";
     VIEW.ratesFrom = "";
-    VIEW.ratesMessage = "Zapisano stawkę.";
+    VIEW.ratesDays = "";
+    VIEW.ratesMessage =
+      VIEW.ratesTarget === "harmonogram" ? "Zapisano stawkę harmonogramu." : "Zapisano stawkę.";
     VIEW.ratesMessageOk = true;
-    if (VIEW.screen === "statement") {
+    if (VIEW.screen === "statement" && VIEW.mode === "report") {
       const refreshed = await reloadStatement();
       if (!refreshed) {
         VIEW.status = STATEMENT_ERROR.refresh;

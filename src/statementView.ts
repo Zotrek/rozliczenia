@@ -17,20 +17,28 @@ import type { Grosze, RateTie, ShopCost, StatementLine } from "./types.js";
 
 const DASH = '<span class="muted">—</span>';
 
-export function renderStatement(screen: StatementScreen, status = ""): string {
+export function renderStatement(
+  screen: StatementScreen,
+  status = "",
+  options: { allowApprove?: boolean } = {},
+): string {
+  const allowApprove = options.allowApprove !== false;
   const statement = currentStatement(screen);
   const selectedSum = sumSelected(statement, selectedKeys(screen.selected));
   const count = selectedLineCount(statement, screen.selected);
   const note = status ? `<p class="err">${escapeHtml(status)}</p>` : "";
+  const emptyHint = allowApprove
+    ? "Brak nierozliczonych odbiorów tego podwykonawcy w podanym zakresie."
+    : "Brak dni podjazdu tego podwykonawcy w podanym zakresie (Baza cen harmonogram).";
   const body =
     statement.lines.length === 0
-      ? '<div class="blank"><strong>Brak pozycji.</strong><p>Brak nierozliczonych odbiorów tego podwykonawcy w podanym zakresie.</p></div>'
+      ? `<div class="blank"><strong>Brak pozycji.</strong><p>${emptyHint}</p></div>`
       : table(screen, statement.lines);
   return (
     `<div class="center-h">${escapeHtml(positionLabel(statement.lines.length))}</div>` +
     note +
     body +
-    footer(screen.invoice, statement.total, selectedSum, count)
+    footer(screen.invoice, statement.total, selectedSum, count, allowApprove)
   );
 }
 
@@ -167,7 +175,21 @@ function childRow(screen: StatementScreen, shop: ShopCost, sharedBagRate: boolea
   );
 }
 
-function footer(invoice: string, total: Grosze, selected: Grosze, count: number): string {
+function footer(
+  invoice: string,
+  total: Grosze,
+  selected: Grosze,
+  count: number,
+  allowApprove: boolean,
+): string {
+  if (!allowApprove) {
+    return (
+      '<footer class="footer">' +
+      `<div class="stat"><span>Suma zestawienia</span><b data-out="sum-all">${formatPln(total)}</b></div>` +
+      '<p class="note">Tryb Harmonogram: podgląd kosztów. Zatwierdzenie faktury w tej wersji niedostępne.</p>' +
+      "</footer>"
+    );
+  }
   const enabled = canPressApprove(invoice, count);
   return (
     '<footer class="footer">' +

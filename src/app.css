@@ -237,6 +237,27 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   gap: 8px;
 }
 .modal-panel h2 { margin: 0; font-size: 16px; }
+.rates-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 0 0 12px;
+}
+.rates-tab {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #64748b;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.rates-tab.is-on {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 .modal-actions .btn-ghost, .modal-actions .btn-teal { width: auto; margin-top: 0; }
 :root { --orange: #ea580c; --orange-deep: #c2410c; --rose: #e11d48; }

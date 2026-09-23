@@ -126,14 +126,23 @@ export function storeAddressLabel(item: StoreAddress): string {
   return address;
 }
 
-/** Pola `saveRate` jak na mapie. Listy wybiera widok, tu jest tylko body. */
-export function saveRateBody(input: {
+export type RatesTarget = "stawki" | "harmonogram";
+
+type RateBodyInput = {
   shop: string;
   contractor: string;
   pickup: string;
   bag: string;
   from: string;
-}): { ok: false; error: "shop" | "date" } | { ok: true; body: Record<string, string> } {
+};
+
+type RateBodyResult = { ok: false; error: "shop" | "date" } | { ok: true; body: Record<string, string> };
+
+function buildRateBody(
+  input: RateBodyInput,
+  mode: "saveRate" | "saveRateHarmonogram",
+  extra?: Record<string, string>,
+): RateBodyResult {
   const shop = input.shop.trim();
   const contractor = input.contractor.trim();
   if (shop === "" || contractor === "") {
@@ -151,14 +160,29 @@ export function saveRateBody(input: {
   return {
     ok: true,
     body: {
-      mode: "saveRate",
+      mode,
       sklep: shop,
       podwykonawca: contractor,
       kwotaPodjazd: input.pickup,
       kwotaWorek: input.bag,
       odKiedy,
+      ...(extra ?? {}),
     },
   };
+}
+
+/** Pola `saveRate` jak na mapie. Listy wybiera widok, tu jest tylko body. */
+export function saveRateBody(input: RateBodyInput): RateBodyResult {
+  return buildRateBody(input, "saveRate");
+}
+
+/** Pola `saveRateHarmonogram` jak na mapie (+ dni transportu). */
+export function saveRateHarmonogramBody(
+  input: RateBodyInput & { days: string },
+): RateBodyResult {
+  return buildRateBody(input, "saveRateHarmonogram", {
+    dniOdbiorow: input.days.trim(),
+  });
 }
 
 export function rateSaveMessage(code: unknown): string {

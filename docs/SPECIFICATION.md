@@ -36,12 +36,13 @@ Koszt podjazdu, worków i trasy ma być liczony z danych już zapisanych przy pr
 Dwa obszary aplikacji docelowo:
 
 1. **Na zgłoszenie** — ta specyfikacja (Zakres, Zestawienie, Statystyki, Baza stawek).
-2. **Harmonogram** — założenia później. W filtrze jest checkbox, ale nie da się go zaznaczyć. Nie ma reguł ani kolumn tego modułu. Wspólne dane to Arkusz1, żeby później nie zakładać drugiego pliku.
-3. **Baza stawek** — wprowadzanie i edycja kwoty za podjazd i za worek. Robi to Arkusz-mapa i aplikacja rozliczeń, ta sama zakładka.
+2. **Harmonogram** — MVP: checkbox wybieralny; Szukaj buduje zestawienie z dni podjazdu (`Baza cen harmonogram` + worki z `odebrane z harmonogramu`, także 0 worków). Zatwierdź / faktura w tej wersji niedostępne. Wspólny plik Google (ewidencja), bez drugiej mili.
+3. **Baza stawek** — wprowadzanie i edycja kwoty za podjazd i za worek. Robi to Arkusz-mapa i aplikacja rozliczeń, ta sama zakładka. Osobno: **Baza cen harmonogram** (to samo okno, druga zakładka; + dni transportu).
 
 Poza zakresem, świadomie:
 
 - Cofanie rozliczenia i edycja numeru faktury po zatwierdzeniu. W tej wersji tego nie ma.
+- Zatwierdzenie faktury w trybie Harmonogram (MVP tylko podgląd kosztów).
 - Biblioteki wykresów (Chart.js itd.) i wykres składu kosztów na Zestawieniu. Na Statystykach dozwolone są proste słupki CSS.
 - Raport po numerze faktury; lista sklepów bez odbiorów (np. 2 tygodnie); prognoza / trend na przyszłe tygodnie.
 - Wybór technologii aplikacji rozliczeń. Z zachowania nie wynika Symfony, Vue ani PostgreSQL.
@@ -296,7 +297,7 @@ Układ Zakresu i Zestawienia jest w makiecie `rozliczenia/docs/makiety-tabeli.ht
 
 Trzy widoki aplikacji + okno Bazy stawek. Tabeli na Zakresie nie ma. Na Zestawieniu wykresu składu kosztów nie ma.
 
-**Zakres.** Na środku karta. Ikona, nazwa Rozliczenia i tryb Na zgłoszenie. Pod spodem dwa tryby: Na zgłoszenie zaznaczony, Harmonogram widać i nie da się go zaznaczyć. Potem podwykonawca, data początkowa, data końcowa i Szukaj. Na dole karty: **Statystyki** (wejście bez Szukaj) oraz **Baza stawek**. Baza stawek otwiera okno, nie osobny ekran. Sklep i podwykonawca są listami, bez wpisu ręcznego: adres z kolumny Adres sklepu rejestru, nazwa krótka z Listy podwykonawców. To nie są pinezki mapy.
+**Zakres.** Na środku karta. Ikona, nazwa Rozliczenia i tryb Na zgłoszenie. Pod spodem dwa tryby: Na zgłoszenie zaznaczony, Harmonogram da się zaznaczyć. Potem podwykonawca, data początkowa, data końcowa i Szukaj. Na dole karty: **Statystyki** (wejście bez Szukaj) oraz **Baza stawek**. Baza stawek otwiera okno (zakładki: Baza stawek / Baza cen harmonogram), nie osobny ekran. Sklep i podwykonawca są listami, bez wpisu ręcznego: adres z kolumny Adres sklepu rejestru, nazwa krótka z Listy podwykonawców. To nie są pinezki mapy.
 
 **Zestawienie.** Po Szukaj. W nagłówku ikona, zakres (podwykonawca i daty) oraz przycisk Zmień zakres, który wraca do ekranu Zakres. Obok jest Baza stawek. Przycisku Statystyki na Zestawieniu nie ma. Pod nagłówkiem liczba pozycji w zestawieniu, bez sklepów z rozwinięcia trasy. Potem tabela. Na dole Suma zestawienia, Suma zaznaczonych, numer faktury i Zatwierdź.
 
@@ -318,8 +319,8 @@ Zapis stawek podjazdu i worka jest od razu, nie czeka na Zatwierdź. Nie zmienia
 
 Na początku użytkownik widzi dwa checkboxy:
 
-- **Na zgłoszenie** — na starcie zaznaczony. Wyszukiwanie w tej wersji dotyczy tego trybu.
-- **Harmonogram** — widać go, ale nie da się go zaznaczyć.
+- **Na zgłoszenie** — na starcie zaznaczony. Wyszukiwanie dotyczy rejestru `Arkusz1`.
+- **Harmonogram** — zaznaczalny. Szukaj czyta `Baza cen harmonogram` (dni podjazdu) i `odebrane z harmonogramu` (liczba worków; może być 0). Zatwierdź niedostępne.
 
 Podwykonawcę znajduje się tak samo jak na mapie, z tej samej **Listy podwykonawców**. Kolumny to **Nazwa** i **Dane do Worda**. Nazwa to nazwa krótka, ta sama co **Kto odbiera**. Adresu nie ma w osobnej kolumnie. Jest w **Dane do Worda**, sklejony z nazwą do protokołu, BDO i NIP, tak jak zapisuje go mapa.
 

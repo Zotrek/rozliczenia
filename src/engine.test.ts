@@ -393,3 +393,30 @@ describe("settle", () => {
     ).toBe(19_000);
   });
 });
+
+describe("harmonogram pickup without bags", () => {
+  it("test_settle_three_shops_pickup_only_zero_bags_sums_all_days", () => {
+    const rows: RegisterRow[] = [];
+    let sheetRow = 2;
+    for (const address of ["A", "B", "C"]) {
+      for (const day of ["15.09.2026", "22.09.2026"]) {
+        rows.push(
+          reception({
+            sheetRow,
+            transportNumber: "",
+            address,
+            shopName: address,
+            pickupDate: day,
+            bagCount: 0,
+            pickupRate: 10_000,
+            bagRate: 0,
+          }),
+        );
+        sheetRow += 1;
+      }
+    }
+    const statement = go(rows);
+    expect(statement.lines).toHaveLength(6);
+    expect(statement.total).toBe(60_000);
+  });
+});

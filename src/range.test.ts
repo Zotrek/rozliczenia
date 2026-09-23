@@ -126,6 +126,32 @@ describe("startSearch", () => {
       podwykonawca: "GPW",
       dataOd: "18.09.2026",
       dataDo: "18.09.2026",
+      tryb: "report",
+    });
+  });
+
+  it("test_startSearch_schedule_mode_sets_tryb_and_searchParams", () => {
+    const started = startSearch(
+      { contractor: "gpw", from: "2026-09-01", to: "2026-09-18" },
+      LIST,
+      "schedule",
+    );
+    expect(started).toEqual({
+      ok: true,
+      podwykonawca: "GPW",
+      dataOd: "01.09.2026",
+      dataDo: "18.09.2026",
+      tryb: "schedule",
+    });
+    if (!started.ok) {
+      return;
+    }
+    expect(searchParams(started)).toEqual({
+      action: "settlementSearch",
+      podwykonawca: "GPW",
+      dataOd: "01.09.2026",
+      dataDo: "18.09.2026",
+      tryb: "harmonogram",
     });
   });
 
@@ -143,7 +169,7 @@ describe("startSearch", () => {
       noFrom: true,
     });
     const started = startSearch(fields, LIST);
-    expect(started).toEqual({ ok: true, podwykonawca: "GPW", dataDo: "18.09.2026" });
+    expect(started).toEqual({ ok: true, podwykonawca: "GPW", dataDo: "18.09.2026", tryb: "report" });
     if (!started.ok) {
       return;
     }

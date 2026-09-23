@@ -49,6 +49,10 @@ export interface RangeViewModel {
   ratesPickup: string;
   ratesBag: string;
   ratesFrom: string;
+  /** Dni transportu (tylko Baza cen harmonogram), np. pn, cz. */
+  ratesDays: string;
+  /** Zakładka okna stawek. */
+  ratesTarget: "stawki" | "harmonogram";
   ratesMessage: string;
   ratesMessageOk: boolean;
   stats: StatsViewModel;
@@ -244,6 +248,17 @@ function ratesButton(): string {
   return '<button type="button" class="btn-ghost" data-action="rates">Baza stawek</button>';
 }
 
+function ratesTabs(target: "stawki" | "harmonogram"): string {
+  const stawkiOn = target === "stawki";
+  const harmOn = target === "harmonogram";
+  return (
+    '<div class="rates-tabs" role="tablist" aria-label="Źródło stawek">' +
+    `<button type="button" role="tab" class="rates-tab${stawkiOn ? " is-on" : ""}" data-action="rates-tab" data-target="stawki" aria-selected="${stawkiOn ? "true" : "false"}">Baza stawek</button>` +
+    `<button type="button" role="tab" class="rates-tab${harmOn ? " is-on" : ""}" data-action="rates-tab" data-target="harmonogram" aria-selected="${harmOn ? "true" : "false"}">Baza cen harmonogram</button>` +
+    "</div>"
+  );
+}
+
 function renderRangeScreen(model: RangeViewModel): string {
   const note = model.webappMissing
     ? '<p class="callout">Brak adresu Web App. Dopisz ?webapp= do adresu tej strony.</p>'
@@ -271,6 +286,7 @@ function renderRangeScreen(model: RangeViewModel): string {
 
 function renderStatementScreen(model: RangeViewModel): string {
   const label = model.applied ? rangeLabel(model.applied) : "";
+  const schedule = model.mode === "schedule";
   return (
     '<div class="statement" data-screen="statement"><div class="top">' +
     brand(model.mode) +
@@ -278,17 +294,26 @@ function renderStatementScreen(model: RangeViewModel): string {
     '<button type="button" class="btn-ghost" data-action="back">Zmień zakres</button>' +
     ratesButton() +
     "</div>" +
-    renderStatement(model.statement, model.status) +
+    renderStatement(model.statement, model.status, { allowApprove: !schedule }) +
     "</div>"
   );
 }
 
 export function renderRatesDialog(model: RangeViewModel): string {
   const messageClass = model.ratesMessageOk ? "note" : "err";
+  const harm = model.ratesTarget === "harmonogram";
+  const title = harm ? "Baza cen harmonogram" : "Baza stawek";
+  const daysField = harm
+    ? '<label class="field"><span>Dni transportu</span>' +
+      `<input type="text" data-rate="days" data-keep="days" autocomplete="off" spellcheck="false" placeholder="np. pn, cz" value="${escapeHtml(model.ratesDays)}">` +
+      '<span class="note">Dni tygodnia z transportem (np. pn, cz).</span></label>'
+    : "";
+  const saveLabel = harm ? "Zapisz stawkę harmonogramu" : "Zapisz stawkę";
   return (
     '<div class="modal" data-window="rates">' +
     '<div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="rates-title">' +
-    '<h2 id="rates-title">Baza stawek</h2>' +
+    `<h2 id="rates-title">${escapeHtml(title)}</h2>` +
+    ratesTabs(model.ratesTarget) +
     rateCombo(
       "Sklep",
       "shop",
@@ -309,13 +334,14 @@ export function renderRatesDialog(model: RangeViewModel): string {
     `<input type="text" inputmode="decimal" data-rate="pickup" data-keep="pickup" autocomplete="off" value="${escapeHtml(model.ratesPickup)}"></label>` +
     '<label class="field"><span>Kwota za worek</span>' +
     `<input type="text" inputmode="decimal" data-rate="bag" data-keep="bag" autocomplete="off" value="${escapeHtml(model.ratesBag)}"></label>` +
+    daysField +
     '<label class="field"><span>Od kiedy obowiązuje</span>' +
     `<input type="date" data-rate="from" data-keep="from" value="${escapeHtml(model.ratesFrom)}">` +
     '<span class="note">Puste znaczy od zawsze.</span></label>' +
     `<p data-rates-message class="${messageClass}"${model.ratesMessage ? "" : " hidden"}>${escapeHtml(model.ratesMessage)}</p>` +
     '<div class="modal-actions">' +
     '<button type="button" class="btn-ghost" data-action="close-rates">Zamknij</button>' +
-    '<button type="button" class="btn-teal" data-action="save-rates">Zapisz stawkę</button>' +
+    `<button type="button" class="btn-teal" data-action="save-rates">${escapeHtml(saveLabel)}</button>` +
     "</div></div></div>"
   );
 }

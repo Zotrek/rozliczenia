@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { rateContractorNames, rateSaveMessage, readAddressList, resolveStoreAddress, saveRateBody, storeAddressLabel, addressWithCommaAfterLocality, matchingStoreAddresses } from "./rateWindow.js";
+import { rateContractorNames, rateSaveMessage, readAddressList, resolveStoreAddress, saveRateBody, saveRateHarmonogramBody, storeAddressLabel, addressWithCommaAfterLocality, matchingStoreAddresses } from "./rateWindow.js";
 
 const gsPath = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -83,6 +83,45 @@ describe("saveRateBody", () => {
       ok: false,
       error: "date",
     });
+  });
+});
+
+describe("saveRateHarmonogramBody", () => {
+  it("test_saveRateHarmonogramBody_includes_days_and_mode", () => {
+    expect(
+      saveRateHarmonogramBody({
+        shop: " ul. A ",
+        contractor: " GPW ",
+        pickup: "100",
+        bag: "0",
+        from: "2026-09-01",
+        days: " pn, cz ",
+      }),
+    ).toEqual({
+      ok: true,
+      body: {
+        mode: "saveRateHarmonogram",
+        sklep: "ul. A",
+        podwykonawca: "GPW",
+        kwotaPodjazd: "100",
+        kwotaWorek: "0",
+        odKiedy: "01.09.2026",
+        dniOdbiorow: "pn, cz",
+      },
+    });
+  });
+
+  it("test_saveRateHarmonogramBody_missing_shop_refuses", () => {
+    expect(
+      saveRateHarmonogramBody({
+        shop: "",
+        contractor: "GPW",
+        pickup: "1",
+        bag: "1",
+        from: "",
+        days: "pn",
+      }).ok,
+    ).toBe(false);
   });
 });
 

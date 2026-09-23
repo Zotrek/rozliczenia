@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { SITE_PASSWORD_FETCH_SNIPPET } from "./sitePasswordFetchSnippet.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const entry = resolve(root, "src/page.ts");
@@ -71,6 +72,7 @@ ${css}
   <div id="app"></div>
   <script>
 ${webAppBootstrap(process.env.TRANSPORT_WEBAPP_URL)}
+${SITE_PASSWORD_FETCH_SNIPPET}
 ${js}
   </script>
 </body>

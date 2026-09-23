@@ -1,8 +1,9 @@
 # Katalog główny repozytorium = pakiet rozliczenia.
 #
 # Wymagany sekret:
-#   TRANSPORT_WEBAPP_URL — URL Web App (Apps Script), ten sam co w arkuszu-mapie.
-#   Build wpisuje go do index.html. W źródłach na main go nie ma.
+#   TRANSPORT_WEBAPP_URL — URL Cloudflare Workera …/api/transport
+#   (NIE bezpośredni script.google.com/…/exec). Build wpisuje go do index.html.
+#   Patrz cloudflare/SETUP.md w monorepo.
 #
 # GitHub Pages: Settings → Pages → Source: Deploy from a branch → gh-pages / (root).
 name: rozliczenia — Pages

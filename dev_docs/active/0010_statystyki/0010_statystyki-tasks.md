@@ -1,7 +1,7 @@
 # Tasks: Statystyki rozliczeń
 
 > **Task:** 0010_statystyki  
-> **Updated:** 2026-09-23 (step 2 GAS done)
+> **Updated:** 2026-09-23 (step 3 UI done)
 
 ## 0. Makieta (zrobione)
 
@@ -38,10 +38,10 @@
 
 ## 3. UI ekranu Statystyki
 
-- [ ] Stan / router: Zakres ↔ Statystyki (Powrót, przycisk na Zakresie)
-- [ ] Filtry: chipy okresu, miesiąc, exact, podwykonawca, Pokaż
-- [ ] KPI + tabele Q/luki/podwykonawcy/0 worków + Worki/Koszty w czasie; zwijanie sekcji/tabel + localStorage
-- [ ] **CHECKPOINT 3:** `npm test` w `rozliczenia/` — pełny suite pass
+- [x] Stan / router: Zakres ↔ Statystyki (Powrót, przycisk na Zakresie)
+- [x] Filtry: chipy okresu, miesiąc, exact, podwykonawca, Pokaż
+- [x] KPI + tabele Q/luki/podwykonawcy/0 worków + Worki/Koszty w czasie; zwijanie sekcji/tabel + localStorage
+- [x] **CHECKPOINT 3:** `npm test` w `rozliczenia/` — 221 pass ✅
 
 ## 4. Domknięcie
 
@@ -64,3 +64,4 @@
 - [x] Update scope: Worki w czasie × tryb (2026-09-23)
 - [x] SPEC § Statystyki + ARCH (3 widoki, `settlementStats`) + PLAN R8 (2026-09-23)
 - [x] Copy UI w makiecie i 0010 wyrównane do języka zarządu
+- [x] Update `-context.md` (step 3 UI: `statsView.ts` / nawigacja / fold)

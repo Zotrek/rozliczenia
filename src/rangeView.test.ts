@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildPage } from "../scripts/build-page.mjs";
-import { CONTRACTOR_LIST_LIMIT, renderApp, renderModes, type RangeViewModel } from "./rangeView.js";
+import { CONTRACTOR_LIST_LIMIT, emptyStats, renderApp, renderModes, type RangeViewModel } from "./rangeView.js";
 import type { StartedSearch } from "./range.js";
 import { emptyStatement } from "./statement.js";
 
@@ -38,6 +38,7 @@ function model(over: Partial<RangeViewModel> = {}): RangeViewModel {
     ratesFrom: "",
     ratesMessage: "",
     ratesMessageOk: false,
+    stats: emptyStats({ year: 2026, month: 9, day: 23 }),
     ...over,
   };
 }
@@ -90,6 +91,19 @@ describe("renderApp", () => {
     expect(html).toContain('data-window="rates"');
     expect(html).not.toContain('data-screen="range"');
     expect(html).not.toContain('data-screen="rates"');
+  });
+
+  it("test_renderApp_stats_button_on_range_and_back_on_stats", () => {
+    const range = renderApp(model({ screen: "range" }));
+    expect(range).toContain('data-action="stats"');
+    expect(range).toContain("Statystyki");
+    expect(range).toContain("Baza stawek");
+    const stats = renderApp(model({ screen: "stats" }));
+    expect(stats).toContain('data-screen="stats"');
+    expect(stats).toContain('data-action="stats-back"');
+    expect(stats).toContain("← Powrót");
+    expect(stats).toContain("Pokaż raport");
+    expect(stats).not.toContain('data-screen="range"');
   });
 
   it("test_renderApp_escapes_contractor_word_data", () => {

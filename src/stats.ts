@@ -696,3 +696,172 @@ function gapEntry(row: StatsRow, kind: RateGapKind, tie: RateTie | null): RateGa
     tie,
   };
 }
+
+export type StatsPeriodKind = "current" | "prev" | "quarter" | "exact";
+
+export interface MonthOption {
+  year: number;
+  month: number;
+  /** `yyyy-mm` */
+  value: string;
+  label: string;
+}
+
+export interface StatsReport {
+  activity: PeriodActivityStats;
+  backlog: BacklogStats;
+  settled: SettledStats;
+  avgQ: AvgQStats;
+  qRanks: QRankStats;
+  rateGaps: RateGapsStats;
+  bagsOverTime: TimeSeriesStats;
+  costsOverTime: TimeSeriesStats;
+  contractorRanks: ContractorRankStats;
+  zeroBags: ZeroBagPickup[];
+}
+
+export const STATS_PAGE_SIZE = 5;
+
+/** Przy ≥ tylu bucketach wykres i tabela w kolumnie (długi okres). */
+export const STATS_STACK_MIN_BUCKETS = 7;
+
+const MONTH_PL = [
+  "",
+  "styczeń",
+  "luty",
+  "marzec",
+  "kwiecień",
+  "maj",
+  "czerwiec",
+  "lipiec",
+  "sierpień",
+  "wrzesień",
+  "październik",
+  "listopad",
+  "grudzień",
+] as const;
+
+/** Pełny raport pod filtry (wszystkie bloki ekranu). */
+export function buildStatsReport(
+  rows: readonly StatsRow[],
+  rates: readonly SettlementRateRow[],
+  filters: StatsFilters,
+): StatsReport {
+  return {
+    activity: aggregatePeriodActivity(rows, filters),
+    backlog: aggregateBacklog(rows, filters.contractor),
+    settled: aggregateSettled(rows, filters),
+    avgQ: aggregateAvgQ(rows, filters),
+    qRanks: aggregateQRanks(rows, filters),
+    rateGaps: aggregateRateGaps(rows, rates, filters.contractor),
+    bagsOverTime: aggregateBagsOverTime(rows, filters),
+    costsOverTime: aggregateCostsOverTime(rows, filters),
+    contractorRanks: aggregateContractorRanks(rows, filters),
+    zeroBags: listZeroBagPickups(rows, filters),
+  };
+}
+
+/** Poprzednie pełne miesiące (bez bieżącego), od najnowszego. */
+export function previousMonthOptions(today: CalendarDate, count = 12): MonthOption[] {
+  const out: MonthOption[] = [];
+  let year = today.year;
+  let month = today.month - 1;
+  for (let i = 0; i < count; i++) {
+    if (month < 1) {
+      month = 12;
+      year -= 1;
+    }
+    out.push({
+      year,
+      month,
+      value: `${year}-${String(month).padStart(2, "0")}`,
+      label: `${MONTH_PL[month]} ${year}`,
+    });
+    month -= 1;
+  }
+  return out;
+}
+
+export function monthOptionLabel(value: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(value);
+  if (!match) {
+    return value;
+  }
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) {
+    return value;
+  }
+  return `${MONTH_PL[month]} ${match[1]}`;
+}
+
+/**
+ * Zakres dat z chipa + pól pomocniczych.
+ * `month` = `yyyy-mm`; `from`/`to` = ISO lub arkusz.
+ */
+export function resolveStatsPeriod(
+  kind: StatsPeriodKind,
+  today: CalendarDate,
+  draft: { month: string; from: string; to: string },
+): SheetDateRange | null {
+  if (kind === "current") {
+    return currentMonthPeriod(today);
+  }
+  if (kind === "quarter") {
+    return previousQuarterPeriod(today);
+  }
+  if (kind === "prev") {
+    const match = /^(\d{4})-(\d{2})$/.exec(draft.month);
+    if (!match) {
+      return null;
+    }
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    if (month < 1 || month > 12) {
+      return null;
+    }
+    return calendarMonthPeriod(year, month);
+  }
+  return exactPeriod(draft.from, draft.to);
+}
+
+/** Podpis pod chipami (język zarządu). */
+export function statsPeriodKindLabel(kind: StatsPeriodKind, monthValue = ""): string {
+  if (kind === "current") {
+    return "bieżący miesiąc";
+  }
+  if (kind === "quarter") {
+    return "ostatni kwartał";
+  }
+  if (kind === "prev") {
+    return monthOptionLabel(monthValue) || "poprzedni miesiąc";
+  }
+  return "dokładny zakres";
+}
+
+export function rateGapLabel(kind: RateGapKind): string {
+  if (kind === "emptyPickup") {
+    return "Brak stawki za dojazd";
+  }
+  if (kind === "emptyBag") {
+    return "Brak stawki za worek";
+  }
+  return "Konflikt: kilka stawek w bazie";
+}
+
+/** Stronicowanie 1-based; pusta lista → strona 1, pusty slice. */
+export function pageSlice<T>(items: readonly T[], page: number, size = STATS_PAGE_SIZE): {
+  page: number;
+  pages: number;
+  slice: T[];
+  total: number;
+} {
+  const total = items.length;
+  const pages = Math.max(1, Math.ceil(total / size) || 1);
+  const safe = Math.min(Math.max(1, page), pages);
+  const start = (safe - 1) * size;
+  return { page: safe, pages, slice: items.slice(start, start + size), total };
+}
+
+export function chartShouldStack(series: TimeSeriesStats): boolean {
+  return series.buckets.length >= STATS_STACK_MIN_BUCKETS;
+}

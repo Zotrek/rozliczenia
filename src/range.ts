@@ -25,7 +25,7 @@ export const RANGE_ERROR = {
 
 export type RangeError = keyof typeof RANGE_ERROR;
 
-export type ScreenId = "range" | "statement";
+export type ScreenId = "range" | "statement" | "stats";
 
 export interface RangeFields {
   /** Nazwa krótka z listy albo pusty tekst, gdy wpis nie jest pozycją listy. */
@@ -242,6 +242,16 @@ export function screenAfterApprove(): ScreenId {
   return "range";
 }
 
+/** Zakres → Statystyki (bez Szukaj). */
+export function screenAfterOpenStats(): ScreenId {
+  return "stats";
+}
+
+/** Statystyki → Zakres. */
+export function screenAfterStatsBack(): ScreenId {
+  return "range";
+}
+
 /** Baza stawek jest oknem na bieżącym ekranie, nie trzecim ekranem. */
 export function openRatesWindow<T extends ScreenId>(screen: T): { screen: T; window: "rates" } {
   return { screen, window: "rates" };
@@ -271,6 +281,24 @@ export function searchParams(query: StartedSearch): Record<string, string> {
   };
   if (query.dataOd) {
     params.dataOd = query.dataOd;
+  }
+  return params;
+}
+
+/** GET `settlementStats`. Oba krańce dat wymagane; pusty podwykonawca = wszyscy. */
+export function statsParams(query: {
+  dataOd: string;
+  dataDo: string;
+  podwykonawca?: string;
+}): Record<string, string> {
+  const params: Record<string, string> = {
+    action: "settlementStats",
+    dataOd: query.dataOd,
+    dataDo: query.dataDo,
+  };
+  const who = query.podwykonawca?.trim() ?? "";
+  if (who !== "") {
+    params.podwykonawca = who;
   }
   return params;
 }

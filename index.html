@@ -133,11 +133,14 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .dates .checkline { grid-column: 1 / -1; }
 .setup-foot {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
+  gap: 8px;
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
+.setup-foot .btn-ghost { flex: 1 1 auto; min-width: 7.5rem; }
 @media (max-width: 520px) {
   .dates { grid-template-columns: 1fr; }
 }
@@ -244,7 +247,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .modal-panel h2 { margin: 0; font-size: 16px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
 .modal-actions .btn-ghost, .modal-actions .btn-teal { width: auto; margin-top: 0; }
-:root { --orange: #ea580c; --orange-deep: #c2410c; }
+:root { --orange: #ea580c; --orange-deep: #c2410c; --rose: #e11d48; }
 .center-h { padding: 12px 14px 0; font-size: 13px; color: var(--muted); font-weight: 650; }
 .table-wrap { flex: 1; min-height: 0; overflow: auto; }
 table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
@@ -343,6 +346,391 @@ td input[type="text"]:focus { border-color: var(--teal); background: #fff; outli
 .overlay-panel img.uni { width: 220px; height: auto; }
 .statement .top .btn-ghost, .statement .top .btn-teal { width: auto; margin-top: 0; }
 
+
+/* —— Statystyki —— */
+.stats {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: #fff;
+}
+.stats .top { flex-wrap: wrap; gap: 12px; }
+.stats .top .brand { margin-right: auto; }
+.stats .filters {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #f8fafc;
+}
+.stats .filters .field input,
+.stats .filters .field select { min-width: 9rem; width: auto; }
+.stats .filters .btn-teal { width: auto; }
+.period-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.chip {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #334155;
+}
+.chip.is-on {
+  background: var(--teal-soft);
+  border-color: transparent;
+  color: var(--teal-deep);
+}
+.exact-range { display: none; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.exact-range.is-on { display: flex; }
+.month-pick { display: none; }
+.month-pick.is-on { display: flex; }
+.stats .body {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.period-label {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 650;
+}
+.period-label strong { color: var(--ink); }
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 900px) {
+  .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.kpi {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+.kpi span {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.kpi b {
+  display: block;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.kpi em {
+  display: block;
+  margin-top: 4px;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 550;
+}
+.kpi.warn b { color: var(--orange-deep); }
+.kpi.ok b { color: var(--teal-deep); }
+.section {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+}
+.section-h {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #f8fafc;
+  cursor: pointer;
+  user-select: none;
+}
+.section-h:hover { background: #f1f5f9; }
+.section-h h2 { margin: 0; font-size: 14px; }
+.section-h .head-text { flex: 1; min-width: 0; }
+.section-h p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 550;
+}
+.section.is-collapsed .section-h { border-bottom: none; }
+.section.is-collapsed .section-b { display: none; }
+.fold-chev {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--teal-deep);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+.table-fold-bar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+.chart-split.is-stack .table-fold-bar { display: flex; }
+.table-fold-bar button {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--teal-deep);
+}
+.table-fold-bar .muted { font-size: 12px; color: var(--muted); font-weight: 550; }
+.chart-split.is-stack .table-pane.is-collapsed { display: none; }
+.chart-split:not(.is-stack) .table-fold-bar { display: none; }
+.chart-split:not(.is-stack) .table-pane { display: block; }
+.section-b { padding: 12px 14px; }
+.bags-grid {
+  display: grid;
+  grid-template-columns: 180px 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .bags-grid { grid-template-columns: 1fr; }
+}
+.rank-block { margin-bottom: 16px; }
+.rank-block:last-child { margin-bottom: 0; }
+.rank-block > .metric {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 750;
+  color: var(--ink);
+}
+.rank-block > .metric span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--muted);
+}
+.rank-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .rank-pair { grid-template-columns: 1fr; }
+}
+.avg-box {
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--teal-soft);
+  text-align: center;
+}
+.avg-box span {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--teal-deep);
+}
+.avg-box b {
+  display: block;
+  margin-top: 6px;
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  color: var(--teal-deep);
+}
+.avg-box em {
+  display: block;
+  margin-top: 4px;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rank h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rank.hi h3 { color: var(--orange-deep); }
+.rank.lo h3 { color: var(--teal-deep); }
+.stats td.shop { font-weight: 700; white-space: normal; }
+.stats .sub { display: block; font-size: 12px; font-weight: 550; color: var(--muted); }
+.tag-gap { background: #ffe4e6; color: var(--rose); }
+.tag-tie { background: #fef3c7; color: #92400e; }
+.money.hi { color: var(--orange-deep); }
+.money.lo { color: var(--teal-deep); }
+.bags-time-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 140px;
+  padding: 8px 4px 0;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.bags-time-chart.is-dense {
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.bags-time-chart.is-dense .bags-time-col { flex: 0 0 40px; }
+.bags-time-chart.is-dense .bags-time-stack { max-width: 28px; height: 140px; }
+.bags-time-chart.is-dense .wk {
+  font-size: 10px;
+  transform: rotate(-35deg);
+  width: 3.2rem;
+  margin-top: 6px;
+  margin-bottom: 8px;
+}
+.bags-time-col {
+  flex: 0 0 52px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.bags-time-stack {
+  width: 100%;
+  max-width: 36px;
+  height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.bags-time-stack i {
+  display: block;
+  width: 100%;
+  border-radius: 4px 4px 2px 2px;
+  min-height: 0;
+}
+.bags-time-stack .s-na { background: var(--teal); }
+.bags-time-stack .s-h { background: var(--orange); }
+.bags-time-col .wk {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.2;
+}
+.bags-time-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.bags-time-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  margin-right: 4px;
+}
+.bags-time-legend .c-na { background: var(--teal); }
+.bags-time-legend .c-h { background: var(--orange); }
+.chart-split {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.chart-split.is-stack { grid-template-columns: 1fr; }
+@media (max-width: 720px) {
+  .chart-split { grid-template-columns: 1fr; }
+}
+.chart-split .bags-time-chart {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.chart-split.is-stack .bags-time-chart {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+  padding-bottom: 4px;
+}
+.chart-split .table-pane { overflow: auto; max-height: 220px; }
+.chart-split.is-stack .table-pane { max-height: none; }
+.stats .note {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.4;
+}
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--line);
+  background: #f8fafc;
+}
+.pager .meta {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--muted);
+}
+.pager .nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pager button {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.pager button:disabled { opacity: 0.45; }
+.pager .page-label {
+  font-size: 12px;
+  font-weight: 750;
+  color: var(--ink);
+  min-width: 4.5rem;
+  text-align: center;
+}
 
   </style>
 </head>
@@ -580,6 +968,14 @@ function screenAfterChangeRange() {
 function screenAfterApprove() {
     return "range";
 }
+/** Zakres → Statystyki (bez Szukaj). */
+function screenAfterOpenStats() {
+    return "stats";
+}
+/** Statystyki → Zakres. */
+function screenAfterStatsBack() {
+    return "range";
+}
 /** Baza stawek jest oknem na bieżącym ekranie, nie trzecim ekranem. */
 function openRatesWindow(screen) {
     return { screen, window: "rates" };
@@ -603,6 +999,19 @@ function searchParams(query) {
     };
     if (query.dataOd) {
         params.dataOd = query.dataOd;
+    }
+    return params;
+}
+/** GET `settlementStats`. Oba krańce dat wymagane; pusty podwykonawca = wszyscy. */
+function statsParams(query) {
+    const params = {
+        action: "settlementStats",
+        dataOd: query.dataOd,
+        dataDo: query.dataDo,
+    };
+    const who = query.podwykonawca?.trim() ?? "";
+    if (who !== "") {
+        params.podwykonawca = who;
     }
     return params;
 }
@@ -1262,6 +1671,30 @@ function readSettlement(body) {
     }
     return { ok: true, rows, rates };
 }
+/** Odczyt `settlementStats` — wiersze z settled/happened/P/Q. */
+function readSettlementStats(body) {
+    if (!isRecord(body) || body.ok !== true || !Array.isArray(body.rows) || !Array.isArray(body.rates)) {
+        const error = isRecord(body) && typeof body.error === "string" ? body.error : "Odczyt statystyk nie doszedł.";
+        return { ok: false, error };
+    }
+    const rows = [];
+    for (const item of body.rows) {
+        const row = readStatsRow(item);
+        if (!row) {
+            return { ok: false, error: "Odczyt statystyk nie doszedł." };
+        }
+        rows.push(row);
+    }
+    const rates = [];
+    for (const item of body.rates) {
+        const rate = readRateRow(item);
+        if (!rate) {
+            return { ok: false, error: "Odczyt statystyk nie doszedł." };
+        }
+        rates.push(rate);
+    }
+    return { ok: true, rows, rates };
+}
 function findRow(rows, sheetRow, transportNumber) {
     return rows.find((row) => row.sheetRow === sheetRow && row.transportNumber === transportNumber) ?? null;
 }
@@ -1679,6 +2112,27 @@ function readRegisterRow(value) {
         bagRate,
     };
 }
+function readStatsRow(value) {
+    const base = readRegisterRow(value);
+    if (!base || !isRecord(value)) {
+        return null;
+    }
+    if (typeof value.settled !== "boolean" || typeof value.happened !== "boolean") {
+        return null;
+    }
+    const receptionCost = readGrosze(value.receptionCost);
+    const costPerBag = readGrosze(value.costPerBag);
+    if (receptionCost === undefined || costPerBag === undefined) {
+        return null;
+    }
+    return {
+        ...base,
+        settled: value.settled,
+        happened: value.happened,
+        receptionCost,
+        costPerBag,
+    };
+}
 function readRateRow(value) {
     if (!isRecord(value)) {
         return null;
@@ -1939,6 +2393,988 @@ function shopsWord(count) {
 }
 
 
+/**
+ * Który wiersz Bazy stawek obowiązuje w dniu odbioru.
+ * Pusta data jest starsza niż każda wpisana. Wygrywa najpóźniejsza data nie późniejsza niż odbiór.
+ * Dwa wiersze tej daty to remis, nie 0 zł. Starszy dublet, który przegrywa z późniejszą datą, nie blokuje.
+ */
+function resolveRate(rates, shop, contractor, pickupDate) {
+    parseSheetDate(pickupDate);
+    const matching = rates
+        .map((rate, index) => ({ rate, index }))
+        .filter((entry) => entry.rate.shop === shop &&
+        entry.rate.contractor === contractor &&
+        isOnOrBefore(entry.rate.validFrom, pickupDate));
+    if (matching.length === 0) {
+        return { kind: "none" };
+    }
+    let bestFrom = matching[0].rate.validFrom;
+    for (const entry of matching) {
+        if (compareSheetDate(entry.rate.validFrom, bestFrom) > 0) {
+            bestFrom = entry.rate.validFrom;
+        }
+    }
+    const winners = matching.filter((entry) => entry.rate.validFrom === bestFrom);
+    if (winners.length > 1) {
+        const candidates = winners.map((entry) => ({
+            index: entry.index,
+            validFrom: entry.rate.validFrom,
+            pickupAmount: entry.rate.pickupAmount,
+            bagAmount: entry.rate.bagAmount,
+        }));
+        return {
+            kind: "tie",
+            tie: { shop, contractor, validFrom: bestFrom, candidates },
+        };
+    }
+    return {
+        kind: "ok",
+        pickupAmount: winners[0].rate.pickupAmount,
+        bagAmount: winners[0].rate.bagAmount,
+    };
+}
+
+
+
+
+
+
+/** Próg inkluzywnej długości okresu: ≤ → tygodnie, inaczej miesiące. */
+const TIME_SERIES_WEEK_MAX_DAYS = 45;
+const SHEET_DATE = /^(\d{2})\.(\d{2})\.(\d{4})$/;
+const MS_DAY = 86_400_000;
+/** `CalendarDate` → tekst arkusza `dd.mm.yyyy`. */
+function formatSheetDate(date) {
+    return `${String(date.day).padStart(2, "0")}.${String(date.month).padStart(2, "0")}.${date.year}`;
+}
+/** Od 1. dnia bieżącego miesiąca do dziś (włącznie). */
+function currentMonthPeriod(today) {
+    return {
+        from: formatSheetDate({ year: today.year, month: today.month, day: 1 }),
+        to: formatSheetDate(today),
+    };
+}
+/** Pełny miesiąc kalendarzowy. `month` = 1..12. */
+function calendarMonthPeriod(year, month) {
+    return {
+        from: formatSheetDate({ year, month, day: 1 }),
+        to: formatSheetDate({ year, month, day: daysInMonth(year, month) }),
+    };
+}
+/**
+ * Pełny poprzedni kwartał względem `today`
+ * (nie „ostatnie 90 dni”).
+ */
+function previousQuarterPeriod(today) {
+    const quarter = Math.ceil(today.month / 3);
+    if (quarter === 1) {
+        return calendarMonthSpan(today.year - 1, 10, 12);
+    }
+    const startMonth = (quarter - 2) * 3 + 1;
+    return calendarMonthSpan(today.year, startMonth, startMonth + 2);
+}
+/**
+ * Exact od–do. ISO `yyyy-mm-dd` albo już `dd.mm.yyyy`.
+ * Zły kalendarz albo from > to → null.
+ */
+function exactPeriod(from, to) {
+    const dataOd = toSheetBound(from);
+    const dataDo = toSheetBound(to);
+    if (!dataOd || !dataDo) {
+        return null;
+    }
+    if (compareSheetDate(dataOd, dataDo) > 0) {
+        return null;
+    }
+    return { from: dataOd, to: dataDo };
+}
+/** Data odbioru ∈ [from, to] włącznie. */
+function inSheetDateRange(pickupDate, range) {
+    return (compareSheetDate(pickupDate, range.from) >= 0 && compareSheetDate(pickupDate, range.to) <= 0);
+}
+/** Tydzień przy okresie ≤ 45 dni (włącznie), inaczej miesiąc. */
+function timeBucketGranularity(range) {
+    return inclusiveDayCount(range) <= TIME_SERIES_WEEK_MAX_DAYS ? "week" : "month";
+}
+/**
+ * Backlog: nierozliczone i odbyte (bez filtra okresu).
+ * Szacunek = `settle().total` (trasa raz).
+ */
+function aggregateBacklog(rows, contractor) {
+    const open = rows.filter((row) => !row.settled && row.happened && matchesContractor(row, contractor));
+    const statement = settle({
+        rows: open.map(toRegisterRow),
+        rates: [],
+        screenByRow: {},
+    });
+    return { count: open.length, estimate: statement.total };
+}
+/** Rozliczone w okresie: odbyte, suma kol. P. */
+function aggregateSettled(rows, filters) {
+    const matched = rows.filter((row) => row.settled &&
+        row.happened &&
+        matchesContractor(row, filters.contractor) &&
+        inSheetDateRange(row.pickupDate, filters.range));
+    return {
+        count: matched.length,
+        receptionSum: matched.reduce((sum, row) => sum + (row.receptionCost ?? 0), 0),
+    };
+}
+/**
+ * Średnia Q: rozliczone, odbyte, worki > 0, Q niepuste.
+ * Średnia w groszach z `divRoundHalfUp`.
+ */
+function aggregateAvgQ(rows, filters) {
+    const pool = qPool(rows, filters);
+    if (pool.length === 0) {
+        return { average: null, sampleCount: 0 };
+    }
+    const sum = pool.reduce((acc, row) => acc + row.costPerBag, 0);
+    return { average: divRoundHalfUp(sum, pool.length), sampleCount: pool.length };
+}
+/** Top N (domyślnie 5) najdroższe / najtańsze po Q. */
+function aggregateQRanks(rows, filters, topN = 5) {
+    const entries = qPool(rows, filters).map(toRankEntry);
+    const byQDesc = [...entries].sort((a, b) => b.costPerBag - a.costPerBag || a.address.localeCompare(b.address));
+    const byQAsc = [...entries].sort((a, b) => a.costPerBag - b.costPerBag || a.address.localeCompare(b.address));
+    return {
+        expensive: byQDesc.slice(0, topN),
+        cheap: byQAsc.slice(0, topN),
+    };
+}
+/**
+ * Luki: puste L/M na nierozliczonych odbytych + remis `resolveRate` na wierszu.
+ * Zero w L/M nie jest luką.
+ */
+function aggregateRateGaps(rows, rates, contractor) {
+    const open = rows.filter((row) => !row.settled && row.happened && matchesContractor(row, contractor));
+    const entries = [];
+    for (const row of open) {
+        if (row.pickupRate === null) {
+            entries.push(gapEntry(row, "emptyPickup", null));
+        }
+        if (row.bagRate === null) {
+            entries.push(gapEntry(row, "emptyBag", null));
+        }
+        const resolved = resolveRate(rates, row.address, row.contractor, row.pickupDate);
+        if (resolved.kind === "tie") {
+            entries.push(gapEntry(row, "tie", resolved.tie));
+        }
+    }
+    const emptySnapshotCount = entries.filter((e) => e.kind === "emptyPickup" || e.kind === "emptyBag").length;
+    const tieCount = entries.filter((e) => e.kind === "tie").length;
+    return {
+        entries,
+        emptySnapshotCount,
+        tieCount,
+        total: emptySnapshotCount + tieCount,
+    };
+}
+/** Remisy w Bazie: ≥2 wiersze tej samej pary i `validFrom`. */
+function findRateTiesInBase(rates) {
+    const groups = new Map();
+    rates.forEach((rateRow, index) => {
+        const key = `${rateRow.shop}\t${rateRow.contractor}\t${rateRow.validFrom}`;
+        const group = groups.get(key);
+        if (group) {
+            group.push({ rate: rateRow, index });
+        }
+        else {
+            groups.set(key, [{ rate: rateRow, index }]);
+        }
+    });
+    const ties = [];
+    for (const group of groups.values()) {
+        if (group.length < 2) {
+            continue;
+        }
+        const first = group[0].rate;
+        const candidates = group.map((entry) => ({
+            index: entry.index,
+            validFrom: entry.rate.validFrom,
+            pickupAmount: entry.rate.pickupAmount,
+            bagAmount: entry.rate.bagAmount,
+        }));
+        ties.push({
+            shop: first.shop,
+            contractor: first.contractor,
+            validFrom: first.validFrom,
+            candidates,
+        });
+    }
+    return ties;
+}
+/** Liczba zrealizowanych odbiorów + unikalne adresy w okresie. */
+function aggregatePeriodActivity(rows, filters) {
+    const matched = rows.filter((row) => row.happened &&
+        matchesContractor(row, filters.contractor) &&
+        inSheetDateRange(row.pickupDate, filters.range));
+    const addresses = new Set(matched.map((row) => row.address));
+    return { pickupCount: matched.length, uniqueShopCount: addresses.size };
+}
+/**
+ * Suma worków (I) z zrealizowanych odbiorów w buckettach.
+ * Brak trybu = Na zgłoszenie.
+ */
+function aggregateBagsOverTime(rows, filters) {
+    return aggregateTimeSeries(rows, filters, {
+        include: (row) => row.happened,
+        value: (row) => row.bagCount ?? 0,
+    });
+}
+/**
+ * Suma kosztów rozliczonych (P) w buckettach.
+ * Brak trybu = Na zgłoszenie.
+ */
+function aggregateCostsOverTime(rows, filters) {
+    return aggregateTimeSeries(rows, filters, {
+        include: (row) => row.happened && row.settled,
+        value: (row) => row.receptionCost ?? 0,
+    });
+}
+/**
+ * Ranking podwykonawców: śr. P i śr. Q.
+ * Tylko rozliczone, zrealizowane, worki > 0.
+ */
+function aggregateContractorRanks(rows, filters, topN = 5) {
+    const pool = qPool(rows, filters);
+    const byContractor = new Map();
+    for (const row of pool) {
+        const prev = byContractor.get(row.contractor) ?? { pSum: 0, qSum: 0, count: 0 };
+        byContractor.set(row.contractor, {
+            pSum: prev.pSum + (row.receptionCost ?? 0),
+            qSum: prev.qSum + row.costPerBag,
+            count: prev.count + 1,
+        });
+    }
+    const byShop = [];
+    const byBag = [];
+    for (const [contractor, agg] of byContractor) {
+        byShop.push({
+            contractor,
+            average: divRoundHalfUp(agg.pSum, agg.count),
+            pickupCount: agg.count,
+        });
+        byBag.push({
+            contractor,
+            average: divRoundHalfUp(agg.qSum, agg.count),
+            pickupCount: agg.count,
+        });
+    }
+    return {
+        byShop: rankContractors(byShop, topN),
+        byBag: rankContractors(byBag, topN),
+    };
+}
+/**
+ * Odbiory z I = 0 w okresie (także nierozliczone).
+ * `null` ilości nie wchodzi (to nie zero).
+ */
+function listZeroBagPickups(rows, filters) {
+    return rows
+        .filter((row) => row.happened &&
+        row.bagCount === 0 &&
+        matchesContractor(row, filters.contractor) &&
+        inSheetDateRange(row.pickupDate, filters.range))
+        .map((row) => ({
+        address: row.address,
+        shopName: row.shopName,
+        contractor: row.contractor,
+        pickupDate: row.pickupDate,
+        settled: row.settled,
+        receptionCost: row.receptionCost,
+    }))
+        .sort((a, b) => compareSheetDate(a.pickupDate, b.pickupDate) || a.address.localeCompare(b.address));
+}
+function aggregateTimeSeries(rows, filters, rules) {
+    const granularity = timeBucketGranularity(filters.range);
+    const frames = buildTimeBuckets(filters.range, granularity);
+    const matched = rows.filter((row) => rules.include(row) &&
+        matchesContractor(row, filters.contractor) &&
+        inSheetDateRange(row.pickupDate, filters.range));
+    const buckets = frames.map((frame) => {
+        let report = 0;
+        let schedule = 0;
+        for (const row of matched) {
+            if (!inSheetDateRange(row.pickupDate, frame)) {
+                continue;
+            }
+            const amount = rules.value(row);
+            if (rowMode(row) === "schedule") {
+                schedule += amount;
+            }
+            else {
+                report += amount;
+            }
+        }
+        return {
+            label: frame.label,
+            from: frame.from,
+            to: frame.to,
+            report,
+            schedule,
+            total: report + schedule,
+        };
+    });
+    return { granularity, buckets };
+}
+function buildTimeBuckets(range, granularity) {
+    if (granularity === "month") {
+        return buildMonthBuckets(range);
+    }
+    return buildWeekBuckets(range);
+}
+function buildWeekBuckets(range) {
+    const rangeFrom = parseSheetDate(range.from);
+    const rangeTo = parseSheetDate(range.to);
+    let cursor = mondayOnOrBefore(rangeFrom);
+    const buckets = [];
+    while (compareCalendar(cursor, rangeTo) <= 0) {
+        const weekEnd = addDays(cursor, 6);
+        const clipFrom = maxCalendar(cursor, rangeFrom);
+        const clipTo = minCalendar(weekEnd, rangeTo);
+        if (compareCalendar(clipFrom, clipTo) <= 0) {
+            buckets.push({
+                from: formatSheetDate(clipFrom),
+                to: formatSheetDate(clipTo),
+                label: formatWeekLabel(clipFrom, clipTo),
+            });
+        }
+        cursor = addDays(cursor, 7);
+    }
+    return buckets;
+}
+function buildMonthBuckets(range) {
+    const rangeFrom = parseSheetDate(range.from);
+    const rangeTo = parseSheetDate(range.to);
+    let year = rangeFrom.year;
+    let month = rangeFrom.month;
+    const buckets = [];
+    while (year < rangeTo.year || (year === rangeTo.year && month <= rangeTo.month)) {
+        const monthStart = { year, month, day: 1 };
+        const monthEnd = { year, month, day: daysInMonth(year, month) };
+        const clipFrom = maxCalendar(monthStart, rangeFrom);
+        const clipTo = minCalendar(monthEnd, rangeTo);
+        if (compareCalendar(clipFrom, clipTo) <= 0) {
+            buckets.push({
+                from: formatSheetDate(clipFrom),
+                to: formatSheetDate(clipTo),
+                label: `${String(month).padStart(2, "0")}.${year}`,
+            });
+        }
+        month += 1;
+        if (month > 12) {
+            month = 1;
+            year += 1;
+        }
+    }
+    return buckets;
+}
+function formatWeekLabel(from, to) {
+    if (from.month === to.month && from.year === to.year) {
+        return `${from.day}–${to.day}.${String(from.month).padStart(2, "0")}`;
+    }
+    return `${from.day}.${String(from.month).padStart(2, "0")}–${to.day}.${String(to.month).padStart(2, "0")}`;
+}
+function rankContractors(entries, topN) {
+    const desc = [...entries].sort((a, b) => b.average - a.average || a.contractor.localeCompare(b.contractor));
+    const asc = [...entries].sort((a, b) => a.average - b.average || a.contractor.localeCompare(b.contractor));
+    return { expensive: desc.slice(0, topN), cheap: asc.slice(0, topN) };
+}
+function rowMode(row) {
+    return row.mode === "schedule" ? "schedule" : "report";
+}
+function inclusiveDayCount(range) {
+    const from = parseSheetDate(range.from);
+    const to = parseSheetDate(range.to);
+    return Math.round((toUtcMs(to) - toUtcMs(from)) / MS_DAY) + 1;
+}
+function mondayOnOrBefore(date) {
+    const utc = new Date(toUtcMs(date));
+    const dow = utc.getUTCDay();
+    const back = dow === 0 ? 6 : dow - 1;
+    return addDays(date, -back);
+}
+function addDays(date, days) {
+    const next = new Date(toUtcMs(date) + days * MS_DAY);
+    return {
+        year: next.getUTCFullYear(),
+        month: next.getUTCMonth() + 1,
+        day: next.getUTCDate(),
+    };
+}
+function toUtcMs(date) {
+    return Date.UTC(date.year, date.month - 1, date.day);
+}
+function compareCalendar(a, b) {
+    if (a.year !== b.year) {
+        return a.year - b.year;
+    }
+    if (a.month !== b.month) {
+        return a.month - b.month;
+    }
+    return a.day - b.day;
+}
+function maxCalendar(a, b) {
+    return compareCalendar(a, b) >= 0 ? a : b;
+}
+function minCalendar(a, b) {
+    return compareCalendar(a, b) <= 0 ? a : b;
+}
+function calendarMonthSpan(year, fromMonth, toMonth) {
+    return {
+        from: formatSheetDate({ year, month: fromMonth, day: 1 }),
+        to: formatSheetDate({ year, month: toMonth, day: daysInMonth(year, toMonth) }),
+    };
+}
+function daysInMonth(year, month) {
+    return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+function toSheetBound(text) {
+    const trimmed = text.trim();
+    if (trimmed === "") {
+        return null;
+    }
+    if (SHEET_DATE.test(trimmed)) {
+        try {
+            parseSheetDate(trimmed);
+            return trimmed;
+        }
+        catch {
+            return null;
+        }
+    }
+    return isoToSheetDate(trimmed);
+}
+function matchesContractor(row, contractor) {
+    if (contractor === undefined || contractor === "") {
+        return true;
+    }
+    return row.contractor === contractor;
+}
+function toRegisterRow(row) {
+    return {
+        sheetRow: row.sheetRow,
+        transportNumber: row.transportNumber,
+        address: row.address,
+        shopName: row.shopName,
+        pickupDate: row.pickupDate,
+        contractor: row.contractor,
+        bagCount: row.bagCount,
+        routeName: row.routeName,
+        routeRate: row.routeRate,
+        pickupRate: row.pickupRate,
+        bagRate: row.bagRate,
+    };
+}
+function qPool(rows, filters) {
+    return rows.filter((row) => row.settled &&
+        row.happened &&
+        matchesContractor(row, filters.contractor) &&
+        inSheetDateRange(row.pickupDate, filters.range) &&
+        row.bagCount !== null &&
+        row.bagCount > 0 &&
+        row.costPerBag !== null);
+}
+function toRankEntry(row) {
+    return {
+        address: row.address,
+        shopName: row.shopName,
+        pickupDate: row.pickupDate,
+        contractor: row.contractor,
+        bagCount: row.bagCount,
+        costPerBag: row.costPerBag,
+    };
+}
+function gapEntry(row, kind, tie) {
+    return {
+        address: row.address,
+        shopName: row.shopName,
+        contractor: row.contractor,
+        pickupDate: row.pickupDate,
+        kind,
+        tie,
+    };
+}
+const STATS_PAGE_SIZE = 5;
+/** Przy ≥ tylu bucketach wykres i tabela w kolumnie (długi okres). */
+const STATS_STACK_MIN_BUCKETS = 7;
+const MONTH_PL = [
+    "",
+    "styczeń",
+    "luty",
+    "marzec",
+    "kwiecień",
+    "maj",
+    "czerwiec",
+    "lipiec",
+    "sierpień",
+    "wrzesień",
+    "październik",
+    "listopad",
+    "grudzień",
+];
+/** Pełny raport pod filtry (wszystkie bloki ekranu). */
+function buildStatsReport(rows, rates, filters) {
+    return {
+        activity: aggregatePeriodActivity(rows, filters),
+        backlog: aggregateBacklog(rows, filters.contractor),
+        settled: aggregateSettled(rows, filters),
+        avgQ: aggregateAvgQ(rows, filters),
+        qRanks: aggregateQRanks(rows, filters),
+        rateGaps: aggregateRateGaps(rows, rates, filters.contractor),
+        bagsOverTime: aggregateBagsOverTime(rows, filters),
+        costsOverTime: aggregateCostsOverTime(rows, filters),
+        contractorRanks: aggregateContractorRanks(rows, filters),
+        zeroBags: listZeroBagPickups(rows, filters),
+    };
+}
+/** Poprzednie pełne miesiące (bez bieżącego), od najnowszego. */
+function previousMonthOptions(today, count = 12) {
+    const out = [];
+    let year = today.year;
+    let month = today.month - 1;
+    for (let i = 0; i < count; i++) {
+        if (month < 1) {
+            month = 12;
+            year -= 1;
+        }
+        out.push({
+            year,
+            month,
+            value: `${year}-${String(month).padStart(2, "0")}`,
+            label: `${MONTH_PL[month]} ${year}`,
+        });
+        month -= 1;
+    }
+    return out;
+}
+function monthOptionLabel(value) {
+    const match = /^(\d{4})-(\d{2})$/.exec(value);
+    if (!match) {
+        return value;
+    }
+    const month = Number(match[2]);
+    if (month < 1 || month > 12) {
+        return value;
+    }
+    return `${MONTH_PL[month]} ${match[1]}`;
+}
+/**
+ * Zakres dat z chipa + pól pomocniczych.
+ * `month` = `yyyy-mm`; `from`/`to` = ISO lub arkusz.
+ */
+function resolveStatsPeriod(kind, today, draft) {
+    if (kind === "current") {
+        return currentMonthPeriod(today);
+    }
+    if (kind === "quarter") {
+        return previousQuarterPeriod(today);
+    }
+    if (kind === "prev") {
+        const match = /^(\d{4})-(\d{2})$/.exec(draft.month);
+        if (!match) {
+            return null;
+        }
+        const year = Number(match[1]);
+        const month = Number(match[2]);
+        if (month < 1 || month > 12) {
+            return null;
+        }
+        return calendarMonthPeriod(year, month);
+    }
+    return exactPeriod(draft.from, draft.to);
+}
+/** Podpis pod chipami (język zarządu). */
+function statsPeriodKindLabel(kind, monthValue = "") {
+    if (kind === "current") {
+        return "bieżący miesiąc";
+    }
+    if (kind === "quarter") {
+        return "ostatni kwartał";
+    }
+    if (kind === "prev") {
+        return monthOptionLabel(monthValue) || "poprzedni miesiąc";
+    }
+    return "dokładny zakres";
+}
+function rateGapLabel(kind) {
+    if (kind === "emptyPickup") {
+        return "Brak stawki za dojazd";
+    }
+    if (kind === "emptyBag") {
+        return "Brak stawki za worek";
+    }
+    return "Konflikt: kilka stawek w bazie";
+}
+/** Stronicowanie 1-based; pusta lista → strona 1, pusty slice. */
+function pageSlice(items, page, size = STATS_PAGE_SIZE) {
+    const total = items.length;
+    const pages = Math.max(1, Math.ceil(total / size) || 1);
+    const safe = Math.min(Math.max(1, page), pages);
+    const start = (safe - 1) * size;
+    return { page: safe, pages, slice: items.slice(start, start + size), total };
+}
+function chartShouldStack(series) {
+    return series.buckets.length >= STATS_STACK_MIN_BUCKETS;
+}
+
+
+
+
+const STATS_FOLD_LS_PREFIX = "rozliczenia.stats.fold.";
+function defaultStatsView(today, over = {}) {
+    const months = previousMonthOptions(today);
+    const month = months[0]?.value ?? `${today.year}-${String(today.month).padStart(2, "0")}`;
+    return {
+        period: "current",
+        month,
+        from: "",
+        to: "",
+        contractor: "",
+        contractors: [],
+        months,
+        today,
+        appliedFrom: "",
+        appliedTo: "",
+        appliedKind: "current",
+        appliedMonth: month,
+        appliedContractor: "",
+        report: null,
+        status: "",
+        emptyBagsPage: 1,
+        gapsPage: 1,
+        sectionsCollapsed: {},
+        tablesCollapsed: {},
+        ...over,
+    };
+}
+function readStatsFold(storage, key) {
+    if (!storage) {
+        return null;
+    }
+    try {
+        return storage.getItem(STATS_FOLD_LS_PREFIX + key);
+    }
+    catch {
+        return null;
+    }
+}
+function writeStatsFold(storage, key, value) {
+    if (!storage) {
+        return;
+    }
+    try {
+        storage.setItem(STATS_FOLD_LS_PREFIX + key, value);
+    }
+    catch {
+        /* ignore quota / private mode */
+    }
+}
+/** Stan sekcji z localStorage (closed = zwinięta). */
+function loadSectionsCollapsed(storage, ids) {
+    const out = {};
+    for (const id of ids) {
+        out[id] = readStatsFold(storage, `section.${id}`) === "closed";
+    }
+    return out;
+}
+/**
+ * Tabele pod długim wykresem: brak zapisu → zwinięta;
+ * przy krótkim okresie ignorujemy collaps (zawsze widoczna).
+ */
+function loadTablesCollapsed(storage, ids, stacked) {
+    const out = {};
+    for (const id of ids) {
+        if (!stacked[id]) {
+            out[id] = false;
+            continue;
+        }
+        const saved = readStatsFold(storage, `table.${id}`);
+        out[id] = saved == null ? true : saved === "closed";
+    }
+    return out;
+}
+function renderStatsScreen(model) {
+    return ('<div class="stats" data-screen="stats">' +
+        statsTop() +
+        statsFilters(model) +
+        statsBody(model) +
+        "</div>");
+}
+function statsTop() {
+    return ('<div class="top">' +
+        '<div class="brand"><img src="logo.png" alt="" width="36" height="36">' +
+        "<div><strong>Rozliczenia</strong><em>Statystyki</em></div></div>" +
+        '<button type="button" class="btn-ghost" data-action="stats-back">← Powrót</button>' +
+        "</div>");
+}
+function statsFilters(model) {
+    const chips = [
+        { id: "current", label: "Bieżący miesiąc" },
+        { id: "prev", label: "Poprzednie miesiące" },
+        { id: "quarter", label: "Ostatni kwartał" },
+        { id: "exact", label: "Dokładny zakres" },
+    ];
+    const chipHtml = chips
+        .map((chip) => `<button type="button" class="chip${model.period === chip.id ? " is-on" : ""}" ` +
+        `data-action="stats-period" data-period="${chip.id}">${chip.label}</button>`)
+        .join("");
+    const monthOpts = model.months
+        .map((m) => `<option value="${escapeHtml(m.value)}"${m.value === model.month ? " selected" : ""}>` +
+        `${escapeHtml(m.label)}</option>`)
+        .join("");
+    const whoOpts = '<option value="">Wszyscy</option>' +
+        model.contractors
+            .map((c) => {
+            const name = c.nazwa.trim();
+            if (name === "") {
+                return "";
+            }
+            return (`<option value="${escapeHtml(name)}"${name === model.contractor ? " selected" : ""}>` +
+                `${escapeHtml(name)}</option>`);
+        })
+            .join("");
+    return ('<div class="filters">' +
+        '<div class="field" style="flex: 1 1 100%;"><span>Okres</span>' +
+        `<div class="period-chips" role="group" aria-label="Okres">${chipHtml}</div></div>` +
+        `<div class="field month-pick${model.period === "prev" ? " is-on" : ""}">` +
+        '<label for="stats-month">Miesiąc</label>' +
+        `<select id="stats-month" data-stats="month">${monthOpts}</select></div>` +
+        `<div class="exact-range${model.period === "exact" ? " is-on" : ""}">` +
+        '<div class="field"><label for="stats-from">Od</label>' +
+        `<input id="stats-from" type="date" data-stats="from" value="${escapeHtml(model.from)}"></div>` +
+        '<div class="field"><label for="stats-to">Do</label>' +
+        `<input id="stats-to" type="date" data-stats="to" value="${escapeHtml(model.to)}"></div></div>` +
+        '<div class="field"><label for="stats-who">Podwykonawca</label>' +
+        `<select id="stats-who" data-stats="contractor">${whoOpts}</select></div>` +
+        '<button type="button" class="btn-teal" data-action="stats-show">Pokaż raport</button>' +
+        "</div>");
+}
+function statsBody(model) {
+    const status = model.status ? `<p class="err">${escapeHtml(model.status)}</p>` : "";
+    if (!model.report) {
+        return (`<div class="body">${status}` +
+            '<p class="period-label">Wybierz okres i naciśnij <strong>Pokaż raport</strong>.</p></div>');
+    }
+    const who = model.appliedContractor === "" ? "Wszyscy" : model.appliedContractor;
+    const kindLabel = statsPeriodKindLabel(model.appliedKind, model.appliedMonth);
+    const periodLabel = `Okres: <strong>${escapeHtml(model.appliedFrom)} – ${escapeHtml(model.appliedTo)}</strong>` +
+        ` (${escapeHtml(kindLabel)}) · podwykonawca: <strong>${escapeHtml(who)}</strong>`;
+    return (`<div class="body">${status}` +
+        `<p class="period-label">${periodLabel}</p>` +
+        kpiGrid(model.report) +
+        section("bags", model, "Ile worków zabrano w czasie", bagsTimeSub(model.report.bagsOverTime), timeSeriesBlock("bags", model, model.report.bagsOverTime, false)) +
+        section("costs", model, "Ile zapłacono w czasie", costsTimeSub(model.report.costsOverTime), timeSeriesBlock("costs", model, model.report.costsOverTime, true)) +
+        section("q", model, "Koszt w przeliczeniu na worek", "Tylko rozliczone odbiory, w których zabrano worki · 5 najdroższych i 5 najtańszych sklepów", qRanksBlock(model.report)) +
+        section("contractors", model, "Podwykonawcy — kto jest droższy, kto tańszy", "Średnie z rozliczonych odbiorów z workami · 5 najwyższych i 5 najniższych · najlepiej przy wyborze „Wszyscy”", contractorsBlock(model.report)) +
+        section("empty-bags", model, "Odbiory bez worków", "Zrealizowane w okresie, ale bez zabranych worków · także jeszcze nierozliczone · po 5 na stronę", zeroBagsBlock(model), true) +
+        section("gaps", model, "Problemy ze stawkami", "Odbiory jeszcze nierozliczone, przy których brakuje stawki albo w bazie jest więcej niż jedna · po 5 na stronę", gapsBlock(model), true) +
+        "</div>");
+}
+function bagsTimeSub(series) {
+    const unit = series.granularity === "week" ? "tygodniami" : "miesiącami";
+    return `Suma worków z zrealizowanych odbiorów · ${unit} · według sposobu zlecenia`;
+}
+function costsTimeSub(series) {
+    const unit = series.granularity === "week" ? "tygodniami" : "miesiącami";
+    return `Suma kosztów już rozliczonych · ${unit} · według sposobu zlecenia`;
+}
+function section(id, model, title, sub, body, flush = false) {
+    const collapsed = model.sectionsCollapsed[id] === true;
+    const chev = collapsed ? "▸" : "▾";
+    const aria = collapsed ? "Rozwiń sekcję" : "Zwiń sekcję";
+    return (`<section class="section${collapsed ? " is-collapsed" : ""}" data-fold="${id}">` +
+        `<div class="section-h" data-action="stats-fold" data-fold="${id}">` +
+        `<div class="head-text"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(sub)}</p></div>` +
+        `<button type="button" class="fold-chev" aria-label="${aria}">${chev}</button></div>` +
+        `<div class="section-b"${flush ? ' style="padding: 0;"' : ""}>${body}</div></section>`);
+}
+function kpiGrid(report) {
+    const gapsSub = `${report.rateGaps.emptySnapshotCount} bez stawki · ${report.rateGaps.tieCount} ` +
+        `${report.rateGaps.tieCount === 1 ? "konflikt stawek" : "konflikty stawek"}`;
+    const avg = report.avgQ.average === null ? "—" : formatPln(report.avgQ.average);
+    const avgSub = report.avgQ.sampleCount === 0
+        ? "brak odbiorów z workami"
+        : `ze ${report.avgQ.sampleCount} odbiorów, w których zabrano worki`;
+    return ('<div class="kpi-grid">' +
+        kpi("Liczba odbiorów", String(report.activity.pickupCount), "zrealizowane w okresie · każdy sklep osobno") +
+        kpi("Obsłużone sklepy", String(report.activity.uniqueShopCount), "różne sklepy w okresie") +
+        kpi("Problemy ze stawkami", String(report.rateGaps.total), gapsSub, "warn") +
+        kpi("Rozliczone w okresie", String(report.settled.count), `łącznie ${formatPln(report.settled.receptionSum)}`, "ok") +
+        kpi("Do rozliczenia", String(report.backlog.count), `szacunkowo ${formatPln(report.backlog.estimate)}`, "warn") +
+        kpi("Średni koszt za worek", avg, avgSub) +
+        "</div>");
+}
+function kpi(title, value, sub, tone = "") {
+    const cls = tone ? `kpi ${tone}` : "kpi";
+    return (`<div class="${cls}">` +
+        `<span>${escapeHtml(title)}</span>` +
+        `<b>${escapeHtml(value)}</b>` +
+        `<em>${escapeHtml(sub)}</em></div>`);
+}
+function timeSeriesBlock(id, model, series, money) {
+    const stacked = chartShouldStack(series);
+    const collapsed = stacked && (model.tablesCollapsed[id] ?? true);
+    const col0 = series.granularity === "week" ? "Tydzień" : "Miesiąc";
+    const foldLabel = money ? "Tabela z kwotami" : "Tabela z liczbami";
+    const note = id === "bags"
+        ? "Na razie wszystkie worki widać jako „Na zgłoszenie”. Podział na harmonogram pojawi się, gdy w danych będzie rozróżnienie sposobu zlecenia."
+        : "Jak wyżej: do czasu rozróżnienia w danych całość kosztów jest w „Na zgłoszenie”.";
+    const max = Math.max(1, ...series.buckets.map((b) => b.total));
+    const chart = `<div class="bags-time-chart${stacked ? " is-dense" : ""}" aria-hidden="true">` +
+        series.buckets
+            .map((b) => {
+            const naH = Math.round((b.report / max) * 100);
+            const hH = Math.round((b.schedule / max) * 100);
+            return ('<div class="bags-time-col"><div class="bags-time-stack">' +
+                `<i class="s-h" style="height:${hH}%"></i>` +
+                `<i class="s-na" style="height:${naH}%"></i></div>` +
+                `<span class="wk">${escapeHtml(b.label)}</span></div>`);
+        })
+            .join("") +
+        "</div>";
+    const rows = series.buckets
+        .map((b) => {
+        const fmt = (n) => (money ? formatPln(n) : String(n));
+        const range = `${b.from} – ${b.to}`;
+        return (`<tr><td>${escapeHtml(range)}</td>` +
+            `<td class="num">${escapeHtml(fmt(b.report))}</td>` +
+            `<td class="num">${escapeHtml(fmt(b.schedule))}</td>` +
+            `<td class="num"><strong>${escapeHtml(fmt(b.total))}</strong></td></tr>`);
+    })
+        .join("");
+    return ('<ul class="bags-time-legend">' +
+        '<li><i class="c-na"></i> Na zgłoszenie</li>' +
+        '<li><i class="c-h"></i> Harmonogram</li></ul>' +
+        `<div class="chart-split${stacked ? " is-stack" : ""}">` +
+        chart +
+        "<div>" +
+        `<div class="table-fold-bar"><span class="muted">${foldLabel}</span>` +
+        `<button type="button" data-action="stats-table-fold" data-table-fold="${id}">` +
+        `${collapsed ? "Pokaż tabelę" : "Ukryj tabelę"}</button></div>` +
+        `<div class="table-pane${collapsed ? " is-collapsed" : ""}" data-table="${id}">` +
+        "<table><thead><tr>" +
+        `<th>${col0}</th><th class="num">Na zgłoszenie</th><th class="num">Harmonogram</th><th class="num">Razem</th>` +
+        `</tr></thead><tbody>${rows || emptyRow(4)}</tbody></table></div></div></div>` +
+        `<p class="note">${escapeHtml(note)}</p>`);
+}
+function qRanksBlock(report) {
+    const avg = report.avgQ.average === null ? "—" : formatPln(report.avgQ.average);
+    const avgSub = report.avgQ.sampleCount === 0 ? "brak odbiorów" : `${report.avgQ.sampleCount} odbiorów`;
+    return ('<div class="bags-grid">' +
+        `<div class="avg-box"><span>Średni koszt za worek</span><b>${escapeHtml(avg)}</b>` +
+        `<em>${escapeHtml(avgSub)}</em></div>` +
+        '<div class="rank hi"><h3>Najdroższe sklepy</h3>' +
+        qTable(report.qRanks.expensive, "hi") +
+        '</div><div class="rank lo"><h3>Najtańsze sklepy</h3>' +
+        qTable(report.qRanks.cheap, "lo") +
+        "</div></div>");
+}
+function qTable(entries, tone) {
+    const body = entries
+        .map((e) => `<tr><td class="shop">${escapeHtml(e.address)}` +
+        `<span class="sub">${escapeHtml(e.shopName)} · ${escapeHtml(e.pickupDate)}</span></td>` +
+        `<td class="num money ${tone}">${escapeHtml(formatPln(e.costPerBag))}</td></tr>`)
+        .join("");
+    return ("<table><thead><tr><th>Sklep</th><th class=\"num\">Koszt za worek</th></tr></thead>" +
+        `<tbody>${body || emptyRow(2)}</tbody></table>`);
+}
+function contractorsBlock(report) {
+    return (rankPair("W przeliczeniu na sklep", "Ile średnio kosztuje jeden odbiór u danego podwykonawcy (tylko gdy zabrano worki)", report.contractorRanks.byShop, "Średni koszt odbioru") +
+        rankPair("W przeliczeniu na worek", "Ile średnio kosztuje jeden worek u danego podwykonawcy", report.contractorRanks.byBag, "Średni koszt za worek") +
+        '<p class="note">Odbiory, w których <strong>nie zabrano żadnego worka</strong>, nie wchodzą do tych średnich ani do rankingu sklepów powyżej. ' +
+        "Gdy wybrany jest jeden podwykonawca, w tabeli widać tylko jego wynik.</p>");
+}
+function rankPair(title, sub, ranks, amountHeader) {
+    return ('<div class="rank-block">' +
+        `<p class="metric">${escapeHtml(title)}<span>${escapeHtml(sub)}</span></p>` +
+        '<div class="rank-pair">' +
+        '<div class="rank hi"><h3>Najdrożsi</h3>' +
+        contractorTable(ranks.expensive, amountHeader, "hi") +
+        '</div><div class="rank lo"><h3>Najtańsi</h3>' +
+        contractorTable(ranks.cheap, amountHeader, "lo") +
+        "</div></div></div>");
+}
+function contractorTable(entries, amountHeader, tone) {
+    const body = entries
+        .map((e) => `<tr><td>${escapeHtml(e.contractor)}</td>` +
+        `<td class="num money ${tone}">${escapeHtml(formatPln(e.average))}</td>` +
+        `<td class="num">${e.pickupCount}</td></tr>`)
+        .join("");
+    return ("<table><thead><tr><th>Podwykonawca</th>" +
+        `<th class="num">${escapeHtml(amountHeader)}</th><th class="num">Odbiory</th></tr></thead>` +
+        `<tbody>${body || emptyRow(3)}</tbody></table>`);
+}
+function zeroBagsBlock(model) {
+    const report = model.report;
+    if (!report) {
+        return "";
+    }
+    const paged = pageSlice(report.zeroBags, model.emptyBagsPage);
+    const body = paged.slice
+        .map((row) => {
+        const cost = row.receptionCost === null ? "—" : formatPln(row.receptionCost);
+        return (`<tr><td class="shop">${escapeHtml(row.address)}` +
+            `<span class="sub">${escapeHtml(row.shopName)}</span></td>` +
+            `<td>${escapeHtml(row.contractor)}</td>` +
+            `<td>${escapeHtml(row.pickupDate)}</td>` +
+            `<td>${row.settled ? "Tak" : "Nie"}</td>` +
+            `<td class="num">${escapeHtml(cost)}</td></tr>`);
+    })
+        .join("");
+    return ("<table><thead><tr>" +
+        "<th>Sklep</th><th>Podwykonawca</th><th>Data odbioru</th><th>Czy rozliczone</th><th class=\"num\">Koszt odbioru</th>" +
+        `</tr></thead><tbody>${body || emptyRow(5)}</tbody></table>` +
+        pager("empty-bags", paged) +
+        '<p class="note" style="margin: 10px 12px 12px;">' +
+        "Te odbiory nie wchodzą do rankingów kosztów za worek ani do porównania podwykonawców. " +
+        `Lista pokazuje po ${STATS_PAGE_SIZE} pozycji na stronę.</p>`);
+}
+function gapsBlock(model) {
+    const report = model.report;
+    if (!report) {
+        return "";
+    }
+    const paged = pageSlice(report.rateGaps.entries, model.gapsPage);
+    const body = paged.slice
+        .map((row) => {
+        const tag = row.kind === "tie" ? "tag-tie" : "tag-gap";
+        return (`<tr><td class="shop">${escapeHtml(row.address)}` +
+            `<span class="sub">${escapeHtml(row.shopName)}</span></td>` +
+            `<td>${escapeHtml(row.contractor)}</td>` +
+            `<td>${escapeHtml(row.pickupDate)}</td>` +
+            `<td><span class="tag ${tag}">${escapeHtml(rateGapLabel(row.kind))}</span></td></tr>`);
+    })
+        .join("");
+    return ("<table><thead><tr>" +
+        "<th>Sklep</th><th>Podwykonawca</th><th>Data odbioru</th><th>Na czym polega problem</th>" +
+        `</tr></thead><tbody>${body || emptyRow(4)}</tbody></table>` +
+        pager("gaps", paged));
+}
+function pager(id, paged) {
+    if (paged.total <= STATS_PAGE_SIZE) {
+        return `<div class="pager" data-pager="${id}" hidden></div>`;
+    }
+    const from = (paged.page - 1) * STATS_PAGE_SIZE + 1;
+    const to = Math.min(paged.page * STATS_PAGE_SIZE, paged.total);
+    const meta = `Pozycje ${from}–${to} z ${paged.total} · po ${STATS_PAGE_SIZE} na stronę`;
+    return (`<div class="pager" data-pager="${id}">` +
+        `<span class="meta">${escapeHtml(meta)}</span>` +
+        '<div class="nav">' +
+        `<button type="button" data-action="stats-page" data-pager="${id}" data-dir="prev"` +
+        `${paged.page <= 1 ? " disabled" : ""}>← Poprzednia</button>` +
+        `<span class="page-label">${paged.page} / ${paged.pages}</span>` +
+        `<button type="button" data-action="stats-page" data-pager="${id}" data-dir="next"` +
+        `${paged.page >= paged.pages ? " disabled" : ""}>Następna →</button>` +
+        "</div></div>");
+}
+function emptyRow(cols) {
+    return `<tr><td colspan="${cols}" class="note" style="border:none;background:transparent">Brak danych w tym okresie.</td></tr>`;
+}
+
+
+
 
 
 
@@ -2088,6 +3524,7 @@ function renderRangeScreen(model) {
         status +
         note +
         '<div class="setup-foot">' +
+        '<button type="button" class="btn-ghost" data-action="stats">Statystyki</button>' +
         ratesButton() +
         "</div></div></div>");
 }
@@ -2131,10 +3568,18 @@ function renderLoading(message, unicorn) {
         `<div class="msg">${escapeHtml(message)}</div></div></div>`);
 }
 function renderApp(model) {
-    const main = model.screen === "statement" ? renderStatementScreen(model) : renderRangeScreen(model);
+    const main = model.screen === "statement"
+        ? renderStatementScreen(model)
+        : model.screen === "stats"
+            ? renderStatsScreen(model.stats)
+            : renderRangeScreen(model);
     const dialog = model.ratesOpen ? renderRatesDialog(model) : "";
     const loading = model.loading ? renderLoading(model.loadMessage, model.loadKind === "unicorn") : "";
     return main + dialog + loading;
+}
+/** Domyślny stan stats w modelu aplikacji (zegar = dziś lokalnie). */
+function emptyStats(today) {
+    return defaultStatsView(today);
 }
 
 
@@ -2142,6 +3587,13 @@ function renderApp(model) {
 
 
 
+
+
+const STATS_SECTION_IDS = ["bags", "costs", "q", "contractors", "empty-bags", "gaps"];
+function todayCalendar() {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
+}
 const VIEW = {
     mode: "report",
     contractorQuery: "",
@@ -2173,6 +3625,7 @@ const VIEW = {
     ratesFrom: "",
     ratesMessage: "",
     ratesMessageOk: false,
+    stats: emptyStats(todayCalendar()),
 };
 let heldFrom = "";
 let webapp = "";
@@ -2324,6 +3777,36 @@ function onClick(event) {
         VIEW.loading = false;
         VIEW.ratesOpen = false;
         paint();
+    }
+    else if (action === "stats") {
+        openStats();
+    }
+    else if (action === "stats-back") {
+        VIEW.screen = screenAfterStatsBack();
+        VIEW.loading = false;
+        VIEW.ratesOpen = false;
+        VIEW.stats = { ...VIEW.stats, status: "" };
+        paint();
+    }
+    else if (action === "stats-period") {
+        const period = el.dataset.period;
+        if (!period) {
+            return;
+        }
+        VIEW.stats = { ...VIEW.stats, period, status: "" };
+        paint();
+    }
+    else if (action === "stats-show") {
+        void runStats();
+    }
+    else if (action === "stats-fold") {
+        toggleStatsSection(el.dataset.fold ?? "");
+    }
+    else if (action === "stats-table-fold") {
+        toggleStatsTable(el.dataset.tableFold ?? "");
+    }
+    else if (action === "stats-page") {
+        shiftStatsPage(el.dataset.pager ?? "", el.dataset.dir ?? "");
     }
     else if (action === "rates") {
         void openRates();
@@ -2487,7 +3970,15 @@ function syncDate(el) {
 }
 function onChange(event) {
     const el = event.target;
+    if (el instanceof HTMLSelectElement && el.dataset.stats) {
+        applyStatsField(el.dataset.stats, el.value);
+        return;
+    }
     if (!(el instanceof HTMLInputElement)) {
+        return;
+    }
+    if (el.dataset.stats === "from" || el.dataset.stats === "to") {
+        applyStatsField(el.dataset.stats, el.value);
         return;
     }
     if (el.dataset.toggle === "checked") {
@@ -3157,6 +4648,149 @@ async function runApprove() {
         }
         VIEW.loading = false;
         VIEW.loadKind = "logo";
+        paint();
+    }
+}
+function openStats() {
+    const today = todayCalendar();
+    const storage = typeof localStorage !== "undefined" ? localStorage : null;
+    VIEW.stats = {
+        ...emptyStats(today),
+        contractors: VIEW.contractors,
+        contractor: VIEW.contractor,
+        sectionsCollapsed: loadSectionsCollapsed(storage, STATS_SECTION_IDS),
+    };
+    VIEW.screen = screenAfterOpenStats();
+    VIEW.ratesOpen = false;
+    VIEW.status = "";
+    paint();
+    void runStats();
+}
+function applyStatsField(field, value) {
+    if (field === "month") {
+        VIEW.stats = { ...VIEW.stats, month: value };
+    }
+    else if (field === "from") {
+        VIEW.stats = { ...VIEW.stats, from: value };
+    }
+    else if (field === "to") {
+        VIEW.stats = { ...VIEW.stats, to: value };
+    }
+    else if (field === "contractor") {
+        VIEW.stats = { ...VIEW.stats, contractor: value };
+    }
+    else {
+        return;
+    }
+    paint();
+}
+function toggleStatsSection(id) {
+    if (id === "") {
+        return;
+    }
+    const collapsed = !(VIEW.stats.sectionsCollapsed[id] === true);
+    VIEW.stats = {
+        ...VIEW.stats,
+        sectionsCollapsed: { ...VIEW.stats.sectionsCollapsed, [id]: collapsed },
+    };
+    writeStatsFold(typeof localStorage !== "undefined" ? localStorage : null, `section.${id}`, collapsed ? "closed" : "open");
+    paint();
+}
+function toggleStatsTable(id) {
+    if (id === "") {
+        return;
+    }
+    const currently = VIEW.stats.tablesCollapsed[id] ?? true;
+    const collapsed = !currently;
+    VIEW.stats = {
+        ...VIEW.stats,
+        tablesCollapsed: { ...VIEW.stats.tablesCollapsed, [id]: collapsed },
+    };
+    writeStatsFold(typeof localStorage !== "undefined" ? localStorage : null, `table.${id}`, collapsed ? "closed" : "open");
+    paint();
+}
+function shiftStatsPage(pager, dir) {
+    if (pager === "empty-bags") {
+        const next = VIEW.stats.emptyBagsPage + (dir === "next" ? 1 : -1);
+        VIEW.stats = { ...VIEW.stats, emptyBagsPage: Math.max(1, next) };
+        paint();
+        return;
+    }
+    if (pager === "gaps") {
+        const next = VIEW.stats.gapsPage + (dir === "next" ? 1 : -1);
+        VIEW.stats = { ...VIEW.stats, gapsPage: Math.max(1, next) };
+        paint();
+        return;
+    }
+}
+async function runStats() {
+    if (webapp === "") {
+        VIEW.stats = { ...VIEW.stats, status: "Brak adresu Web App. Dopisz ?webapp= do adresu tej strony." };
+        paint();
+        return;
+    }
+    const today = todayCalendar();
+    const range = resolveStatsPeriod(VIEW.stats.period, today, {
+        month: VIEW.stats.month,
+        from: VIEW.stats.from,
+        to: VIEW.stats.to,
+    });
+    if (!range) {
+        VIEW.stats = {
+            ...VIEW.stats,
+            status: VIEW.stats.period === "exact"
+                ? "Podaj poprawny zakres od–do (data początkowa nie później niż końcowa)."
+                : "Wybierz miesiąc z listy.",
+        };
+        paint();
+        return;
+    }
+    VIEW.loading = true;
+    VIEW.loadKind = "logo";
+    VIEW.loadMessage = "Ładuję dane…";
+    VIEW.stats = { ...VIEW.stats, status: "" };
+    paint();
+    try {
+        const response = await fetch(webAppUrl(webapp, statsParams({
+            dataOd: range.from,
+            dataDo: range.to,
+            podwykonawca: VIEW.stats.contractor,
+        })));
+        const body = await response.json();
+        const parsed = readSettlementStats(body);
+        if (!parsed.ok) {
+            VIEW.stats = { ...VIEW.stats, status: parsed.error, report: null };
+            return;
+        }
+        const report = buildStatsReport(parsed.rows, parsed.rates, {
+            range,
+            contractor: VIEW.stats.contractor || undefined,
+        });
+        const storage = typeof localStorage !== "undefined" ? localStorage : null;
+        const stacked = {
+            bags: chartShouldStack(report.bagsOverTime),
+            costs: chartShouldStack(report.costsOverTime),
+        };
+        VIEW.stats = {
+            ...VIEW.stats,
+            today,
+            appliedFrom: range.from,
+            appliedTo: range.to,
+            appliedKind: VIEW.stats.period,
+            appliedMonth: VIEW.stats.month,
+            appliedContractor: VIEW.stats.contractor,
+            report,
+            status: "",
+            emptyBagsPage: 1,
+            gapsPage: 1,
+            tablesCollapsed: loadTablesCollapsed(storage, ["bags", "costs"], stacked),
+        };
+    }
+    catch {
+        VIEW.stats = { ...VIEW.stats, status: "Odczyt statystyk nie doszedł.", report: null };
+    }
+    finally {
+        VIEW.loading = false;
         paint();
     }
 }

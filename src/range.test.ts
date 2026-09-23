@@ -20,8 +20,11 @@ import {
   resolveListText,
   screenAfterApprove,
   screenAfterChangeRange,
+  screenAfterOpenStats,
   screenAfterSearch,
+  screenAfterStatsBack,
   searchParams,
+  statsParams,
   selectedContractor,
   startSearch,
   webAppUrl,
@@ -177,9 +180,15 @@ describe("screens", () => {
     expect(screenAfterApprove()).toBe("range");
   });
 
+  it("test_screenAfterOpenStats_and_back", () => {
+    expect(screenAfterOpenStats()).toBe("stats");
+    expect(screenAfterStatsBack()).toBe("range");
+  });
+
   it("test_openRatesWindow_stays_on_current_screen", () => {
     expect(openRatesWindow("range")).toEqual({ screen: "range", window: "rates" });
     expect(openRatesWindow("statement")).toEqual({ screen: "statement", window: "rates" });
+    expect(openRatesWindow("stats")).toEqual({ screen: "stats", window: "rates" });
     expect(selectMode("report")).toEqual({ report: true, schedule: false });
     expect(selectMode("schedule")).toEqual({ report: false, schedule: true });
   });

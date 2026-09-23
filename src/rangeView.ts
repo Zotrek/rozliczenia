@@ -15,6 +15,8 @@ import {
 } from "./range.js";
 import type { StatementScreen } from "./statement.js";
 import { renderStatement } from "./statementView.js";
+import { defaultStatsView, renderStatsScreen, type StatsViewModel } from "./statsView.js";
+import type { CalendarDate } from "./sheetDate.js";
 
 export interface RangeViewModel {
   mode: SettlementMode;
@@ -49,6 +51,7 @@ export interface RangeViewModel {
   ratesFrom: string;
   ratesMessage: string;
   ratesMessageOk: boolean;
+  stats: StatsViewModel;
 }
 
 
@@ -260,6 +263,7 @@ function renderRangeScreen(model: RangeViewModel): string {
     status +
     note +
     '<div class="setup-foot">' +
+    '<button type="button" class="btn-ghost" data-action="stats">Statystyki</button>' +
     ratesButton() +
     "</div></div></div>"
   );
@@ -328,8 +332,18 @@ function renderLoading(message: string, unicorn: boolean): string {
 }
 
 export function renderApp(model: RangeViewModel): string {
-  const main = model.screen === "statement" ? renderStatementScreen(model) : renderRangeScreen(model);
+  const main =
+    model.screen === "statement"
+      ? renderStatementScreen(model)
+      : model.screen === "stats"
+        ? renderStatsScreen(model.stats)
+        : renderRangeScreen(model);
   const dialog = model.ratesOpen ? renderRatesDialog(model) : "";
   const loading = model.loading ? renderLoading(model.loadMessage, model.loadKind === "unicorn") : "";
   return main + dialog + loading;
+}
+
+/** Domyślny stan stats w modelu aplikacji (zegar = dziś lokalnie). */
+export function emptyStats(today: CalendarDate): StatsViewModel {
+  return defaultStatsView(today);
 }

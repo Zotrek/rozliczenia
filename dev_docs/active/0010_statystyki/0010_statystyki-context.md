@@ -2,7 +2,7 @@
 
 > **Task:** 0010_statystyki (= R8)  
 > **Last Updated:** 2026-09-23  
-> **Status:** step 2 complete (`settlementStats` GET); UI pending
+> **Status:** step 3 complete (UI); smoke / CP4 pending
 
 ## Decyzje produktowe (2026-09-23)
 
@@ -62,7 +62,8 @@
 | SPEC / ARCH / PLAN | § Statystyki; Frontend 3 widoki; etap R8 |
 | Agregacje TS | `rozliczenia/src/stats.ts` + `stats.test.ts` ✅ |
 | Odczyt GAS | `settlementStats` + `buildSettlementStats_` (+ `statsRead.test.ts`) ✅ |
-| Widok | `rozliczenia/src/statsView.ts` (planowany) |
+| Widok | `rozliczenia/src/statsView.ts` + `statsView.test.ts` ✅ |
+| Router / fetch | `range.ts` (`stats` screen), `page.ts` (`runStats`), `readSettlementStats` |
 | GAS | `settlementStats` w `transport-log.gs` |
 
 ## Decyzje implementacyjne (step 1)
@@ -88,13 +89,25 @@
 | Rates | Baza stawek (filtr podwykonawcy gdy podany); remisy po stronie TS |
 | Tryb | brak kolumny → nie ma w payloadzie (TS domyślnie `report`) |
 
+## Decyzje implementacyjne (step 3)
+
+| Temat | Decyzja |
+|-------|---------|
+| ScreenId | `"range" \| "statement" \| "stats"` |
+| Wejście | Przycisk na Zakresie → auto `runStats` (bieżący miesiąc) |
+| Fold LS | `rozliczenia.stats.fold.section.*` / `table.*` |
+| Stack wykresu | ≥7 bucketów → kolumna + tabela startuje zwinięta |
+| Stronicowanie | 5 / stronę: odbiory bez worków + problemy ze stawkami |
+
 ## Checkpoint
 
 - **CP1:** `npm test` — 189 pass (2026-09-23) ✅
 - **CP1b:** `npm test` — 198 pass, 36 w `stats.test.ts` (2026-09-23) ✅
 - **CP2:** `arkusz-mapa` 608 pass + `rozliczenia` 208 pass (`statsRead.test.ts`) (2026-09-23) ✅
+- **CP3:** `rozliczenia` 221 pass (UI + `statsView.test.ts`) (2026-09-23) ✅
 
 ## Otwarte (drobne)
 
 - Top N: stałe **5**.
 - „Ostatni kwartał”: poprzedni pełny kwartał (nie 90 dni).
+- Punkt 4: ręczny smoke z wdrożonym Web App.

@@ -1,4 +1,4 @@
-import { renderApp, renderContractorList, renderRateContractorList, renderRateShopList, type RangeViewModel } from "./rangeView.js";
+import { renderApp, renderContractorList, renderRateContractorList, renderRateShopList, emptyStats, type RangeViewModel } from "./rangeView.js";
 import {
   applyNoStartDate,
   fieldsForSearch,
@@ -6,8 +6,11 @@ import {
   readWebAppUrl,
   screenAfterApprove,
   screenAfterChangeRange,
+  screenAfterOpenStats,
   screenAfterSearch,
+  screenAfterStatsBack,
   searchParams,
+  statsParams,
   selectedContractor,
   resolveContractorText,
   startSearch,
@@ -35,6 +38,7 @@ import {
   freshStatement,
   parseAmountText,
   readSettlement,
+  readSettlementStats,
   routeRateBody,
   setBagRate,
   setBagsOnly,
@@ -50,6 +54,25 @@ import {
   writeError,
 } from "./statement.js";
 import { rateContractorNames, rateSaveMessage, readAddressList, resolveStoreAddress, saveRateBody, storeAddressLabel } from "./rateWindow.js";
+import {
+  buildStatsReport,
+  chartShouldStack,
+  resolveStatsPeriod,
+  type StatsPeriodKind,
+} from "./stats.js";
+import {
+  loadSectionsCollapsed,
+  loadTablesCollapsed,
+  writeStatsFold,
+} from "./statsView.js";
+import type { CalendarDate } from "./sheetDate.js";
+
+const STATS_SECTION_IDS = ["bags", "costs", "q", "contractors", "empty-bags", "gaps"] as const;
+
+function todayCalendar(): CalendarDate {
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
+}
 
 const VIEW: RangeViewModel = {
   mode: "report",
@@ -82,6 +105,7 @@ const VIEW: RangeViewModel = {
   ratesFrom: "",
   ratesMessage: "",
   ratesMessageOk: false,
+  stats: emptyStats(todayCalendar()),
 };
 
 let heldFrom = "";
@@ -246,6 +270,29 @@ function onClick(event: MouseEvent): void {
     VIEW.loading = false;
     VIEW.ratesOpen = false;
     paint();
+  } else if (action === "stats") {
+    openStats();
+  } else if (action === "stats-back") {
+    VIEW.screen = screenAfterStatsBack();
+    VIEW.loading = false;
+    VIEW.ratesOpen = false;
+    VIEW.stats = { ...VIEW.stats, status: "" };
+    paint();
+  } else if (action === "stats-period") {
+    const period = el.dataset.period as StatsPeriodKind | undefined;
+    if (!period) {
+      return;
+    }
+    VIEW.stats = { ...VIEW.stats, period, status: "" };
+    paint();
+  } else if (action === "stats-show") {
+    void runStats();
+  } else if (action === "stats-fold") {
+    toggleStatsSection(el.dataset.fold ?? "");
+  } else if (action === "stats-table-fold") {
+    toggleStatsTable(el.dataset.tableFold ?? "");
+  } else if (action === "stats-page") {
+    shiftStatsPage(el.dataset.pager ?? "", el.dataset.dir ?? "");
   } else if (action === "rates") {
     void openRates();
   } else if (action === "close-rates") {
@@ -409,7 +456,15 @@ function syncDate(el: HTMLInputElement): void {
 
 function onChange(event: Event): void {
   const el = event.target;
+  if (el instanceof HTMLSelectElement && el.dataset.stats) {
+    applyStatsField(el.dataset.stats, el.value);
+    return;
+  }
   if (!(el instanceof HTMLInputElement)) {
+    return;
+  }
+  if (el.dataset.stats === "from" || el.dataset.stats === "to") {
+    applyStatsField(el.dataset.stats, el.value);
     return;
   }
   if (el.dataset.toggle === "checked") {
@@ -1093,6 +1148,163 @@ async function runApprove(): Promise<void> {
     }
     VIEW.loading = false;
     VIEW.loadKind = "logo";
+    paint();
+  }
+}
+
+function openStats(): void {
+  const today = todayCalendar();
+  const storage = typeof localStorage !== "undefined" ? localStorage : null;
+  VIEW.stats = {
+    ...emptyStats(today),
+    contractors: VIEW.contractors,
+    contractor: VIEW.contractor,
+    sectionsCollapsed: loadSectionsCollapsed(storage, STATS_SECTION_IDS),
+  };
+  VIEW.screen = screenAfterOpenStats();
+  VIEW.ratesOpen = false;
+  VIEW.status = "";
+  paint();
+  void runStats();
+}
+
+function applyStatsField(field: string, value: string): void {
+  if (field === "month") {
+    VIEW.stats = { ...VIEW.stats, month: value };
+  } else if (field === "from") {
+    VIEW.stats = { ...VIEW.stats, from: value };
+  } else if (field === "to") {
+    VIEW.stats = { ...VIEW.stats, to: value };
+  } else if (field === "contractor") {
+    VIEW.stats = { ...VIEW.stats, contractor: value };
+  } else {
+    return;
+  }
+  paint();
+}
+
+function toggleStatsSection(id: string): void {
+  if (id === "") {
+    return;
+  }
+  const collapsed = !(VIEW.stats.sectionsCollapsed[id] === true);
+  VIEW.stats = {
+    ...VIEW.stats,
+    sectionsCollapsed: { ...VIEW.stats.sectionsCollapsed, [id]: collapsed },
+  };
+  writeStatsFold(
+    typeof localStorage !== "undefined" ? localStorage : null,
+    `section.${id}`,
+    collapsed ? "closed" : "open",
+  );
+  paint();
+}
+
+function toggleStatsTable(id: string): void {
+  if (id === "") {
+    return;
+  }
+  const currently = VIEW.stats.tablesCollapsed[id] ?? true;
+  const collapsed = !currently;
+  VIEW.stats = {
+    ...VIEW.stats,
+    tablesCollapsed: { ...VIEW.stats.tablesCollapsed, [id]: collapsed },
+  };
+  writeStatsFold(
+    typeof localStorage !== "undefined" ? localStorage : null,
+    `table.${id}`,
+    collapsed ? "closed" : "open",
+  );
+  paint();
+}
+
+function shiftStatsPage(pager: string, dir: string): void {
+  if (pager === "empty-bags") {
+    const next = VIEW.stats.emptyBagsPage + (dir === "next" ? 1 : -1);
+    VIEW.stats = { ...VIEW.stats, emptyBagsPage: Math.max(1, next) };
+    paint();
+    return;
+  }
+  if (pager === "gaps") {
+    const next = VIEW.stats.gapsPage + (dir === "next" ? 1 : -1);
+    VIEW.stats = { ...VIEW.stats, gapsPage: Math.max(1, next) };
+    paint();
+    return;
+  }
+}
+
+async function runStats(): Promise<void> {
+  if (webapp === "") {
+    VIEW.stats = { ...VIEW.stats, status: "Brak adresu Web App. Dopisz ?webapp= do adresu tej strony." };
+    paint();
+    return;
+  }
+  const today = todayCalendar();
+  const range = resolveStatsPeriod(VIEW.stats.period, today, {
+    month: VIEW.stats.month,
+    from: VIEW.stats.from,
+    to: VIEW.stats.to,
+  });
+  if (!range) {
+    VIEW.stats = {
+      ...VIEW.stats,
+      status:
+        VIEW.stats.period === "exact"
+          ? "Podaj poprawny zakres od–do (data początkowa nie później niż końcowa)."
+          : "Wybierz miesiąc z listy.",
+    };
+    paint();
+    return;
+  }
+  VIEW.loading = true;
+  VIEW.loadKind = "logo";
+  VIEW.loadMessage = "Ładuję dane…";
+  VIEW.stats = { ...VIEW.stats, status: "" };
+  paint();
+  try {
+    const response = await fetch(
+      webAppUrl(
+        webapp,
+        statsParams({
+          dataOd: range.from,
+          dataDo: range.to,
+          podwykonawca: VIEW.stats.contractor,
+        }),
+      ),
+    );
+    const body: unknown = await response.json();
+    const parsed = readSettlementStats(body);
+    if (!parsed.ok) {
+      VIEW.stats = { ...VIEW.stats, status: parsed.error, report: null };
+      return;
+    }
+    const report = buildStatsReport(parsed.rows, parsed.rates, {
+      range,
+      contractor: VIEW.stats.contractor || undefined,
+    });
+    const storage = typeof localStorage !== "undefined" ? localStorage : null;
+    const stacked = {
+      bags: chartShouldStack(report.bagsOverTime),
+      costs: chartShouldStack(report.costsOverTime),
+    };
+    VIEW.stats = {
+      ...VIEW.stats,
+      today,
+      appliedFrom: range.from,
+      appliedTo: range.to,
+      appliedKind: VIEW.stats.period,
+      appliedMonth: VIEW.stats.month,
+      appliedContractor: VIEW.stats.contractor,
+      report,
+      status: "",
+      emptyBagsPage: 1,
+      gapsPage: 1,
+      tablesCollapsed: loadTablesCollapsed(storage, ["bags", "costs"], stacked),
+    };
+  } catch {
+    VIEW.stats = { ...VIEW.stats, status: "Odczyt statystyk nie doszedł.", report: null };
+  } finally {
+    VIEW.loading = false;
     paint();
   }
 }

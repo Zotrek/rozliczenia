@@ -1,6 +1,11 @@
 import { lineKey, rowKey, settle, sumSelected } from "./engine.js";
 import { parseSheetDate } from "./sheetDate.js";
-import type { SettlementRateRow, SettlementSearchResult } from "./search.js";
+import type {
+  SettlementRateRow,
+  SettlementSearchResult,
+  SettlementStatsResult,
+  SettlementStatsRow,
+} from "./search.js";
 import type {
   Grosze,
   RegisterRow,
@@ -204,6 +209,32 @@ export function readSettlement(body: unknown): SettlementSearchResult {
     const rate = readRateRow(item);
     if (!rate) {
       return { ok: false, error: "Wyszukanie nie doszło." };
+    }
+    rates.push(rate);
+  }
+  return { ok: true, rows, rates };
+}
+
+/** Odczyt `settlementStats` — wiersze z settled/happened/P/Q. */
+export function readSettlementStats(body: unknown): SettlementStatsResult {
+  if (!isRecord(body) || body.ok !== true || !Array.isArray(body.rows) || !Array.isArray(body.rates)) {
+    const error =
+      isRecord(body) && typeof body.error === "string" ? body.error : "Odczyt statystyk nie doszedł.";
+    return { ok: false, error };
+  }
+  const rows = [];
+  for (const item of body.rows) {
+    const row = readStatsRow(item);
+    if (!row) {
+      return { ok: false, error: "Odczyt statystyk nie doszedł." };
+    }
+    rows.push(row);
+  }
+  const rates: SettlementRateRow[] = [];
+  for (const item of body.rates) {
+    const rate = readRateRow(item);
+    if (!rate) {
+      return { ok: false, error: "Odczyt statystyk nie doszedł." };
     }
     rates.push(rate);
   }
@@ -732,6 +763,28 @@ function readRegisterRow(value: unknown): RegisterRow | null {
     routeRate,
     pickupRate,
     bagRate,
+  };
+}
+
+function readStatsRow(value: unknown): SettlementStatsRow | null {
+  const base = readRegisterRow(value);
+  if (!base || !isRecord(value)) {
+    return null;
+  }
+  if (typeof value.settled !== "boolean" || typeof value.happened !== "boolean") {
+    return null;
+  }
+  const receptionCost = readGrosze(value.receptionCost);
+  const costPerBag = readGrosze(value.costPerBag);
+  if (receptionCost === undefined || costPerBag === undefined) {
+    return null;
+  }
+  return {
+    ...base,
+    settled: value.settled,
+    happened: value.happened,
+    receptionCost,
+    costPerBag,
   };
 }
 

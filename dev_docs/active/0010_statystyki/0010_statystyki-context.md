@@ -2,7 +2,7 @@
 
 > **Task:** 0010_statystyki (= R8)  
 > **Last Updated:** 2026-09-23  
-> **Status:** step 1 complete (okres + wszystkie agregacje pure TS); GAS / UI pending
+> **Status:** step 2 complete (`settlementStats` GET); UI pending
 
 ## Decyzje produktowe (2026-09-23)
 
@@ -61,6 +61,7 @@
 | Makieta | `rozliczenia/docs/makiety-statystyki.html` |
 | SPEC / ARCH / PLAN | § Statystyki; Frontend 3 widoki; etap R8 |
 | Agregacje TS | `rozliczenia/src/stats.ts` + `stats.test.ts` ✅ |
+| Odczyt GAS | `settlementStats` + `buildSettlementStats_` (+ `statsRead.test.ts`) ✅ |
 | Widok | `rozliczenia/src/statsView.ts` (planowany) |
 | GAS | `settlementStats` w `transport-log.gs` |
 
@@ -76,10 +77,22 @@
 | Ranking podwykonawców | śr. P i śr. Q; bags > 0; top 5 |
 | Odbiory I = 0 | `bagCount === 0` (null nie wchodzi); w okresie |
 
+## Decyzje implementacyjne (step 2)
+
+| Temat | Decyzja |
+|-------|---------|
+| Endpoint | GET `settlementStats` tylko (bez POST, bez locka) |
+| Query | `dataOd` + `dataDo` wymagane; `podwykonawca` opcjonalny (pusty = wszyscy) |
+| Wiersze | rozliczone ∩ zakres; nierozliczone odbyte bez filtra dat; `nie` w R wykluczone |
+| Payload wiersza | jak search + `settled`, `happened`, `receptionCost` (P), `costPerBag` (Q) |
+| Rates | Baza stawek (filtr podwykonawcy gdy podany); remisy po stronie TS |
+| Tryb | brak kolumny → nie ma w payloadzie (TS domyślnie `report`) |
+
 ## Checkpoint
 
 - **CP1:** `npm test` — 189 pass (2026-09-23) ✅
 - **CP1b:** `npm test` — 198 pass, 36 w `stats.test.ts` (2026-09-23) ✅
+- **CP2:** `arkusz-mapa` 608 pass + `rozliczenia` 208 pass (`statsRead.test.ts`) (2026-09-23) ✅
 
 ## Otwarte (drobne)
 

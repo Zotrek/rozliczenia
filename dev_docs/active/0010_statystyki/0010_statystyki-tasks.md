@@ -1,7 +1,7 @@
 # Tasks: Statystyki rozliczeń
 
 > **Task:** 0010_statystyki  
-> **Updated:** 2026-09-23
+> **Updated:** 2026-09-23 (step 2 GAS done)
 
 ## 0. Makieta (zrobione)
 
@@ -31,10 +31,10 @@
 
 ## 2. Odczyt GAS
 
-- [ ] GET action (np. `settlementStats`): odczyt wierszy rejestru pod filtry (bez zapisu, bez locka)
-- [ ] W payloadzie: pola potrzebne do P/Q/I, statusu, daty, podwykonawcy, adresu, snapshotów; dane do remisów stawek; tryb gdy będzie w rejestrze
-- [ ] Testy / smoke jak przy innych GET w `arkusz-mapa` (nie psuć `settlementSearch` / `saveRate`)
-- [ ] **CHECKPOINT 2:** testy skryptu / `npm test` w `arkusz-mapa/` pass
+- [x] GET action (np. `settlementStats`): odczyt wierszy rejestru pod filtry (bez zapisu, bez locka)
+- [x] W payloadzie: pola potrzebne do P/Q/I, statusu, daty, podwykonawcy, adresu, snapshotów; dane do remisów stawek; tryb gdy będzie w rejestrze
+- [x] Testy / smoke jak przy innych GET w `arkusz-mapa` (nie psuć `settlementSearch` / `saveRate`)
+- [x] **CHECKPOINT 2:** `npm test` w `arkusz-mapa/` — 608 pass; `rozliczenia/` — 208 pass (10 w `statsRead.test.ts`) ✅
 
 ## 3. UI ekranu Statystyki
 

@@ -97,6 +97,17 @@ describe("addressWithCommaAfterLocality", () => {
       "10 Wieluń — 98-300 Wieluń, Sieradzka 62A",
     );
   });
+
+  it("test_addressWithCommaAfterLocality_locality_hint_and_edge_cases", () => {
+    expect(addressWithCommaAfterLocality("")).toBe("");
+    expect(addressWithCommaAfterLocality("  ")).toBe("");
+    expect(addressWithCommaAfterLocality("98-300 Wieluń, Sieradzka 1")).toBe("98-300 Wieluń, Sieradzka 1");
+    expect(addressWithCommaAfterLocality("98-300 Wieluń Sieradzka 1", "Wieluń")).toBe("98-300 Wieluń, Sieradzka 1");
+    expect(addressWithCommaAfterLocality("98-300 Wieluń", "Wieluń")).toBe("98-300 Wieluń");
+    expect(addressWithCommaAfterLocality("ul. Bez kodu 1")).toBe("ul. Bez kodu 1");
+    expect(addressWithCommaAfterLocality("26-900 Kozienice nad Wisłą 3")).toMatch(/Kozienice nad Wisłą,/);
+    expect(storeAddressLabel({ address: "ul. A 1", shop: "ul. A 1" })).toBe("ul. A 1");
+  });
 });
 
 describe("readAddressList", () => {
@@ -159,6 +170,9 @@ describe("rateSaveMessage", () => {
     expect(rateSaveMessage("tie")).toContain("Zapisu nie ma");
     expect(rateSaveMessage("date")).toContain("dd.mm.yyyy");
     expect(rateSaveMessage("shop")).toContain("podwykonawcę");
+    expect(rateSaveMessage("amount")).toContain("kwota");
+    expect(rateSaveMessage("addresses")).toContain("adresów");
+    expect(rateSaveMessage("other")).toContain("Zapis nieudany");
   });
 });
 

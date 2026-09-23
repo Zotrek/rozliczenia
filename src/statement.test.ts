@@ -27,6 +27,7 @@ import {
   parseBagText,
   positionLabel,
   readSettlement,
+  readSettlementStats,
   routeRateBody,
   routeSelectionKey,
   selectedKeys,
@@ -438,8 +439,103 @@ describe("route edits and commits", () => {
     expect(skippedCount({})).toBe(0);
     expect(writeError("bags")).toBe(STATEMENT_ERROR.badBags);
     expect(writeError("key")).toBe(STATEMENT_ERROR.stale);
+    expect(writeError("settled")).toBe(STATEMENT_ERROR.stale);
+    expect(writeError("nie")).toBe(STATEMENT_ERROR.stale);
+    expect(writeError("rate")).toBe(STATEMENT_ERROR.badRate);
+    expect(writeError("name")).toBe(STATEMENT_ERROR.routeName);
+    expect(writeError("invoice")).toBe(STATEMENT_ERROR.invoice);
+    expect(writeError("selection")).toBe(STATEMENT_ERROR.selection);
     expect(writeError("unknown")).toBe(STATEMENT_ERROR.write);
     const statement = currentStatement(base);
     expect(lineHasTie(statement.lines[0])).toBe(false);
+    const withTie = {
+      ...statement.lines[0],
+      kind: "plain" as const,
+      shop: {
+        ...(statement.lines[0].kind === "plain" ? statement.lines[0].shop : statement.lines[0].shops[0]),
+        tie: {
+          shop: "A",
+          contractor: "gpw",
+          validFrom: "01.01.2026",
+          candidates: [{ index: 0, validFrom: "01.01.2026", pickupAmount: 1, bagAmount: 1 }],
+        },
+      },
+    };
+    expect(lineHasTie(withTie)).toBe(true);
+  });
+
+  it("test_bagsBody_and_routeRateBody_reject_bad_text", () => {
+    expect(bagsBody(row({ sheetRow: 2 }), "x")).toEqual({ ok: false, error: STATEMENT_ERROR.badBags });
+    expect(bagsBody(row({ sheetRow: 2 }), "").ok).toBe(true);
+    expect(routeRateBody(row({ sheetRow: 2, routeName: "t" }), "t", "bad")).toEqual({
+      ok: false,
+      error: STATEMENT_ERROR.badRate,
+    });
+    expect(routeRateBody(row({ sheetRow: 2, routeName: "t" }), "t", "").ok).toBe(true);
+  });
+
+  it("test_attachDecision_empty_name_and_bad_rate", () => {
+    const shop = row({ sheetRow: 2, routeName: "" });
+    expect(attachDecision(shop, "  ", "10", "").error).toBe(STATEMENT_ERROR.routeName);
+    expect(attachDecision(shop, "nowa", "", "stara").error).toBe(STATEMENT_ERROR.emptyRate);
+    expect(attachDecision(shop, "nowa", "-1", "stara").error).toBe(STATEMENT_ERROR.badRate);
+  });
+
+  it("test_commitDetach_and_commitAttach_missing_row_return_null", () => {
+    expect(commitDetach(screen([row({ sheetRow: 2, routeName: "" })]), 2, "2")).toBeNull();
+    expect(commitAttach(screen([row({ sheetRow: 2 })]), 9, "9", "t", 100)).toBeNull();
+  });
+
+  it("test_withoutTiedRates_missing_kept_returns_copy", () => {
+    const rates = [rate({ sheetRow: 8, shop: "A" })];
+    expect(withoutTiedRates(rates, 99)).toEqual(rates);
+  });
+
+  it("test_readSettlementStats_rejects_bad_payload", () => {
+    expect(readSettlementStats({ ok: false, error: "x" })).toEqual({ ok: false, error: "x" });
+    expect(readSettlementStats({ ok: true, rows: [{ sheetRow: 2 }], rates: [] }).ok).toBe(false);
+    expect(readSettlementStats({ ok: true }).ok).toBe(false);
+  });
+
+  it("test_buildApprove_tie_blocks_and_bagsOnly_flag", () => {
+    const base = setBagsOnly(
+      screen([row({ sheetRow: 2, bagCount: 1, bagRate: 1_000 })], [
+        rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 }),
+      ]),
+      2,
+      "2",
+      true,
+    );
+    const statement = currentStatement(base);
+    const built = buildApprove("FV/1", statement, { "2\t2": true });
+    expect(built.ok).toBe(true);
+    if (built.ok) {
+      expect(built.body.wiersze[0]).toMatchObject({ tylkoWorki: true, koszt: 1_000 });
+    }
+    const tied = {
+      ...statement,
+      lines: [
+        {
+          kind: "plain" as const,
+          shop: {
+            ...(statement.lines[0].kind === "plain" ? statement.lines[0].shop : statement.lines[0].shops[0]),
+            receptionCost: null,
+            tie: {
+              shop: "Sklepowa 1",
+              contractor: "gpw",
+              validFrom: "",
+              candidates: [{ index: 0, validFrom: "", pickupAmount: 1, bagAmount: 1 }],
+            },
+          },
+        },
+      ],
+    };
+    expect(buildApprove("FV/1", tied, { "2\t2": true })).toEqual({ ok: false, error: "tie" });
+  });
+
+  it("test_parseAmountText_rejects_empty_frac_and_double_dot", () => {
+    expect(parseAmountText("1.").kind).toBe("bad");
+    expect(parseAmountText("1.2.3").kind).toBe("bad");
+    expect(parseAmountText("abc").kind).toBe("bad");
   });
 });

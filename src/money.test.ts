@@ -36,6 +36,12 @@ describe("toGrosze", () => {
     expect(toGrosze(33.33)).toBe(3_333);
     expect(toGrosze(0)).toBe(0);
   });
+
+  it("test_toGrosze_negative_and_non_finite_rejected", () => {
+    expect(toGrosze(-12.5)).toBe(-1_250);
+    expect(() => toGrosze(Number.NaN)).toThrow(/nie jest liczbą/);
+    expect(() => toGrosze(Number.POSITIVE_INFINITY)).toThrow(/nie jest liczbą/);
+  });
 });
 
 describe("mulGrosze", () => {
@@ -48,5 +54,19 @@ describe("mulGrosze", () => {
   it("test_mulGrosze_fractional_count_rounds_half_up", () => {
     expect(mulGrosze(0.5, 1)).toBe(1);
     expect(mulGrosze(1.5, 1_000)).toBe(1_500);
+  });
+
+  it("test_mulGrosze_negative_sign_from_either_side", () => {
+    expect(mulGrosze(-2, 1_000)).toBe(-2_000);
+    expect(mulGrosze(2, -1_000)).toBe(-2_000);
+    expect(mulGrosze(-1.5, 1_000)).toBe(-1_500);
+  });
+});
+
+describe("divRoundHalfUp guards", () => {
+  it("test_divRoundHalfUp_bad_divisor_throws_and_negative_amount_keeps_sign", () => {
+    expect(() => divRoundHalfUp(100, 0)).toThrow(/dzielnik/);
+    expect(() => divRoundHalfUp(100, -1)).toThrow(/dzielnik/);
+    expect(divRoundHalfUp(-10_000, 3)).toBe(-3_333);
   });
 });

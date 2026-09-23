@@ -39,6 +39,11 @@ export interface StatsFilters {
   range: SheetDateRange;
   /** Pusty / brak = wszyscy. */
   contractor?: string;
+  /**
+   * Dzień „dziś” do oznaczenia niedomkniętego bucketa (tydzień/miesiąc zawierający tę datę).
+   * Brak = żaden bucket nie jest incomplete.
+   */
+  asOf?: CalendarDate;
 }
 
 export interface BacklogStats {
@@ -107,6 +112,11 @@ export interface TimeSeriesBucket {
   report: number;
   schedule: number;
   total: number;
+  /**
+   * Okres jeszcze trwa (zawiera `asOf`) — liczby mogą wzrosnąć.
+   * Pełne przeszłe buckety = false.
+   */
+  incomplete: boolean;
 }
 
 export interface TimeSeriesStats {
@@ -480,6 +490,7 @@ function aggregateTimeSeries(
       matchesContractor(row, filters.contractor) &&
       inSheetDateRange(row.pickupDate, filters.range),
   );
+  const asOfSheet = filters.asOf ? formatSheetDate(filters.asOf) : null;
   const buckets: TimeSeriesBucket[] = frames.map((frame) => {
     let report = 0;
     let schedule = 0;
@@ -501,6 +512,7 @@ function aggregateTimeSeries(
       report,
       schedule,
       total: report + schedule,
+      incomplete: asOfSheet !== null && inSheetDateRange(asOfSheet, frame),
     };
   });
   return { granularity, buckets };

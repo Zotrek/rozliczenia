@@ -525,6 +525,7 @@ describe("timeBucketGranularity / series", () => {
       report: 10,
       schedule: 4,
       total: 14,
+      incomplete: false,
     });
     const last = series.buckets[series.buckets.length - 1];
     expect(last).toMatchObject({
@@ -533,7 +534,33 @@ describe("timeBucketGranularity / series", () => {
       report: 7,
       schedule: 0,
       total: 7,
+      incomplete: false,
     });
+  });
+
+  it("test_aggregateBagsOverTime_marks_current_week_incomplete_when_asOf", () => {
+    const range = { from: "01.09.2026", to: "23.09.2026" };
+    const series = aggregateBagsOverTime(
+      [statsRow({ sheetRow: 2, pickupDate: "22.09.2026", bagCount: 3 })],
+      { range, asOf: { year: 2026, month: 9, day: 23 } },
+    );
+    expect(series.buckets.every((b, i) => b.incomplete === (i === series.buckets.length - 1))).toBe(
+      true,
+    );
+    expect(series.buckets[series.buckets.length - 1]).toMatchObject({
+      from: "21.09.2026",
+      to: "23.09.2026",
+      incomplete: true,
+    });
+  });
+
+  it("test_aggregateBagsOverTime_past_month_has_no_incomplete_with_asOf", () => {
+    const range = { from: "01.08.2026", to: "31.08.2026" };
+    const series = aggregateBagsOverTime(
+      [statsRow({ sheetRow: 2, pickupDate: "10.08.2026", bagCount: 1 })],
+      { range, asOf: { year: 2026, month: 9, day: 23 } },
+    );
+    expect(series.buckets.every((b) => b.incomplete === false)).toBe(true);
   });
 
   it("test_aggregateBagsOverTime_missing_mode_counts_as_report", () => {

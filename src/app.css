@@ -652,6 +652,22 @@ td input[type="text"]:focus { border-color: var(--teal); background: #fff; outli
 }
 .bags-time-stack .s-na { background: var(--teal); }
 .bags-time-stack .s-h { background: var(--orange); }
+.bags-time-col.is-incomplete .bags-time-stack {
+  opacity: 0.48;
+}
+.bags-time-col.is-incomplete .bags-time-stack i {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 3px,
+    rgba(255, 255, 255, 0.45) 3px,
+    rgba(255, 255, 255, 0.45) 5px
+  );
+}
+.bags-time-col.is-incomplete .wk {
+  color: var(--teal-deep);
+  font-style: italic;
+}
 .bags-time-col .wk {
   font-size: 11px;
   font-weight: 650;
@@ -677,6 +693,21 @@ td input[type="text"]:focus { border-color: var(--teal); background: #fff; outli
 }
 .bags-time-legend .c-na { background: var(--teal); }
 .bags-time-legend .c-h { background: var(--orange); }
+.bags-time-legend .c-open {
+  background: var(--teal);
+  opacity: 0.48;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 1px,
+    rgba(255, 255, 255, 0.55) 1px,
+    rgba(255, 255, 255, 0.55) 2px
+  );
+}
+.stats tr.is-incomplete td {
+  color: var(--muted);
+  font-style: italic;
+}
 .chart-split {
   display: grid;
   grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);

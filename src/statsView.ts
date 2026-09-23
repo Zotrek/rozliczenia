@@ -380,17 +380,21 @@ function timeSeriesBlock(
       ? "Na razie wszystkie worki widać jako „Na zgłoszenie”. Podział na harmonogram pojawi się, gdy w danych będzie rozróżnienie sposobu zlecenia."
       : "Jak wyżej: do czasu rozróżnienia w danych całość kosztów jest w „Na zgłoszenie”.";
   const max = Math.max(1, ...series.buckets.map((b) => b.total));
+  const hasIncomplete = series.buckets.some((b) => b.incomplete);
   const chart =
     `<div class="bags-time-chart${stacked ? " is-dense" : ""}" aria-hidden="true">` +
     series.buckets
       .map((b) => {
         const naH = Math.round((b.report / max) * 100);
         const hH = Math.round((b.schedule / max) * 100);
+        const colCls = b.incomplete ? "bags-time-col is-incomplete" : "bags-time-col";
+        const label = b.incomplete ? `${b.label} · trwa` : b.label;
         return (
-          '<div class="bags-time-col"><div class="bags-time-stack">' +
+          `<div class="${colCls}"${b.incomplete ? ' title="Okres jeszcze trwa — liczby mogą wzrosnąć"' : ""}>` +
+          '<div class="bags-time-stack">' +
           `<i class="s-h" style="height:${hH}%"></i>` +
           `<i class="s-na" style="height:${naH}%"></i></div>` +
-          `<span class="wk">${escapeHtml(b.label)}</span></div>`
+          `<span class="wk">${escapeHtml(label)}</span></div>`
         );
       })
       .join("") +
@@ -398,19 +402,27 @@ function timeSeriesBlock(
   const rows = series.buckets
     .map((b) => {
       const fmt = (n: number) => (money ? formatPln(n as Grosze) : String(n));
-      const range = `${b.from} – ${b.to}`;
+      const range = b.incomplete
+        ? `${b.from} – ${b.to} (trwa)`
+        : `${b.from} – ${b.to}`;
+      const rowCls = b.incomplete ? ' class="is-incomplete"' : "";
       return (
-        `<tr><td>${escapeHtml(range)}</td>` +
+        `<tr${rowCls}><td>${escapeHtml(range)}</td>` +
         `<td class="num">${escapeHtml(fmt(b.report))}</td>` +
         `<td class="num">${escapeHtml(fmt(b.schedule))}</td>` +
         `<td class="num"><strong>${escapeHtml(fmt(b.total))}</strong></td></tr>`
       );
     })
     .join("");
+  const incompleteLegend = hasIncomplete
+    ? '<li><i class="c-open"></i> Okres trwa — liczby mogą wzrosnąć</li>'
+    : "";
   return (
     '<ul class="bags-time-legend">' +
     '<li><i class="c-na"></i> Na zgłoszenie</li>' +
-    '<li><i class="c-h"></i> Harmonogram</li></ul>' +
+    '<li><i class="c-h"></i> Harmonogram</li>' +
+    incompleteLegend +
+    "</ul>" +
     `<div class="chart-split${stacked ? " is-stack" : ""}">` +
     chart +
     "<div>" +

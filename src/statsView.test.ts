@@ -212,6 +212,29 @@ describe("renderStatsScreen", () => {
     expect(html).toContain('data-fold="bags"');
     expect(html).toContain("Podwykonawcy");
   });
+
+  it("test_renderStats_marks_incomplete_week_column", () => {
+    const report = buildStatsReport(
+      [row({ sheetRow: 2, settled: true, receptionCost: 5_000, costPerBag: 2_500, bagCount: 2 })],
+      [],
+      {
+        range: { from: "01.09.2026", to: "23.09.2026" },
+        asOf: TODAY,
+      },
+    );
+    const html = renderStatsScreen(
+      defaultStatsView(TODAY, {
+        report,
+        appliedFrom: "01.09.2026",
+        appliedTo: "23.09.2026",
+        appliedKind: "current",
+      }),
+    );
+    expect(html).toContain("bags-time-col is-incomplete");
+    expect(html).toContain("· trwa");
+    expect(html).toContain("Okres trwa — liczby mogą wzrosnąć");
+    expect(html).toContain("(trwa)");
+  });
 });
 
 describe("chartShouldStack", () => {
@@ -227,6 +250,7 @@ describe("chartShouldStack", () => {
           report: 1,
           schedule: 0,
           total: 1,
+          incomplete: false,
         })),
       }),
     ).toBe(false);
@@ -240,6 +264,7 @@ describe("chartShouldStack", () => {
           report: 1,
           schedule: 0,
           total: 1,
+          incomplete: false,
         })),
       }),
     ).toBe(true);

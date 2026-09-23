@@ -1301,6 +1301,7 @@ async function runStats(): Promise<void> {
     const report = buildStatsReport(parsed.rows, parsed.rates, {
       range,
       contractor: VIEW.stats.contractor || undefined,
+      asOf: today,
     });
     const storage = typeof localStorage !== "undefined" ? localStorage : null;
     const stacked = {

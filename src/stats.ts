@@ -128,6 +128,8 @@ export interface ContractorRankEntry {
   contractor: string;
   average: Grosze;
   pickupCount: number;
+  /** Suma worków w odbiorach z rankingu (worki > 0). */
+  bagCount: number;
 }
 
 export interface ContractorRankStats {
@@ -438,13 +440,22 @@ export function aggregateContractorRanks(
   topN = 5,
 ): ContractorRankStats {
   const pool = qPool(rows, filters);
-  const byContractor = new Map<string, { pSum: Grosze; qSum: Grosze; count: number }>();
+  const byContractor = new Map<
+    string,
+    { pSum: Grosze; qSum: Grosze; count: number; bags: number }
+  >();
   for (const row of pool) {
-    const prev = byContractor.get(row.contractor) ?? { pSum: 0, qSum: 0, count: 0 };
+    const prev = byContractor.get(row.contractor) ?? {
+      pSum: 0,
+      qSum: 0,
+      count: 0,
+      bags: 0,
+    };
     byContractor.set(row.contractor, {
       pSum: prev.pSum + (row.receptionCost ?? 0),
       qSum: prev.qSum + (row.costPerBag as Grosze),
       count: prev.count + 1,
+      bags: prev.bags + (row.bagCount ?? 0),
     });
   }
   const byShop: ContractorRankEntry[] = [];
@@ -454,11 +465,13 @@ export function aggregateContractorRanks(
       contractor,
       average: divRoundHalfUp(agg.pSum, agg.count),
       pickupCount: agg.count,
+      bagCount: agg.bags,
     });
     byBag.push({
       contractor,
       average: divRoundHalfUp(agg.qSum, agg.count),
       pickupCount: agg.count,
+      bagCount: agg.bags,
     });
   }
   return {

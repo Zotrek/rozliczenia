@@ -473,12 +473,13 @@ function qTable(
       (e) =>
         `<tr><td class="shop">${escapeHtml(e.address)}` +
         `<span class="sub">${escapeHtml(e.shopName)} · ${escapeHtml(e.pickupDate)}</span></td>` +
+        `<td class="num">${e.bagCount}</td>` +
         `<td class="num money ${tone}">${escapeHtml(formatPln(e.costPerBag))}</td></tr>`,
     )
     .join("");
   return (
-    "<table><thead><tr><th>Sklep</th><th class=\"num\">Koszt za worek</th></tr></thead>" +
-    `<tbody>${body || emptyRow(2)}</tbody></table>`
+    "<table><thead><tr><th>Sklep</th><th class=\"num\">Worki</th><th class=\"num\">Koszt za worek</th></tr></thead>" +
+    `<tbody>${body || emptyRow(3)}</tbody></table>`
   );
 }
 
@@ -529,13 +530,15 @@ function contractorTable(
       (e) =>
         `<tr><td>${escapeHtml(e.contractor)}</td>` +
         `<td class="num money ${tone}">${escapeHtml(formatPln(e.average))}</td>` +
+        `<td class="num">${e.bagCount}</td>` +
         `<td class="num">${e.pickupCount}</td></tr>`,
     )
     .join("");
   return (
     "<table><thead><tr><th>Podwykonawca</th>" +
-    `<th class="num">${escapeHtml(amountHeader)}</th><th class="num">Odbiory</th></tr></thead>` +
-    `<tbody>${body || emptyRow(3)}</tbody></table>`
+    `<th class="num">${escapeHtml(amountHeader)}</th>` +
+    '<th class="num">Worki</th><th class="num">Odbiory</th></tr></thead>' +
+    `<tbody>${body || emptyRow(4)}</tbody></table>`
   );
 }
 

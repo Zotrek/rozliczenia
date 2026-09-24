@@ -707,15 +707,21 @@ describe("aggregateContractorRanks / listZeroBagPickups", () => {
       contractor: "eco",
       average: 5_000,
       pickupCount: 2,
+      bagCount: 4,
     });
-    expect(ranks.byShop.cheap[0]).toMatchObject({ contractor: "blue", average: 500 });
+    expect(ranks.byShop.cheap[0]).toMatchObject({
+      contractor: "blue",
+      average: 500,
+      bagCount: 1,
+    });
     expect(ranks.byBag.expensive[0]).toMatchObject({
       contractor: "eco",
       average: 2_500,
       pickupCount: 2,
+      bagCount: 4,
     });
-    expect(ranks.byBag.cheap[0]).toMatchObject({ contractor: "blue", average: 500 });
-    expect(ranks.byBag.cheap[1]).toMatchObject({ contractor: "gpw", average: 1_000 });
+    expect(ranks.byBag.cheap[0]).toMatchObject({ contractor: "blue", average: 500, bagCount: 1 });
+    expect(ranks.byBag.cheap[1]).toMatchObject({ contractor: "gpw", average: 1_000, bagCount: 4 });
   });
 
   it("test_listZeroBagPickups_happened_bagCount_zero_in_period", () => {

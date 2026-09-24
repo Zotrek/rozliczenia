@@ -206,13 +206,14 @@ describe("buildSettlementRead_", () => {
     expect(result.rows.map((row) => row.sheetRow)).toEqual([3]);
   });
 
-  it("test_buildSettlementRead_iso_date_skipped_not_failed", () => {
-    const result = read(open, [entry(2, { 4: "2026-09-18" }), entry(3)], []);
+  it("test_buildSettlementRead_iso_date_accepted_as_dd_mm_yyyy", () => {
+    const result = read(open, [entry(2, { 4: "2026-09-18" }), entry(3, { 4: "nie-data" })], []);
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
-    expect(result.rows.map((row) => row.sheetRow)).toEqual([3]);
+    expect(result.rows.map((row) => row.sheetRow)).toEqual([2]);
+    expect(result.rows[0]?.pickupDate).toBe("18.09.2026");
   });
 
   it("test_buildSettlementRead_date_object_becomes_dd_mm_yyyy", () => {
@@ -275,16 +276,18 @@ describe("buildSettlementRead_", () => {
     ]);
   });
 
-  it("test_buildSettlementRead_bad_rate_date_skipped", () => {
+  it("test_buildSettlementRead_iso_rate_date_accepted", () => {
     const result = read(open, [entry(2)], [
       { sheetRow: 2, cells: ["Sklepowa 1", "gpw", 20, 10, "2026-09-01"] },
       { sheetRow: 3, cells: ["Sklepowa 1", "gpw", 20, 10, ""] },
+      { sheetRow: 4, cells: ["Sklepowa 1", "gpw", 20, 10, "zla-data"] },
     ]);
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
-    expect(result.rates.map((rate) => rate.sheetRow)).toEqual([3]);
+    expect(result.rates.map((rate) => rate.sheetRow)).toEqual([2, 3]);
+    expect(result.rates[0]?.validFrom).toBe("01.09.2026");
   });
 
   it("test_buildSettlementRead_data_od_after_data_do_error", () => {

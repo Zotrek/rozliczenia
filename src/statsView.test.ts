@@ -214,6 +214,35 @@ describe("renderStatsScreen", () => {
     expect(html).toContain('data-fold="bags"');
     expect(html).toContain('data-fold="pickups"');
     expect(html).toContain("Podwykonawcy");
+    expect(html).toContain("Najdroższe sklepy");
+    expect(html).toContain(">Worki</th>");
+    expect(html).toContain("Najdrożsi");
+  });
+
+  it("test_renderStats_q_ranks_show_bag_count", () => {
+    const report = buildStatsReport(
+      [
+        row({
+          sheetRow: 2,
+          settled: true,
+          receptionCost: 5_000,
+          costPerBag: 2_500,
+          bagCount: 7,
+          address: "Drogi 1",
+        }),
+      ],
+      [],
+      { range: { from: "01.09.2026", to: "23.09.2026" } },
+    );
+    const html = renderStatsScreen(
+      defaultStatsView(TODAY, {
+        report,
+        appliedFrom: "01.09.2026",
+        appliedTo: "23.09.2026",
+      }),
+    );
+    expect(html).toContain("Drogi 1");
+    expect(html).toMatch(/<td class="num">7<\/td>/);
   });
 
   it("test_renderStats_marks_incomplete_week_column", () => {

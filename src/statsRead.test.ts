@@ -255,6 +255,48 @@ describe("buildSettlementStats_", () => {
       mode: "report",
     });
   });
+
+  it("test_buildSettlementStats_odebrane_accepts_iso_close_dates", () => {
+    const headers = [
+      "NIP",
+      "Podmiot",
+      "Sklep",
+      "Wg",
+      "Dni",
+      "Firma transportowa",
+      "Kod pocztowy",
+      "Miasto",
+      "Ulica",
+      "Numer budynku",
+      "Gmina",
+      "Woj",
+      "Plomba",
+      "Stan",
+      "TMS",
+      "Data zamknięcia worka",
+    ];
+    const bag = (plomba: string) => {
+      const row = Array.from({ length: 16 }, () => "" as unknown);
+      row[2] = "Gama";
+      row[5] = "GPW";
+      row[6] = "22-300";
+      row[7] = "Krasnystaw";
+      row[8] = "Królowej";
+      row[9] = "1";
+      row[12] = plomba;
+      row[15] = "2026-09-22";
+      return row;
+    };
+    const result = stats(gpw, [], [], { headers, rows: [bag("p1"), bag("p2")] });
+    const schedule = toStatsRows(result).filter((r) => r.mode === "schedule");
+    expect(schedule).toHaveLength(1);
+    expect(schedule[0]).toMatchObject({
+      pickupDate: "22.09.2026",
+      bagCount: 2,
+      contractor: "GPW",
+      mode: "schedule",
+    });
+  });
 });
 
 describe("akcja settlementStats w transport-log.gs", () => {

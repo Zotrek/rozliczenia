@@ -785,6 +785,7 @@ function readStatsRow(value: unknown): SettlementStatsRow | null {
     happened: value.happened,
     receptionCost,
     costPerBag,
+    mode: value.mode === "schedule" ? "schedule" : value.mode === "report" ? "report" : undefined,
   };
 }
 

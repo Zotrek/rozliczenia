@@ -159,7 +159,7 @@ Nowe akcje obok istniejących (`modalData`, `listReferenceData`, zapis protokoł
 | Akcja | Kierunek | Co robi |
 |-------|----------|---------|
 | `settlementSearch` | GET lub POST | Podwykonawca (nazwa krótka), data od (albo brak), data do. Zwraca wiersze rejestru w zakresie, które nie mają Rozliczony `tak` i nie mają transport `nie`, plus pasujące wiersze Bazy stawek. Każdy wiersz rejestru niesie numer wiersza arkusza i numer z kolumny 1 |
-| `settlementStats` | GET | Odczyt pod Statystyki: rozliczone w zakresie dat + nierozliczone (backlog / problemy ze stawkami); pola P/Q/I, status, data, podwykonawca, adres, snapshoty; dane do remisów; tryb gdy będzie w rejestrze. **Bez zapisu**, bez locka |
+| `settlementStats` | GET | Odczyt pod Statystyki: rozliczone w zakresie dat + nierozliczone (backlog / problemy ze stawkami); **worki Harmonogram** z `odebrane z harmonogramu` (`mode: schedule`); pola P/Q/I, status, data, podwykonawca, adres, snapshoty; dane do remisów. **Bez zapisu**, bez locka |
 | `listContractors` | GET | Lista podwykonawców: Nazwa i Dane do Worda. Można oprzeć na `listReferenceData`, jeśli pola już tam są |
 | `listStoreAddresses` | GET | Unikalne adresy z kolumny Adres sklepu rejestru. Okno stawek. Nie pinezki, nie kolumna Sklep. Nic nie zapisuje |
 | `routeNameProposal` | GET | Mapa. Czyta kolumnę 12 i zwraca zajęte nazwy. Propozycję `nazwa-dd.mm.rr-nn` liczy `routeName.ts`, nie skrypt. Gdy 01–99 są zajęte, funkcja zwraca pustą nazwę |

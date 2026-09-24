@@ -67,7 +67,7 @@ import {
 } from "./statsView.js";
 import type { CalendarDate } from "./sheetDate.js";
 
-const STATS_SECTION_IDS = ["bags", "costs", "q", "contractors", "empty-bags", "gaps"] as const;
+const STATS_SECTION_IDS = ["pickups", "bags", "costs", "q", "contractors", "empty-bags", "gaps"] as const;
 
 function todayCalendar(): CalendarDate {
   const now = new Date();
@@ -1250,6 +1250,12 @@ function shiftStatsPage(pager: string, dir: string): void {
     paint();
     return;
   }
+  if (pager === "pickups") {
+    const next = VIEW.stats.pickupsPage + (dir === "next" ? 1 : -1);
+    VIEW.stats = { ...VIEW.stats, pickupsPage: Math.max(1, next) };
+    paint();
+    return;
+  }
 }
 
 async function runStats(): Promise<void> {
@@ -1321,6 +1327,7 @@ async function runStats(): Promise<void> {
       status: "",
       emptyBagsPage: 1,
       gapsPage: 1,
+      pickupsPage: 1,
       tablesCollapsed: loadTablesCollapsed(storage, ["bags", "costs"], stacked),
     };
   } catch {

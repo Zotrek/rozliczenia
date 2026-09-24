@@ -791,7 +791,7 @@ td input[type="text"]:focus { border-color: var(--teal); background: #fff; outli
 <body>
   <div id="app"></div>
   <script>
-window.__ROZLICZENIA_WEBAPP__="";
+window.__ROZLICZENIA_WEBAPP__="/api/transport";
 (function () {
   var KEY = 'zwrotka_site_password';
   var reauthPending = false;
@@ -2344,6 +2344,7 @@ function readStatsRow(value) {
         happened: value.happened,
         receptionCost,
         costPerBag,
+        mode: value.mode === "schedule" ? "schedule" : value.mode === "report" ? "report" : undefined,
     };
 }
 function readRateRow(value) {
@@ -2740,7 +2741,10 @@ function timeBucketGranularity(range) {
  * Szacunek = `settle().total` (trasa raz).
  */
 function aggregateBacklog(rows, contractor) {
-    const open = rows.filter((row) => !row.settled && row.happened && matchesContractor(row, contractor));
+    const open = rows.filter((row) => !row.settled &&
+        row.happened &&
+        rowMode(row) === "report" &&
+        matchesContractor(row, contractor));
     const statement = settle({
         rows: open.map(toRegisterRow),
         rates: [],
@@ -2786,7 +2790,10 @@ function aggregateQRanks(rows, filters, topN = 5) {
  * Zero w L/M nie jest luką.
  */
 function aggregateRateGaps(rows, rates, contractor) {
-    const open = rows.filter((row) => !row.settled && row.happened && matchesContractor(row, contractor));
+    const open = rows.filter((row) => !row.settled &&
+        row.happened &&
+        rowMode(row) === "report" &&
+        matchesContractor(row, contractor));
     const entries = [];
     for (const row of open) {
         if (row.pickupRate === null) {
@@ -2924,6 +2931,35 @@ function listZeroBagPickups(rows, filters) {
         receptionCost: row.receptionCost,
     }))
         .sort((a, b) => compareSheetDate(a.pickupDate, b.pickupDate) || a.address.localeCompare(b.address));
+}
+/**
+ * Odbiory w okresie: Na zgłoszenie (rejestr) + Harmonogram (odebrane).
+ * Sort: data, tryb, adres.
+ */
+function listPeriodPickups(rows, filters) {
+    return rows
+        .filter((row) => row.happened &&
+        matchesContractor(row, filters.contractor) &&
+        inSheetDateRange(row.pickupDate, filters.range))
+        .map((row) => ({
+        address: row.address,
+        shopName: row.shopName,
+        contractor: row.contractor,
+        pickupDate: row.pickupDate,
+        bagCount: row.bagCount,
+        mode: rowMode(row),
+        settled: row.settled,
+    }))
+        .sort((a, b) => {
+        const byDate = compareSheetDate(a.pickupDate, b.pickupDate);
+        if (byDate !== 0) {
+            return byDate;
+        }
+        if (a.mode !== b.mode) {
+            return a.mode === "report" ? -1 : 1;
+        }
+        return a.address.localeCompare(b.address, "pl");
+    });
 }
 function aggregateTimeSeries(rows, filters, rules) {
     const granularity = timeBucketGranularity(filters.range);
@@ -3169,6 +3205,7 @@ function buildStatsReport(rows, rates, filters) {
         costsOverTime: aggregateCostsOverTime(rows, filters),
         contractorRanks: aggregateContractorRanks(rows, filters),
         zeroBags: listZeroBagPickups(rows, filters),
+        periodPickups: listPeriodPickups(rows, filters),
     };
 }
 /** Poprzednie pełne miesiące (bez bieżącego), od najnowszego. */
@@ -3302,6 +3339,7 @@ function chartShouldStack(series) {
 
 
 
+
 const STATS_FOLD_LS_PREFIX = "rozliczenia.stats.fold.";
 function defaultStatsView(today, over = {}) {
     const months = previousMonthOptions(today);
@@ -3329,6 +3367,7 @@ function defaultStatsView(today, over = {}) {
         status: "",
         emptyBagsPage: 1,
         gapsPage: 1,
+        pickupsPage: 1,
         sectionsCollapsed: {},
         tablesCollapsed: {},
         ...over,
@@ -3457,6 +3496,7 @@ function statsBody(model) {
     return (`<div class="body">${status}` +
         `<p class="period-label">${periodLabel}</p>` +
         kpiGrid(model.report) +
+        section("pickups", model, "Odbiory w okresie", "Każdy transport osobno · tryb zlecenia i liczba worków · po 5 na stronę", periodPickupsBlock(model), true) +
         section("bags", model, "Ile worków zabrano w czasie", bagsTimeSub(model.report.bagsOverTime), timeSeriesBlock("bags", model, model.report.bagsOverTime, false)) +
         section("costs", model, "Ile zapłacono w czasie", costsTimeSub(model.report.costsOverTime), timeSeriesBlock("costs", model, model.report.costsOverTime, true)) +
         section("q", model, "Koszt w przeliczeniu na worek", "Tylko rozliczone odbiory, w których zabrano worki · 5 najdroższych i 5 najtańszych sklepów", qRanksBlock(model.report)) +
@@ -3512,8 +3552,8 @@ function timeSeriesBlock(id, model, series, money) {
     const col0 = series.granularity === "week" ? "Tydzień" : "Miesiąc";
     const foldLabel = money ? "Tabela z kwotami" : "Tabela z liczbami";
     const note = id === "bags"
-        ? "Na razie wszystkie worki widać jako „Na zgłoszenie”. Podział na harmonogram pojawi się, gdy w danych będzie rozróżnienie sposobu zlecenia."
-        : "Jak wyżej: do czasu rozróżnienia w danych całość kosztów jest w „Na zgłoszenie”.";
+        ? "Na zgłoszenie = rejestr (Arkusz1). Harmonogram = worki z zakładki „odebrane z harmonogramu” (1 wiersz = 1 worek)."
+        : "Koszty rozliczone pochodzą z rejestru (Na zgłoszenie). Harmonogram w tej serii pojawia się dopiero po rozliczeniu w rejestrze.";
     const max = Math.max(1, ...series.buckets.map((b) => b.total));
     const hasIncomplete = series.buckets.some((b) => b.incomplete);
     const chart = `<div class="bags-time-chart${stacked ? " is-dense" : ""}" aria-hidden="true">` +
@@ -3610,6 +3650,32 @@ function contractorTable(entries, amountHeader, tone) {
     return ("<table><thead><tr><th>Podwykonawca</th>" +
         `<th class="num">${escapeHtml(amountHeader)}</th><th class="num">Odbiory</th></tr></thead>` +
         `<tbody>${body || emptyRow(3)}</tbody></table>`);
+}
+function periodPickupsBlock(model) {
+    const report = model.report;
+    if (!report) {
+        return "";
+    }
+    const paged = pageSlice(report.periodPickups, model.pickupsPage);
+    const body = paged.slice
+        .map((row) => {
+        const bags = row.bagCount === null ? "—" : String(row.bagCount);
+        return (`<tr><td>${escapeHtml(row.pickupDate)}</td>` +
+            `<td class="shop">${escapeHtml(row.address)}` +
+            `<span class="sub">${escapeHtml(row.shopName)}</span></td>` +
+            `<td>${escapeHtml(row.contractor)}</td>` +
+            `<td>${escapeHtml(modeLabel(row.mode))}</td>` +
+            `<td class="num">${escapeHtml(bags)}</td>` +
+            `<td>${row.settled ? "Tak" : "Nie"}</td></tr>`);
+    })
+        .join("");
+    return ("<table><thead><tr>" +
+        "<th>Data</th><th>Sklep</th><th>Podwykonawca</th><th>Tryb</th><th class=\"num\">Worki</th><th>Rozliczone</th>" +
+        `</tr></thead><tbody>${body || emptyRow(6)}</tbody></table>` +
+        pager("pickups", paged) +
+        '<p class="note" style="margin: 10px 12px 12px;">' +
+        "Harmonogram: liczba worków = liczba wierszy w „odebrane z harmonogramu” dla sklepu i dnia. " +
+        `Lista pokazuje po ${STATS_PAGE_SIZE} pozycji na stronę.</p>`);
 }
 function zeroBagsBlock(model) {
     const report = model.report;
@@ -3913,7 +3979,7 @@ function emptyStats(today) {
 
 
 
-const STATS_SECTION_IDS = ["bags", "costs", "q", "contractors", "empty-bags", "gaps"];
+const STATS_SECTION_IDS = ["pickups", "bags", "costs", "q", "contractors", "empty-bags", "gaps"];
 function todayCalendar() {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
@@ -5066,6 +5132,12 @@ function shiftStatsPage(pager, dir) {
         paint();
         return;
     }
+    if (pager === "pickups") {
+        const next = VIEW.stats.pickupsPage + (dir === "next" ? 1 : -1);
+        VIEW.stats = { ...VIEW.stats, pickupsPage: Math.max(1, next) };
+        paint();
+        return;
+    }
 }
 async function runStats() {
     if (webapp === "") {
@@ -5130,6 +5202,7 @@ async function runStats() {
             status: "",
             emptyBagsPage: 1,
             gapsPage: 1,
+            pickupsPage: 1,
             tablesCollapsed: loadTablesCollapsed(storage, ["bags", "costs"], stacked),
         };
     }

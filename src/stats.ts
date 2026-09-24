@@ -146,6 +146,17 @@ export interface ZeroBagPickup {
   receptionCost: Grosze | null;
 }
 
+/** Odbiór w okresie (rejestr albo worki z harmonogramu). */
+export interface PeriodPickup {
+  address: string;
+  shopName: string;
+  contractor: string;
+  pickupDate: string;
+  bagCount: number | null;
+  mode: SettlementMode;
+  settled: boolean;
+}
+
 /** Próg inkluzywnej długości okresu: ≤ → tygodnie, inaczej miesiące. */
 export const TIME_SERIES_WEEK_MAX_DAYS = 45;
 
@@ -241,7 +252,13 @@ export function aggregateBacklog(
   rows: readonly StatsRow[],
   contractor?: string,
 ): BacklogStats {
-  const open = rows.filter((row) => !row.settled && row.happened && matchesContractor(row, contractor));
+  const open = rows.filter(
+    (row) =>
+      !row.settled &&
+      row.happened &&
+      rowMode(row) === "report" &&
+      matchesContractor(row, contractor),
+  );
   const statement = settle({
     rows: open.map(toRegisterRow),
     rates: [],
@@ -302,7 +319,13 @@ export function aggregateRateGaps(
   rates: readonly SettlementRateRow[],
   contractor?: string,
 ): RateGapsStats {
-  const open = rows.filter((row) => !row.settled && row.happened && matchesContractor(row, contractor));
+  const open = rows.filter(
+    (row) =>
+      !row.settled &&
+      row.happened &&
+      rowMode(row) === "report" &&
+      matchesContractor(row, contractor),
+  );
   const entries: RateGapEntry[] = [];
   for (const row of open) {
     if (row.pickupRate === null) {
@@ -472,6 +495,42 @@ export function listZeroBagPickups(
       (a, b) =>
         compareSheetDate(a.pickupDate, b.pickupDate) || a.address.localeCompare(b.address),
     );
+}
+
+/**
+ * Odbiory w okresie: Na zgłoszenie (rejestr) + Harmonogram (odebrane).
+ * Sort: data, tryb, adres.
+ */
+export function listPeriodPickups(
+  rows: readonly StatsRow[],
+  filters: StatsFilters,
+): PeriodPickup[] {
+  return rows
+    .filter(
+      (row) =>
+        row.happened &&
+        matchesContractor(row, filters.contractor) &&
+        inSheetDateRange(row.pickupDate, filters.range),
+    )
+    .map((row) => ({
+      address: row.address,
+      shopName: row.shopName,
+      contractor: row.contractor,
+      pickupDate: row.pickupDate,
+      bagCount: row.bagCount,
+      mode: rowMode(row),
+      settled: row.settled,
+    }))
+    .sort((a, b) => {
+      const byDate = compareSheetDate(a.pickupDate, b.pickupDate);
+      if (byDate !== 0) {
+        return byDate;
+      }
+      if (a.mode !== b.mode) {
+        return a.mode === "report" ? -1 : 1;
+      }
+      return a.address.localeCompare(b.address, "pl");
+    });
 }
 
 function aggregateTimeSeries(
@@ -759,6 +818,7 @@ export interface StatsReport {
   costsOverTime: TimeSeriesStats;
   contractorRanks: ContractorRankStats;
   zeroBags: ZeroBagPickup[];
+  periodPickups: PeriodPickup[];
 }
 
 export const STATS_PAGE_SIZE = 5;
@@ -801,6 +861,7 @@ export function buildStatsReport(
     costsOverTime: aggregateCostsOverTime(rows, filters),
     contractorRanks: aggregateContractorRanks(rows, filters),
     zeroBags: listZeroBagPickups(rows, filters),
+    periodPickups: listPeriodPickups(rows, filters),
   };
 }
 

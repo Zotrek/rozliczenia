@@ -21,6 +21,7 @@ import {
   formatSheetDate,
   inSheetDateRange,
   listZeroBagPickups,
+  listPeriodPickups,
   monthOptionLabel,
   previousQuarterOptions,
   previousQuarterPeriod,
@@ -774,6 +775,57 @@ describe("aggregateContractorRanks / listZeroBagPickups", () => {
       settled: true,
       receptionCost: 1_500,
     });
+  });
+
+  it("test_listPeriodPickups_includes_mode_and_bags", () => {
+    const list = listPeriodPickups(
+      [
+        statsRow({
+          sheetRow: 2,
+          pickupDate: "12.09.2026",
+          bagCount: 3,
+          mode: "report",
+          address: "A",
+        }),
+        statsRow({
+          sheetRow: 3,
+          pickupDate: "12.09.2026",
+          bagCount: 5,
+          mode: "schedule",
+          address: "B",
+          settled: false,
+        }),
+        statsRow({
+          sheetRow: 4,
+          pickupDate: "01.08.2026",
+          bagCount: 9,
+          mode: "schedule",
+          address: "Out",
+        }),
+      ],
+      { range },
+    );
+    expect(list).toHaveLength(2);
+    expect(list[0]).toMatchObject({
+      address: "A",
+      mode: "report",
+      bagCount: 3,
+      pickupDate: "12.09.2026",
+    });
+    expect(list[1]).toMatchObject({
+      address: "B",
+      mode: "schedule",
+      bagCount: 5,
+    });
+  });
+
+  it("test_aggregateBacklog_skips_schedule_rows", () => {
+    expect(
+      aggregateBacklog([
+        statsRow({ sheetRow: 2, settled: false, bagCount: 1 }),
+        statsRow({ sheetRow: 3, settled: false, bagCount: 4, mode: "schedule" }),
+      ]).count,
+    ).toBe(1);
   });
 });
 

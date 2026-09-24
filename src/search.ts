@@ -1,3 +1,4 @@
+import type { SettlementMode } from "./range.js";
 import type { Grosze, RateRow, RegisterRow } from "./types.js";
 
 /** Wiersz Bazy stawek z odczytu. `sheetRow` rozróżnia remis — para i data są wtedy te same. */
@@ -27,6 +28,8 @@ export interface SettlementStatsRow extends RegisterRow {
   happened: boolean;
   receptionCost: Grosze | null;
   costPerBag: Grosze | null;
+  /** Brak / report = Na zgłoszenie; schedule = z „odebrane z harmonogramu”. */
+  mode?: SettlementMode;
 }
 
 export interface SettlementStatsOk {

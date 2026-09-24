@@ -123,6 +123,7 @@ describe("buildStatsReport", () => {
     expect(report.activity.pickupCount).toBe(2);
     expect(report.settled.count).toBe(1);
     expect(report.zeroBags).toHaveLength(1);
+    expect(report.periodPickups).toHaveLength(2);
     expect(report.bagsOverTime.buckets.length).toBeGreaterThan(0);
   });
 });
@@ -206,10 +207,12 @@ describe("renderStatsScreen", () => {
       }),
     );
     expect(html).toContain("Liczba odbiorów");
+    expect(html).toContain("Odbiory w okresie");
     expect(html).toContain("Ile worków zabrano w czasie");
     expect(html).toContain("Problemy ze stawkami");
     expect(html).toContain("Odbiory bez worków");
     expect(html).toContain('data-fold="bags"');
+    expect(html).toContain('data-fold="pickups"');
     expect(html).toContain("Podwykonawcy");
   });
 

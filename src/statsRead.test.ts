@@ -49,6 +49,7 @@ function loadStats(): (
   query: { podwykonawca?: string; dataOd?: string; dataDo?: string },
   register: { sheetRow: number; cells: unknown[] }[],
   rates: { sheetRow: number; cells: unknown[] }[],
+  odebrane?: { headers: string[]; rows: unknown[][] },
 ) => SettlementStatsResult {
   const block = pureBlock();
   expect(block).not.toMatch(/SpreadsheetApp|LockService/);
@@ -57,6 +58,7 @@ function loadStats(): (
     query: { podwykonawca?: string; dataOd?: string; dataDo?: string },
     register: { sheetRow: number; cells: unknown[] }[],
     rates: { sheetRow: number; cells: unknown[] }[],
+    odebrane?: { headers: string[]; rows: unknown[][] },
   ) => SettlementStatsResult;
   return load();
 }
@@ -193,6 +195,66 @@ describe("buildSettlementStats_", () => {
     });
     expect(aggregateBacklog(rows).count).toBe(1);
   });
+
+  it("test_buildSettlementStats_odebrane_groups_bags_as_schedule", () => {
+    const headers = [
+      "NIP",
+      "Podmiot",
+      "Sklep",
+      "Wg",
+      "Dni",
+      "Firma transportowa",
+      "Kod pocztowy",
+      "Miasto",
+      "Ulica",
+      "Numer budynku",
+      "Gmina",
+      "Woj",
+      "Plomba",
+      "Stan",
+      "TMS",
+      "Data zamknięcia worka",
+    ];
+    const bag = (over: Record<string, unknown> = {}) => {
+      const row = Array.from({ length: 16 }, () => "" as unknown);
+      row[2] = "Gama";
+      row[5] = "gpw";
+      row[6] = "22-300";
+      row[7] = "Krasnystaw";
+      row[8] = "Królowej";
+      row[9] = "1";
+      row[15] = "18.09.2026";
+      for (const [k, v] of Object.entries(over)) {
+        row[Number(k)] = v;
+      }
+      return row;
+    };
+    const result = stats(
+      gpw,
+      [entry(2, { 13: "tak", 15: 10, 16: 5 })],
+      [],
+      {
+        headers,
+        rows: [bag(), bag({ 12: "p2" }), bag({ 5: "inna", 12: "p3" }), bag({ 15: "01.08.2026", 12: "p4" })],
+      },
+    );
+    const rows = toStatsRows(result);
+    const schedule = rows.filter((row) => row.mode === "schedule");
+    expect(schedule).toHaveLength(1);
+    expect(schedule[0]).toMatchObject({
+      mode: "schedule",
+      bagCount: 2,
+      contractor: "gpw",
+      shopName: "Gama",
+      pickupDate: "18.09.2026",
+      settled: false,
+      happened: true,
+    });
+    expect(rows.find((row) => row.mode === "report" || row.mode === undefined)).toMatchObject({
+      sheetRow: 2,
+      mode: "report",
+    });
+  });
 });
 
 describe("akcja settlementStats w transport-log.gs", () => {
@@ -200,6 +262,8 @@ describe("akcja settlementStats w transport-log.gs", () => {
     const body = functionSource("settlementStats_");
     expect(body).toContain("buildSettlementStats_");
     expect(body).toContain("getSheetByName(RATE_SHEET_NAME)");
+    expect(body).toContain("ODEBRANE_Z_HARMONOGRAMU_SHEET_NAME");
+    expect(body).toContain("readOdebraneSheetRows_");
     expect(body).not.toMatch(WRITE_CALL);
     expect(gs).toContain("action === 'settlementStats'");
     const getFn = functionSource("doGet");

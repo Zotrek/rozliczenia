@@ -1,7 +1,7 @@
 # Tasks: Statystyki rozliczeń
 
 > **Task:** 0010_statystyki  
-> **Updated:** 2026-09-23 (step 4: CP4 pass; smoke blocked — Web App)
+> **Updated:** 2026-09-24 (Harmonogram worki + lista odbiorów)
 
 ## 0. Makieta (zrobione)
 
@@ -47,9 +47,17 @@
 
 - [ ] Ręczny smoke na Pages / lokalnym HTML z Web App (gdy action wdrożony)
   - 2026-09-23: żywy Web App → `settlementStats` = `{"ok":false,"error":"unknown action"}` (baseline `listContractors` OK). Kod jest w repo `transport-log.gs`, brak nowej wersji wdrożenia.
-  - Pages `https://zotrek.github.io/rozliczenia/` = build z 2026-09-21 (bez UI Statystyk); Settings Pages wskazuje `main`, nie `gh-pages`.
-  - Po wdrożeniu GAS: smoke lokalnie `index.html?webapp=…` albo push + workflow Pages; checklista: Zakres→Statystyki→Powrót, filtry, Pokaż raport, KPI/tabele.
+  - 2026-09-24: w repo: `settlementStats` + odebrane + sekcja „Odbiory w okresie”; **wymaga Deploy Apps Script** (ta sama wersja `/exec`).
+  - Po wdrożeniu GAS: smoke lokalnie / Pages; checklista: Zakres→Statystyki→Powrót, filtry, Pokaż raport, KPI, **Odbiory w okresie** (tryb + worki), serie worków z Harmonogramem > 0.
 - [x] **CHECKPOINT 4 (regresja):** `npm test` — `rozliczenia/` 221 pass + `arkusz-mapa/` 608 pass ✅
+- [x] **CHECKPOINT 5 (2026-09-24):** `rozliczenia/` 286 + `arkusz-mapa/` 649 — odebrane + lista odbiorów ✅
+
+## 5. Worki Harmonogram + lista odbiorów (2026-09-24)
+
+- [x] GAS: `settlementStats` czyta `odebrane z harmonogramu` → `mode: schedule`
+- [x] TS: `listPeriodPickups` + serie worków × tryb; backlog bez schedule
+- [x] UI: sekcja „Odbiory w okresie” (data, sklep, podwykonawca, tryb, worki)
+- [x] Testy + docs 0010
 
 ## Poza checklistą (nie robić)
 

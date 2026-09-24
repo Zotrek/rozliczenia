@@ -1,5 +1,5 @@
 import { escapeHtml } from "./html.js";
-import type { ContractorListItem } from "./range.js";
+import { modeLabel, type ContractorListItem } from "./range.js";
 import { formatPln } from "./statement.js";
 import {
   chartShouldStack,
@@ -42,6 +42,7 @@ export interface StatsViewModel {
   status: string;
   emptyBagsPage: number;
   gapsPage: number;
+  pickupsPage: number;
   /** Sekcje zwinięte (id → true). */
   sectionsCollapsed: Readonly<Record<string, boolean>>;
   /** Tabele pod wykresem zwinięte (id → true). */
@@ -77,6 +78,7 @@ export function defaultStatsView(
     status: "",
     emptyBagsPage: 1,
     gapsPage: 1,
+    pickupsPage: 1,
     sectionsCollapsed: {},
     tablesCollapsed: {},
     ...over,
@@ -246,6 +248,14 @@ function statsBody(model: StatsViewModel): string {
     `<p class="period-label">${periodLabel}</p>` +
     kpiGrid(model.report) +
     section(
+      "pickups",
+      model,
+      "Odbiory w okresie",
+      "Każdy transport osobno · tryb zlecenia i liczba worków · po 5 na stronę",
+      periodPickupsBlock(model),
+      true,
+    ) +
+    section(
       "bags",
       model,
       "Ile worków zabrano w czasie",
@@ -377,8 +387,8 @@ function timeSeriesBlock(
   const foldLabel = money ? "Tabela z kwotami" : "Tabela z liczbami";
   const note =
     id === "bags"
-      ? "Na razie wszystkie worki widać jako „Na zgłoszenie”. Podział na harmonogram pojawi się, gdy w danych będzie rozróżnienie sposobu zlecenia."
-      : "Jak wyżej: do czasu rozróżnienia w danych całość kosztów jest w „Na zgłoszenie”.";
+      ? "Na zgłoszenie = rejestr (Arkusz1). Harmonogram = worki z zakładki „odebrane z harmonogramu” (1 wiersz = 1 worek)."
+      : "Koszty rozliczone pochodzą z rejestru (Na zgłoszenie). Harmonogram w tej serii pojawia się dopiero po rozliczeniu w rejestrze.";
   const max = Math.max(1, ...series.buckets.map((b) => b.total));
   const hasIncomplete = series.buckets.some((b) => b.incomplete);
   const chart =
@@ -526,6 +536,37 @@ function contractorTable(
     "<table><thead><tr><th>Podwykonawca</th>" +
     `<th class="num">${escapeHtml(amountHeader)}</th><th class="num">Odbiory</th></tr></thead>` +
     `<tbody>${body || emptyRow(3)}</tbody></table>`
+  );
+}
+
+function periodPickupsBlock(model: StatsViewModel): string {
+  const report = model.report;
+  if (!report) {
+    return "";
+  }
+  const paged = pageSlice(report.periodPickups, model.pickupsPage);
+  const body = paged.slice
+    .map((row) => {
+      const bags = row.bagCount === null ? "—" : String(row.bagCount);
+      return (
+        `<tr><td>${escapeHtml(row.pickupDate)}</td>` +
+        `<td class="shop">${escapeHtml(row.address)}` +
+        `<span class="sub">${escapeHtml(row.shopName)}</span></td>` +
+        `<td>${escapeHtml(row.contractor)}</td>` +
+        `<td>${escapeHtml(modeLabel(row.mode))}</td>` +
+        `<td class="num">${escapeHtml(bags)}</td>` +
+        `<td>${row.settled ? "Tak" : "Nie"}</td></tr>`
+      );
+    })
+    .join("");
+  return (
+    "<table><thead><tr>" +
+    "<th>Data</th><th>Sklep</th><th>Podwykonawca</th><th>Tryb</th><th class=\"num\">Worki</th><th>Rozliczone</th>" +
+    `</tr></thead><tbody>${body || emptyRow(6)}</tbody></table>` +
+    pager("pickups", paged) +
+    '<p class="note" style="margin: 10px 12px 12px;">' +
+    "Harmonogram: liczba worków = liczba wierszy w „odebrane z harmonogramu” dla sklepu i dnia. " +
+    `Lista pokazuje po ${STATS_PAGE_SIZE} pozycji na stronę.</p>`
   );
 }
 

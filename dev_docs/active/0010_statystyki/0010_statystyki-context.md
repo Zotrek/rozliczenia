@@ -1,8 +1,8 @@
 # Context: Statystyki rozliczeń
 
 > **Task:** 0010_statystyki (= R8)  
-> **Last Updated:** 2026-09-23  
-> **Status:** step 4 partial — CP4 ✅; ręczny smoke czeka na wdrożenie `settlementStats`
+> **Last Updated:** 2026-09-24  
+> **Status:** step 4 partial — CP4 ✅; worki Harmonogram z odebranych ✅; smoke GAS nadal wymaga wdrożenia Web App
 
 ## Decyzje produktowe (2026-09-23)
 
@@ -34,10 +34,11 @@
 | Koszt odbioru | kol. P |
 | W przeliczeniu na sklep / na worek | śr. P / śr. Q per podwykonawca |
 
-## Źródło trybu (serie czasowe)
+## Źródło trybu (serie czasowe + lista odbiorów)
 
-- W rejestrze **nie ma jeszcze** kolumny Na zgłoszenie / Harmonogram.
-- Do czasu: wszystko w serii Na zgłoszenie; Harmonogram = 0.
+- **Na zgłoszenie:** rejestr `Arkusz1` → `mode: report`.
+- **Harmonogram:** zakładka `odebrane z harmonogramu` (1 wiersz = 1 worek) → grupa adres+data+firma → `mode: schedule`, `bagCount` = liczba wierszy.
+- Odbiory z harmonogramu **nie** wchodzą do backlogu / problemów ze stawkami (to nie są wiersze rejestru do rozliczenia P/Q).
 
 ## Kolumny rejestru (istotne)
 
@@ -87,7 +88,12 @@
 | Wiersze | rozliczone ∩ zakres; nierozliczone odbyte bez filtra dat; `nie` w R wykluczone |
 | Payload wiersza | jak search + `settled`, `happened`, `receptionCost` (P), `costPerBag` (Q) |
 | Rates | Baza stawek (filtr podwykonawcy gdy podany); remisy po stronie TS |
-| Tryb | brak kolumny → nie ma w payloadzie (TS domyślnie `report`) |
+| Tryb | brak kolumny w rejestrze → `mode: report`; Harmonogram z odebranych → `mode: schedule` |
+| Lista odbiorów | Sekcja „Odbiory w okresie”: data, sklep, podwykonawca, tryb, worki, rozliczone; stronicowanie 5 |
+
+### 2026-09-24 — worki Harmonogram w statystykach
+- `settlementStats_` czyta `odebrane z harmonogramu` (ten sam arkusz ewidencji).
+- Agregacje: serie worków × tryb; nowa lista `periodPickups`; backlog/luki tylko rejestr.
 
 ## Decyzje implementacyjne (step 3)
 
@@ -97,7 +103,7 @@
 | Wejście | Przycisk na Zakresie → auto `runStats` (bieżący miesiąc) |
 | Fold LS | `rozliczenia.stats.fold.section.*` / `table.*` |
 | Stack wykresu | ≥7 bucketów → kolumna + tabela startuje zwinięta |
-| Stronicowanie | 5 / stronę: odbiory bez worków + problemy ze stawkami |
+| Stronicowanie | 5 / stronę: odbiory (lista) + bez worków + problemy ze stawkami |
 
 ## Checkpoint
 
@@ -106,6 +112,7 @@
 - **CP2:** `arkusz-mapa` 608 pass + `rozliczenia` 208 pass (`statsRead.test.ts`) (2026-09-23) ✅
 - **CP3:** `rozliczenia` 221 pass (UI + `statsView.test.ts`) (2026-09-23) ✅
 - **CP4:** `rozliczenia` 221 + `arkusz-mapa` 608 — bez regresji (2026-09-23) ✅
+- **CP5 (2026-09-24):** `rozliczenia` 286 + `arkusz-mapa` 649 — odebrane + lista odbiorów ✅
 
 ## Otwarte (drobne)
 

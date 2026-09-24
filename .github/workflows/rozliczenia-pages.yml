@@ -1,13 +1,15 @@
 # Katalog główny repozytorium = pakiet rozliczenia.
 #
 # Sekrety:
-#   TRANSPORT_WEBAPP_URL — URL Cloudflare Workera …/api/transport
 #   CLOUDFLARE_API_TOKEN — token z uprawnieniem Cloudflare Pages Edit
 #   CLOUDFLARE_ACCOUNT_ID — Account ID z dash.cloudflare.com
 #   CLOUDFLARE_PAGES_PROJECT — nazwa projektu Pages (np. rozliczenia-6yo)
 #
-# Generate w GH Actions → wrangler pages deploy → *.pages.dev (hasło: CFP_PASSWORD w CF).
-# Opcjonalnie nadal push na gh-pages (stary github.io).
+# Build używa same-origin /api/transport (cookie Pages).
+# Na CF Pages env: CFP_PASSWORD + GAS_PROXY_BASE=https://….workers.dev
+#
+# Generate w GH Actions → wrangler pages deploy → *.pages.dev
+# github.io: tylko stub (bez API).
 #
 # W CF Pages: wyłącz automatyczny build z Gita (Settings → Builds), żeby nie dublować.
 name: rozliczenia — Pages
@@ -47,13 +49,8 @@ jobs:
         run: npm test
 
       - name: Złóż stronę z adresem Web App
-        env:
-          TRANSPORT_WEBAPP_URL: ${{ secrets.TRANSPORT_WEBAPP_URL }}
         run: |
-          if [ -z "$TRANSPORT_WEBAPP_URL" ]; then
-            echo "::error::Brak sekretu TRANSPORT_WEBAPP_URL"
-            exit 1
-          fi
+          export TRANSPORT_WEBAPP_URL="/api/transport"
           npm run build
           mkdir -p site
           cp index.html logo.png jednorozec-deba.gif site/
@@ -74,10 +71,24 @@ jobs:
           fi
           npx --yes wrangler@4 pages deploy ./site --project-name="$PROJECT" --commit-dirty=true
 
-      - name: Publikacja na gałąź gh-pages (legacy github.io)
+      - name: Stub na gh-pages (bez API)
+        run: |
+          mkdir -p gh-stub
+          cat > gh-stub/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="pl">
+          <head><meta charset="utf-8"><title>Rozliczenia przeniesione</title></head>
+          <body style="font-family:system-ui;max-width:36rem;margin:3rem auto;padding:0 1rem">
+            <h1>Aplikacja jest na Cloudflare Pages</h1>
+            <p>Użyj linku <strong>*.pages.dev</strong> (po haśle zespołu).</p>
+          </body>
+          </html>
+          EOF
+
+      - name: Publikacja stubu na gałąź gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
+          publish_dir: ./gh-stub
           force_orphan: true
-          commit_message: "deploy: rozliczenia ${{ github.run_id }}"
+          commit_message: "deploy: rozliczenia gh-stub ${{ github.run_id }}"

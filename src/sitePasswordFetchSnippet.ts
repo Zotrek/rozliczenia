@@ -2,6 +2,7 @@
  * Fetch wrapper:
  * - same-origin /api/* → cookie Pages (credentials), bez hasła w storage
  * - legacy workers.dev → opcjonalny X-Site-Password z localStorage (TTL), bez pętli przy mismatch
+ * - 401 → duży popup, potem /logout
  */
 export const SITE_PASSWORD_FETCH_SNIPPET = `(function () {
   var KEY = 'zwrotka_site_password';
@@ -44,11 +45,54 @@ export const SITE_PASSWORD_FETCH_SNIPPET = `(function () {
     } catch (e) {}
   }
 
+  function showUnauthorizedPopup(onConfirm) {
+    if (document.getElementById('zwrotka-auth-overlay')) return;
+    var overlay = document.createElement('div');
+    overlay.id = 'zwrotka-auth-overlay';
+    overlay.setAttribute('role', 'alertdialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'zwrotka-auth-title');
+    overlay.style.cssText =
+      'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;' +
+      'background:rgba(15,23,42,0.72);padding:1.25rem;box-sizing:border-box;font-family:system-ui,sans-serif;';
+    var box = document.createElement('div');
+    box.style.cssText =
+      'max-width:28rem;width:100%;background:#fff;color:#0f172a;border-radius:12px;' +
+      'padding:1.75rem 1.5rem;box-shadow:0 25px 50px rgba(0,0,0,0.35);text-align:center;';
+    var title = document.createElement('h2');
+    title.id = 'zwrotka-auth-title';
+    title.textContent = 'Brak uprawnień (401)';
+    title.style.cssText = 'margin:0 0 0.75rem;font-size:1.5rem;font-weight:700;line-height:1.25;';
+    var msg = document.createElement('p');
+    msg.textContent =
+      'Sesja wygasła lub hasło jest nieaktualne. Zaloguj się ponownie, aby kontynuować.';
+    msg.style.cssText = 'margin:0 0 1.5rem;font-size:1.05rem;line-height:1.45;color:#334155;';
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Zaloguj ponownie';
+    btn.style.cssText =
+      'display:inline-block;padding:0.75rem 1.5rem;font-size:1.05rem;font-weight:600;' +
+      'border:0;border-radius:8px;background:#0f172a;color:#fff;cursor:pointer;';
+    btn.addEventListener('click', function () {
+      onConfirm();
+    });
+    box.appendChild(title);
+    box.appendChild(msg);
+    box.appendChild(btn);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    try {
+      btn.focus();
+    } catch (e) {}
+  }
+
   function forceReauth() {
     if (reauthPending) return;
     reauthPending = true;
     clearLegacyPass();
-    location.assign('/logout');
+    showUnauthorizedPopup(function () {
+      location.assign('/logout');
+    });
   }
 
   function maybeMismatchAlert(res) {

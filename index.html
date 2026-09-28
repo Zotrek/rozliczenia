@@ -4790,7 +4790,8 @@ function onMouseDown(event) {
 function sheetRef(el) {
     const sheetRow = Number(el.dataset.sheetRow);
     const transportNumber = el.dataset.transport ?? "";
-    if (!Number.isInteger(sheetRow) || sheetRow < 2 || transportNumber === "") {
+    // Harmonogram: brak nr zlecenia — wystarczy sheetRow (+ puste transportNumber).
+    if (!Number.isInteger(sheetRow) || sheetRow < 2) {
         return null;
     }
     return { sheetRow, transportNumber };
@@ -4904,7 +4905,7 @@ async function saveRates() {
         VIEW.ratesMessage =
             VIEW.ratesTarget === "harmonogram" ? "Zapisano stawkę harmonogramu." : "Zapisano stawkę.";
         VIEW.ratesMessageOk = true;
-        if (VIEW.screen === "statement" && VIEW.mode === "report") {
+        if (VIEW.screen === "statement") {
             const refreshed = await reloadStatement();
             if (!refreshed) {
                 VIEW.status = STATEMENT_ERROR.refresh;

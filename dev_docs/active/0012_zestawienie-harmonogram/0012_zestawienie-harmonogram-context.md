@@ -20,6 +20,7 @@
 | 10 | Rodzaj zbiórki | Z `Tryb zbiórki` na workach (agregacja jak w protokole) |
 | 11 | transport się odbył | Zawsze lista tak/nie + przekreślenie przy „nie” |
 | 12 | Sync vs clear | Sync tylko uzupełnia / aktualizuje nierozliczone; **nigdy nie czyści** zakładki |
+| 13 | Zapis stawek → zestawienie | `saveRateHarmonogram` po sukcesie dopisuje stawki/trasę na nierozliczonych wierszach tej pary (bez czekania na pipeline) |
 
 ## Pliki
 

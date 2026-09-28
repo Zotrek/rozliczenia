@@ -104,6 +104,9 @@ describe("page wiring", () => {
     expect(functionBody("runApprove")).toContain("buildApprove(");
     expect(functionBody("saveRates")).toContain("saveRateBody(");
     expect(functionBody("saveRates")).toContain("saveRateHarmonogramBody(");
+    expect(functionBody("saveRates")).toContain('VIEW.screen === "statement"');
+    expect(functionBody("saveRates")).toContain("reloadStatement(");
+    expect(functionBody("saveRates")).not.toContain('VIEW.mode === "report"');
     expect(functionBody("onClick")).toContain('action === "rates-tab"');
   });
 });

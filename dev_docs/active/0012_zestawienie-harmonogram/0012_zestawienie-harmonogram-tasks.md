@@ -13,6 +13,7 @@
 - [x] Sync zestawienia w pipeline po „odebrane” (`syncZestawienieHarmonogram` w phase7)
 - [x] Testy + TRANSPORT_SHEET.md / harmonogram-github-actions.md
 - [x] **CHECKPOINT:** vitest arkusz-mapa (sync + phase7) + rozliczenia
+- [x] `saveRateHarmonogram` → od razu stawki na nierozliczonych wierszach zestawienia (+ reload UI Harmonogram)
 
 ## Documentation Updates
 

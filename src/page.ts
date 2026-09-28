@@ -1002,7 +1002,7 @@ async function saveRates(): Promise<void> {
     VIEW.ratesMessage =
       VIEW.ratesTarget === "harmonogram" ? "Zapisano stawkę harmonogramu." : "Zapisano stawkę.";
     VIEW.ratesMessageOk = true;
-    if (VIEW.screen === "statement" && VIEW.mode === "report") {
+    if (VIEW.screen === "statement") {
       const refreshed = await reloadStatement();
       if (!refreshed) {
         VIEW.status = STATEMENT_ERROR.refresh;

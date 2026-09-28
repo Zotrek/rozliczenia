@@ -284,7 +284,30 @@ function loadRead(): (
   const start = gs.indexOf("/* settlement-read-pure:start */");
   const end = gs.indexOf("/* settlement-read-pure:end */");
   const block = gs.slice(start, end);
-  const load = new Function(`${block}\nreturn buildSettlementRead_;`) as () => (
+  const normMarker = "function normalizeRateShopKey_(";
+  const normStart = gs.indexOf(normMarker);
+  if (normStart < 0) {
+    throw new Error("brak normalizeRateShopKey_");
+  }
+  const brace = gs.indexOf("{", normStart);
+  let depth = 0;
+  let normEnd = brace;
+  for (let i = brace; i < gs.length; i++) {
+    const ch = gs[i];
+    if (ch === "{") {
+      depth += 1;
+    } else if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        normEnd = i + 1;
+        break;
+      }
+    }
+  }
+  const norm = gs.slice(normStart, normEnd);
+  const load = new Function(
+    `${norm}\n${block}\nreturn buildSettlementRead_;`,
+  ) as () => (
     query: { podwykonawca?: string; dataOd?: string; dataDo?: string },
     register: { sheetRow: number; cells: unknown[] }[],
     rates: { sheetRow: number; cells: unknown[] }[],

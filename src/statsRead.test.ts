@@ -54,7 +54,10 @@ function loadStats(): (
   const block = pureBlock();
   expect(block).not.toMatch(/SpreadsheetApp|LockService/);
   expect(block).not.toMatch(WRITE_CALL);
-  const load = new Function(`${block}\nreturn buildSettlementStats_;`) as () => (
+  const norm = functionSource("normalizeRateShopKey_");
+  const load = new Function(
+    `${norm}\n${block}\nreturn buildSettlementStats_;`,
+  ) as () => (
     query: { podwykonawca?: string; dataOd?: string; dataDo?: string },
     register: { sheetRow: number; cells: unknown[] }[],
     rates: { sheetRow: number; cells: unknown[] }[],

@@ -34,12 +34,13 @@ function functionSource(name: string): string {
 }
 
 function loadUnique(): (rows: unknown[]) => { adres: string; sklep: string }[] {
+  const norm = functionSource("normalizeRateShopKey_");
   const source = functionSource("uniqueStoreAddresses_");
   expect(source).not.toMatch(/SpreadsheetApp|LockService/);
   expect(source).not.toMatch(WRITE_CALL);
-  const load = new Function(`${source}\nreturn uniqueStoreAddresses_;`) as () => (
-    rows: unknown[],
-  ) => { adres: string; sklep: string }[];
+  const load = new Function(
+    `${norm}\n${source}\nreturn uniqueStoreAddresses_;`,
+  ) as () => (rows: unknown[]) => { adres: string; sklep: string }[];
   return load();
 }
 

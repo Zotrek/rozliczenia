@@ -286,7 +286,6 @@ function renderRangeScreen(model: RangeViewModel): string {
 
 function renderStatementScreen(model: RangeViewModel): string {
   const label = model.applied ? rangeLabel(model.applied) : "";
-  const schedule = model.mode === "schedule";
   return (
     '<div class="statement" data-screen="statement"><div class="top">' +
     brand(model.mode) +
@@ -294,7 +293,7 @@ function renderStatementScreen(model: RangeViewModel): string {
     '<button type="button" class="btn-ghost" data-action="back">Zmień zakres</button>' +
     ratesButton() +
     "</div>" +
-    renderStatement(model.statement, model.status, { allowApprove: !schedule }) +
+    renderStatement(model.statement, model.status, { allowApprove: true }) +
     "</div>"
   );
 }

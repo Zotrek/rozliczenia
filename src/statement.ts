@@ -1,4 +1,5 @@
 import { lineKey, rowKey, settle, sumSelected } from "./engine.js";
+import type { SettlementMode } from "./range.js";
 import { parseSheetDate } from "./sheetDate.js";
 import type {
   SettlementRateRow,
@@ -37,6 +38,11 @@ export const STATEMENT_ERROR = {
   refresh: "Zapisano, ale nie udało się odświeżyć listy.",
   partial: "Część wierszy nie weszła w zapis.",
 } as const;
+
+/** tryb=harmonogram dla zapisów na „zestawienie z harmonogramu”. */
+function scheduleTrybFields(mode?: SettlementMode): Record<string, string> {
+  return mode === "schedule" ? { tryb: "harmonogram" } : {};
+}
 
 export interface RouteDraft {
   name: string;
@@ -444,6 +450,7 @@ export function adoptRows(
 export function bagsBody(
   row: RegisterRow,
   text: string,
+  mode?: SettlementMode,
 ): { ok: false; error: string } | { ok: true; bagCount: number | null; body: Record<string, unknown> } {
   const parsed = parseBagText(text);
   if (parsed.kind === "bad") {
@@ -457,6 +464,7 @@ export function bagsBody(
       sheetRow: row.sheetRow,
       transportNumber: row.transportNumber,
       iloscWorkow: parsed.kind === "empty" ? "" : parsed.value,
+      ...scheduleTrybFields(mode),
     },
   };
 }
@@ -465,6 +473,7 @@ export function routeRateBody(
   row: RegisterRow,
   routeName: string,
   text: string,
+  mode?: SettlementMode,
 ): { ok: false; error: string } | { ok: true; grosze: Grosze | null; body: Record<string, unknown> } {
   const parsed = parseAmountText(text);
   if (parsed.kind === "bad") {
@@ -480,15 +489,17 @@ export function routeRateBody(
       transportNumber: row.transportNumber,
       trasa: routeName,
       stawkaTrasy: grosze === null ? "" : groszeToZlotyText(grosze),
+      ...scheduleTrybFields(mode),
     },
   };
 }
 
-export function detachBody(row: RegisterRow): Record<string, unknown> {
+export function detachBody(row: RegisterRow, mode?: SettlementMode): Record<string, unknown> {
   return {
     action: "detachRoute",
     sheetRow: row.sheetRow,
     transportNumber: row.transportNumber,
+    ...scheduleTrybFields(mode),
   };
 }
 
@@ -497,6 +508,7 @@ export function attachDecision(
   nameText: string,
   rateText: string,
   leftName: string,
+  mode?: SettlementMode,
 ): { ok: false; error: string } | { ok: true; name: string; grosze: Grosze; body: Record<string, unknown> } {
   const name = nameText.trim();
   if (name === "") {
@@ -522,6 +534,7 @@ export function attachDecision(
       transportNumber: row.transportNumber,
       trasa: name,
       stawkaTrasy: groszeToZlotyText(parsed.value),
+      ...scheduleTrybFields(mode),
     },
   };
 }
@@ -534,6 +547,7 @@ export function buildApprove(
   invoice: string,
   statement: Statement,
   selected: Readonly<Record<string, true>>,
+  mode?: SettlementMode,
 ): ApproveBuild {
   const numerFaktury = invoice.trim();
   if (numerFaktury === "") {
@@ -563,7 +577,10 @@ export function buildApprove(
   if (wiersze.length === 0) {
     return { ok: false, error: blocked ? "tie" : "selection" };
   }
-  return { ok: true, body: { action: "approve", numerFaktury, wiersze } };
+  return {
+    ok: true,
+    body: { action: "approve", numerFaktury, wiersze, ...scheduleTrybFields(mode) },
+  };
 }
 
 export function skippedCount(body: unknown): number {

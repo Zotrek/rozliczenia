@@ -791,7 +791,7 @@ td input[type="text"]:focus { border-color: var(--teal); background: #fff; outli
 <body>
   <div id="app"></div>
   <script>
-window.__ROZLICZENIA_WEBAPP__="/api/transport";
+window.__ROZLICZENIA_WEBAPP__="";
 (function () {
   var KEY = 'zwrotka_site_password';
   var reauthPending = false;
@@ -1757,6 +1757,10 @@ const STATEMENT_ERROR = {
     refresh: "Zapisano, ale nie udało się odświeżyć listy.",
     partial: "Część wierszy nie weszła w zapis.",
 };
+/** tryb=harmonogram dla zapisów na „zestawienie z harmonogramu”. */
+function scheduleTrybFields(mode) {
+    return mode === "schedule" ? { tryb: "harmonogram" } : {};
+}
 function emptyStatement() {
     return {
         rows: [],
@@ -2038,7 +2042,7 @@ function adoptRows(prev, rows, rates) {
         routeDraftError: pick(prev.routeDraftError, keys),
     };
 }
-function bagsBody(row, text) {
+function bagsBody(row, text, mode) {
     const parsed = parseBagText(text);
     if (parsed.kind === "bad") {
         return { ok: false, error: STATEMENT_ERROR.badBags };
@@ -2051,10 +2055,11 @@ function bagsBody(row, text) {
             sheetRow: row.sheetRow,
             transportNumber: row.transportNumber,
             iloscWorkow: parsed.kind === "empty" ? "" : parsed.value,
+            ...scheduleTrybFields(mode),
         },
     };
 }
-function routeRateBody(row, routeName, text) {
+function routeRateBody(row, routeName, text, mode) {
     const parsed = parseAmountText(text);
     if (parsed.kind === "bad") {
         return { ok: false, error: STATEMENT_ERROR.badRate };
@@ -2069,17 +2074,19 @@ function routeRateBody(row, routeName, text) {
             transportNumber: row.transportNumber,
             trasa: routeName,
             stawkaTrasy: grosze === null ? "" : groszeToZlotyText(grosze),
+            ...scheduleTrybFields(mode),
         },
     };
 }
-function detachBody(row) {
+function detachBody(row, mode) {
     return {
         action: "detachRoute",
         sheetRow: row.sheetRow,
         transportNumber: row.transportNumber,
+        ...scheduleTrybFields(mode),
     };
 }
-function attachDecision(row, nameText, rateText, leftName) {
+function attachDecision(row, nameText, rateText, leftName, mode) {
     const name = nameText.trim();
     if (name === "") {
         return { ok: false, error: STATEMENT_ERROR.routeName };
@@ -2104,13 +2111,14 @@ function attachDecision(row, nameText, rateText, leftName) {
             transportNumber: row.transportNumber,
             trasa: name,
             stawkaTrasy: groszeToZlotyText(parsed.value),
+            ...scheduleTrybFields(mode),
         },
     };
 }
 function tieBody(rateSheetRow) {
     return { action: "resolveRateTie", sheetRow: rateSheetRow };
 }
-function buildApprove(invoice, statement, selected) {
+function buildApprove(invoice, statement, selected, mode) {
     const numerFaktury = invoice.trim();
     if (numerFaktury === "") {
         return { ok: false, error: "invoice" };
@@ -2139,7 +2147,10 @@ function buildApprove(invoice, statement, selected) {
     if (wiersze.length === 0) {
         return { ok: false, error: blocked ? "tie" : "selection" };
     }
-    return { ok: true, body: { action: "approve", numerFaktury, wiersze } };
+    return {
+        ok: true,
+        body: { action: "approve", numerFaktury, wiersze, ...scheduleTrybFields(mode) },
+    };
 }
 function skippedCount(body) {
     if (!isRecord(body) || !Array.isArray(body.pominiete)) {
@@ -2886,11 +2897,17 @@ function aggregateContractorRanks(rows, filters, topN = 5) {
     const pool = qPool(rows, filters);
     const byContractor = new Map();
     for (const row of pool) {
-        const prev = byContractor.get(row.contractor) ?? { pSum: 0, qSum: 0, count: 0 };
+        const prev = byContractor.get(row.contractor) ?? {
+            pSum: 0,
+            qSum: 0,
+            count: 0,
+            bags: 0,
+        };
         byContractor.set(row.contractor, {
             pSum: prev.pSum + (row.receptionCost ?? 0),
             qSum: prev.qSum + row.costPerBag,
             count: prev.count + 1,
+            bags: prev.bags + (row.bagCount ?? 0),
         });
     }
     const byShop = [];
@@ -2900,11 +2917,13 @@ function aggregateContractorRanks(rows, filters, topN = 5) {
             contractor,
             average: divRoundHalfUp(agg.pSum, agg.count),
             pickupCount: agg.count,
+            bagCount: agg.bags,
         });
         byBag.push({
             contractor,
             average: divRoundHalfUp(agg.qSum, agg.count),
             pickupCount: agg.count,
+            bagCount: agg.bags,
         });
     }
     return {
@@ -3620,10 +3639,11 @@ function qTable(entries, tone) {
     const body = entries
         .map((e) => `<tr><td class="shop">${escapeHtml(e.address)}` +
         `<span class="sub">${escapeHtml(e.shopName)} · ${escapeHtml(e.pickupDate)}</span></td>` +
+        `<td class="num">${e.bagCount}</td>` +
         `<td class="num money ${tone}">${escapeHtml(formatPln(e.costPerBag))}</td></tr>`)
         .join("");
-    return ("<table><thead><tr><th>Sklep</th><th class=\"num\">Koszt za worek</th></tr></thead>" +
-        `<tbody>${body || emptyRow(2)}</tbody></table>`);
+    return ("<table><thead><tr><th>Sklep</th><th class=\"num\">Worki</th><th class=\"num\">Koszt za worek</th></tr></thead>" +
+        `<tbody>${body || emptyRow(3)}</tbody></table>`);
 }
 function contractorsBlock(report) {
     return (rankPair("W przeliczeniu na sklep", "Ile średnio kosztuje jeden odbiór u danego podwykonawcy (tylko gdy zabrano worki)", report.contractorRanks.byShop, "Średni koszt odbioru") +
@@ -3645,11 +3665,13 @@ function contractorTable(entries, amountHeader, tone) {
     const body = entries
         .map((e) => `<tr><td>${escapeHtml(e.contractor)}</td>` +
         `<td class="num money ${tone}">${escapeHtml(formatPln(e.average))}</td>` +
+        `<td class="num">${e.bagCount}</td>` +
         `<td class="num">${e.pickupCount}</td></tr>`)
         .join("");
     return ("<table><thead><tr><th>Podwykonawca</th>" +
-        `<th class="num">${escapeHtml(amountHeader)}</th><th class="num">Odbiory</th></tr></thead>` +
-        `<tbody>${body || emptyRow(3)}</tbody></table>`);
+        `<th class="num">${escapeHtml(amountHeader)}</th>` +
+        '<th class="num">Worki</th><th class="num">Odbiory</th></tr></thead>' +
+        `<tbody>${body || emptyRow(4)}</tbody></table>`);
 }
 function periodPickupsBlock(model) {
     const report = model.report;
@@ -3909,14 +3931,13 @@ function renderRangeScreen(model) {
 }
 function renderStatementScreen(model) {
     const label = model.applied ? rangeLabel(model.applied) : "";
-    const schedule = model.mode === "schedule";
     return ('<div class="statement" data-screen="statement"><div class="top">' +
         brand(model.mode) +
         `<div class="range"><span>${escapeHtml(modeLabel(model.mode))}</span><strong>${escapeHtml(label)}</strong></div>` +
         '<button type="button" class="btn-ghost" data-action="back">Zmień zakres</button>' +
         ratesButton() +
         "</div>" +
-        renderStatement(model.statement, model.status, { allowApprove: !schedule }) +
+        renderStatement(model.statement, model.status, { allowApprove: true }) +
         "</div>");
 }
 function renderRatesDialog(model) {
@@ -4236,7 +4257,7 @@ function onClick(event) {
         if (!row) {
             return;
         }
-        void writeNow("Odpinam sklep od trasy…", detachBody(row), () => {
+        void writeNow("Odpinam sklep od trasy…", detachBody(row, VIEW.mode), () => {
             const next = commitDetach(VIEW.statement, ref.sheetRow, ref.transportNumber);
             if (next) {
                 VIEW.statement = next;
@@ -4255,7 +4276,7 @@ function onClick(event) {
         }
         const key = rowKey(ref.sheetRow, ref.transportNumber);
         const draft = VIEW.statement.routeDraft[key] ?? { name: "", rate: "" };
-        const decision = attachDecision(row, draft.name, draft.rate, VIEW.statement.leftRoute[key] ?? "");
+        const decision = attachDecision(row, draft.name, draft.rate, VIEW.statement.leftRoute[key] ?? "", VIEW.mode);
         if (!decision.ok) {
             VIEW.statement = {
                 ...VIEW.statement,
@@ -4957,7 +4978,7 @@ async function commitEdit(el) {
     }
     const edit = el.dataset.edit;
     if (edit === "bags") {
-        const built = bagsBody(row, el.value);
+        const built = bagsBody(row, el.value, VIEW.mode);
         if (!built.ok) {
             VIEW.status = built.error;
             paint();
@@ -4971,7 +4992,7 @@ async function commitEdit(el) {
     }
     if (edit === "route-rate") {
         const routeName = el.dataset.route ?? row.routeName;
-        const built = routeRateBody(row, routeName, el.value);
+        const built = routeRateBody(row, routeName, el.value, VIEW.mode);
         if (!built.ok) {
             VIEW.status = built.error;
             paint();
@@ -5008,7 +5029,7 @@ async function commitEdit(el) {
 }
 async function runApprove() {
     const statement = currentStatement(VIEW.statement);
-    const built = buildApprove(VIEW.statement.invoice, statement, VIEW.statement.selected);
+    const built = buildApprove(VIEW.statement.invoice, statement, VIEW.statement.selected, VIEW.mode);
     if (!built.ok) {
         VIEW.status = STATEMENT_ERROR[built.error];
         paint();

@@ -175,6 +175,14 @@ describe("writes", () => {
     }
   });
 
+  it("test_bagsBody_schedule_mode_adds_tryb_harmonogram", () => {
+    const built = bagsBody(row({ sheetRow: 4, transportNumber: "P4", bagCount: 1 }), "6", "schedule");
+    expect(built.ok).toBe(true);
+    if (built.ok) {
+      expect(built.body.tryb).toBe("harmonogram");
+    }
+  });
+
   it("test_routeRateBody_sends_zloty_not_grosze", () => {
     const built = routeRateBody(row({ sheetRow: 2, routeName: "trasa", routeRate: 15_000 }), "trasa", "200");
     expect(built.ok).toBe(true);
@@ -226,6 +234,12 @@ describe("buildApprove", () => {
       expect(built.body.numerFaktury).toBe("FV/1");
       expect(built.body.wiersze).toHaveLength(1);
       expect(built.body.wiersze[0].koszt).toBe(2_000);
+      expect(built.body).not.toHaveProperty("tryb");
+    }
+    const schedule = buildApprove("FV/1", statement, { "2\t2": true }, "schedule");
+    expect(schedule.ok).toBe(true);
+    if (schedule.ok) {
+      expect(schedule.body.tryb).toBe("harmonogram");
     }
   });
 

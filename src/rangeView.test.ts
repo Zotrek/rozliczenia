@@ -93,7 +93,7 @@ describe("renderApp", () => {
     expect(html).toContain("Zapisz stawkę harmonogramu");
   });
 
-  it("test_renderApp_schedule_statement_hides_approve", () => {
+  it("test_renderApp_schedule_statement_shows_approve", () => {
     const html = renderApp(
       model({
         mode: "schedule",
@@ -101,8 +101,8 @@ describe("renderApp", () => {
         applied: APPLIED,
       }),
     );
-    expect(html).not.toContain('data-action="approve"');
-    expect(html).toContain("Zatwierdzenie faktury w tej wersji niedostępne");
+    expect(html).toContain('data-action="approve"');
+    expect(html).not.toContain("Zatwierdzenie faktury w tej wersji niedostępne");
   });
 
   it("test_renderApp_change_range_is_on_the_statement_screen", () => {

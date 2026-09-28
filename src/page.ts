@@ -327,7 +327,7 @@ function onClick(event: MouseEvent): void {
     if (!row) {
       return;
     }
-    void writeNow("Odpinam sklep od trasy…", detachBody(row), () => {
+    void writeNow("Odpinam sklep od trasy…", detachBody(row, VIEW.mode), () => {
       const next = commitDetach(VIEW.statement, ref.sheetRow, ref.transportNumber);
       if (next) {
         VIEW.statement = next;
@@ -345,7 +345,13 @@ function onClick(event: MouseEvent): void {
     }
     const key = rowKey(ref.sheetRow, ref.transportNumber);
     const draft = VIEW.statement.routeDraft[key] ?? { name: "", rate: "" };
-    const decision = attachDecision(row, draft.name, draft.rate, VIEW.statement.leftRoute[key] ?? "");
+    const decision = attachDecision(
+      row,
+      draft.name,
+      draft.rate,
+      VIEW.statement.leftRoute[key] ?? "",
+      VIEW.mode,
+    );
     if (!decision.ok) {
       VIEW.statement = {
         ...VIEW.statement,
@@ -1073,7 +1079,7 @@ async function commitEdit(el: HTMLInputElement): Promise<void> {
   }
   const edit = el.dataset.edit;
   if (edit === "bags") {
-    const built = bagsBody(row, el.value);
+    const built = bagsBody(row, el.value, VIEW.mode);
     if (!built.ok) {
       VIEW.status = built.error;
       paint();
@@ -1087,7 +1093,7 @@ async function commitEdit(el: HTMLInputElement): Promise<void> {
   }
   if (edit === "route-rate") {
     const routeName = el.dataset.route ?? row.routeName;
-    const built = routeRateBody(row, routeName, el.value);
+    const built = routeRateBody(row, routeName, el.value, VIEW.mode);
     if (!built.ok) {
       VIEW.status = built.error;
       paint();
@@ -1123,7 +1129,7 @@ async function commitEdit(el: HTMLInputElement): Promise<void> {
 
 async function runApprove(): Promise<void> {
   const statement = currentStatement(VIEW.statement);
-  const built = buildApprove(VIEW.statement.invoice, statement, VIEW.statement.selected);
+  const built = buildApprove(VIEW.statement.invoice, statement, VIEW.statement.selected, VIEW.mode);
   if (!built.ok) {
     VIEW.status = STATEMENT_ERROR[built.error];
     paint();

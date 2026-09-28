@@ -16,6 +16,10 @@
 | 6 | Okno sync | Domyślnie: 1. bieżącego miesiąca → dziś |
 | 7 | Zatwierdź | Tak — jak Arkusz1; body z `tryb=harmonogram` |
 | 8 | Kiedy sync | Pipeline `COPY_ODEBRANE_Z_HARMONOGRAMU=1` (phase7): po odebrane + Baza cen |
+| 9 | Nr zlecenia | Brak w zestawieniu — klucz zapisu = `sheetRow` + `tryb=harmonogram` |
+| 10 | Rodzaj zbiórki | Z `Tryb zbiórki` na workach (agregacja jak w protokole) |
+| 11 | transport się odbył | Zawsze lista tak/nie + przekreślenie przy „nie” |
+| 12 | Sync vs clear | Sync tylko uzupełnia / aktualizuje nierozliczone; **nigdy nie czyści** zakładki |
 
 ## Pliki
 

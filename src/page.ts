@@ -888,7 +888,8 @@ function onMouseDown(event: MouseEvent): void {
 function sheetRef(el: HTMLElement): { sheetRow: number; transportNumber: string } | null {
   const sheetRow = Number(el.dataset.sheetRow);
   const transportNumber = el.dataset.transport ?? "";
-  if (!Number.isInteger(sheetRow) || sheetRow < 2 || transportNumber === "") {
+  // Harmonogram: brak nr zlecenia — wystarczy sheetRow (+ puste transportNumber).
+  if (!Number.isInteger(sheetRow) || sheetRow < 2) {
     return null;
   }
   return { sheetRow, transportNumber };

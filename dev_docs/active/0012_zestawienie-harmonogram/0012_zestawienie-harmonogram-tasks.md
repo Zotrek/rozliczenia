@@ -10,9 +10,9 @@
 - [x] GAS: `settlementSearch` tryb harmonogram czyta zestawienie
 - [x] GAS: approve / patchBags z `tryb=harmonogram`
 - [x] rozliczenia: allowApprove + `tryb` w body zapisów
-- [x] Testy + TRANSPORT_SHEET.md
-- [x] **CHECKPOINT:** `npx vitest run src/settlementRead.test.ts src/settlementWrites.test.ts` w arkusz-mapa — 53 pass ✅
-- [x] **CHECKPOINT:** `npx vitest run` w rozliczenia — pass ✅
+- [x] Sync zestawienia w pipeline po „odebrane” (`syncZestawienieHarmonogram` w phase7)
+- [x] Testy + TRANSPORT_SHEET.md / harmonogram-github-actions.md
+- [x] **CHECKPOINT:** vitest arkusz-mapa (sync + phase7) + rozliczenia
 
 ## Documentation Updates
 

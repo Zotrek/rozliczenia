@@ -15,6 +15,7 @@
 | 5 | Sync vs rozliczony | `Rozliczony=tak` — sync pomija wiersz |
 | 6 | Okno sync | Domyślnie: 1. bieżącego miesiąca → dziś |
 | 7 | Zatwierdź | Tak — jak Arkusz1; body z `tryb=harmonogram` |
+| 8 | Kiedy sync | Pipeline `COPY_ODEBRANE_Z_HARMONOGRAMU=1` (phase7): po odebrane + Baza cen |
 
 ## Pliki
 

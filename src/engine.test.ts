@@ -4,6 +4,7 @@ import type { EngineInput, RegisterRow, RouteLine, ScreenState, ShopCost, Statem
 
 function reception(over: Partial<RegisterRow> & Pick<RegisterRow, "sheetRow">): RegisterRow {
   return {
+    sheetName: "",
     transportNumber: String(over.sheetRow),
     address: "Sklepowa 1",
     shopName: "Sklep",
@@ -23,7 +24,7 @@ function go(rows: RegisterRow[], screenByRow: EngineInput["screenByRow"] = {}): 
 }
 
 function screen(row: RegisterRow, state: ScreenState): EngineInput["screenByRow"] {
-  return { [rowKey(row.sheetRow, row.transportNumber)]: state };
+  return { [rowKey(row.sheetRow, row.transportNumber, row.sheetName)]: state };
 }
 
 function onlyPlain(statement: Statement): ShopCost {

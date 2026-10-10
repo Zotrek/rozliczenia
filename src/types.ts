@@ -6,6 +6,8 @@ export type Grosze = number;
  * Kwoty wchodzą w groszach. Daty są tekstem `dd.mm.yyyy`, nie ISO.
  */
 export interface RegisterRow {
+  /** Nazwa zakładki rejestru (miesięczna lub legacy). Lookup po nazwie, nie po kolejności. */
+  sheetName: string;
   /** Numer wiersza arkusza. Nagłówek jest w 1, dane od 2. */
   sheetRow: number;
   /** Kolumna 1. */
@@ -81,6 +83,7 @@ export interface RateTie {
 }
 
 export interface ShopCost {
+  sheetName: string;
   sheetRow: number;
   transportNumber: string;
   address: string;

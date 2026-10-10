@@ -39,6 +39,48 @@ export const STATEMENT_ERROR = {
   partial: "Część wierszy nie weszła w zapis.",
 } as const;
 
+const SKIP_REASON_LABEL: Record<string, string> = {
+  key: "wiersz się zmienił",
+  settled: "już rozliczony",
+  nie: "status NIE",
+  date: "niespójna data",
+  cost: "niespójny koszt",
+  bags: "niespójna liczba worków",
+  rate: "niespójna stawka",
+};
+
+export function skipReasonLabel(reason: unknown): string {
+  if (typeof reason === "string" && SKIP_REASON_LABEL[reason]) {
+    return SKIP_REASON_LABEL[reason];
+  }
+  return writeError(reason);
+}
+
+/** Lista pominiętych przy częściowym zatwierdzeniu — tekst wieloliniowy do UI. */
+export function formatPartialApprove(body: unknown): string {
+  const lines: string[] = [STATEMENT_ERROR.partial];
+  if (!isRecord(body) || !Array.isArray(body.pominiete)) {
+    return lines[0];
+  }
+  const saved = Array.isArray(body.zapisane) ? body.zapisane.length : 0;
+  if (saved > 0) {
+    lines.push(`Zapisano: ${saved}.`);
+  }
+  lines.push(`Pominięto (${body.pominiete.length}):`);
+  for (const item of body.pominiete) {
+    if (!isRecord(item)) {
+      lines.push("• pozycja bez szczegółów");
+      continue;
+    }
+    const numer = String(item.transportNumber ?? "").trim() || "?";
+    const reason = skipReasonLabel(item.reason);
+    const row =
+      typeof item.sheetRow === "number" && item.sheetRow > 0 ? ` (wiersz ${item.sheetRow})` : "";
+    lines.push(`• Transport ${numer}${row} — ${reason}`);
+  }
+  return lines.join("\n");
+}
+
 /** tryb=harmonogram dla zapisów na „zestawienie z harmonogramu”. */
 function scheduleTrybFields(mode?: SettlementMode): Record<string, string> {
   return mode === "schedule" ? { tryb: "harmonogram" } : {};
@@ -62,6 +104,7 @@ export interface StatementScreen {
 }
 
 export interface ApproveShop {
+  sheetName: string;
   sheetRow: number;
   transportNumber: string;
   nieOdbył?: true;
@@ -251,8 +294,16 @@ export function findRow(
   rows: readonly RegisterRow[],
   sheetRow: number,
   transportNumber: string,
+  sheetName = "",
 ): RegisterRow | null {
-  return rows.find((row) => row.sheetRow === sheetRow && row.transportNumber === transportNumber) ?? null;
+  return (
+    rows.find(
+      (row) =>
+        row.sheetRow === sheetRow &&
+        row.transportNumber === transportNumber &&
+        row.sheetName === sheetName,
+    ) ?? null
+  );
 }
 
 export function toggleSelected(screen: StatementScreen, key: string): StatementScreen {
@@ -280,8 +331,9 @@ export function setBagsOnly(
   sheetRow: number,
   transportNumber: string,
   on: boolean,
+  sheetName = "",
 ): StatementScreen {
-  return patchScreen(screen, rowKey(sheetRow, transportNumber), { bagsOnly: on });
+  return patchScreen(screen, rowKey(sheetRow, transportNumber, sheetName), { bagsOnly: on });
 }
 
 export function setDidNotHappen(
@@ -289,8 +341,9 @@ export function setDidNotHappen(
   sheetRow: number,
   transportNumber: string,
   on: boolean,
+  sheetName = "",
 ): StatementScreen {
-  return patchScreen(screen, rowKey(sheetRow, transportNumber), { didNotHappen: on });
+  return patchScreen(screen, rowKey(sheetRow, transportNumber, sheetName), { didNotHappen: on });
 }
 
 export function setPickup(
@@ -298,8 +351,9 @@ export function setPickup(
   sheetRow: number,
   transportNumber: string,
   amount: Grosze | null,
+  sheetName = "",
 ): StatementScreen {
-  return patchScreen(screen, rowKey(sheetRow, transportNumber), { pickupAmount: amount });
+  return patchScreen(screen, rowKey(sheetRow, transportNumber, sheetName), { pickupAmount: amount });
 }
 
 export function setBagRate(
@@ -307,8 +361,9 @@ export function setBagRate(
   sheetRow: number,
   transportNumber: string,
   amount: Grosze | null,
+  sheetName = "",
 ): StatementScreen {
-  return patchScreen(screen, rowKey(sheetRow, transportNumber), { bagAmount: amount });
+  return patchScreen(screen, rowKey(sheetRow, transportNumber, sheetName), { bagAmount: amount });
 }
 
 /** Wspólna kwota worka na ekranie, tylko sklepy trasy, które się odbyły. Do Bazy stawek nie idzie. */
@@ -322,7 +377,7 @@ export function setRouteBagRate(
     if (row.routeName !== routeName) {
       continue;
     }
-    const key = rowKey(row.sheetRow, row.transportNumber);
+    const key = rowKey(row.sheetRow, row.transportNumber, row.sheetName);
     if (screenByRow[key]?.didNotHappen) {
       continue;
     }
@@ -336,11 +391,16 @@ export function commitBags(
   sheetRow: number,
   transportNumber: string,
   bagCount: number | null,
+  sheetName = "",
 ): StatementScreen {
   return {
     ...screen,
     rows: screen.rows.map((row) =>
-      row.sheetRow === sheetRow && row.transportNumber === transportNumber ? { ...row, bagCount } : row,
+      row.sheetRow === sheetRow &&
+      row.transportNumber === transportNumber &&
+      row.sheetName === sheetName
+        ? { ...row, bagCount }
+        : row,
     ),
   };
 }
@@ -360,14 +420,17 @@ export function commitDetach(
   screen: StatementScreen,
   sheetRow: number,
   transportNumber: string,
+  sheetName = "",
 ): StatementScreen | null {
-  const row = findRow(screen.rows, sheetRow, transportNumber);
+  const row = findRow(screen.rows, sheetRow, transportNumber, sheetName);
   if (!row || row.routeName === "") {
     return null;
   }
   const left = row.routeName;
   const rows = screen.rows.map((item) =>
-    item.sheetRow === sheetRow && item.transportNumber === transportNumber
+    item.sheetRow === sheetRow &&
+    item.transportNumber === transportNumber &&
+    item.sheetName === sheetName
       ? { ...item, routeName: "", routeRate: null }
       : item,
   );
@@ -379,7 +442,7 @@ export function commitDetach(
     ...screen,
     rows,
     selected,
-    leftRoute: { ...screen.leftRoute, [rowKey(sheetRow, transportNumber)]: left },
+    leftRoute: { ...screen.leftRoute, [rowKey(sheetRow, transportNumber, sheetName)]: left },
   };
 }
 
@@ -389,12 +452,17 @@ export function commitAttach(
   transportNumber: string,
   name: string,
   routeRate: Grosze,
+  sheetName = "",
 ): StatementScreen | null {
-  if (!findRow(screen.rows, sheetRow, transportNumber)) {
+  if (!findRow(screen.rows, sheetRow, transportNumber, sheetName)) {
     return null;
   }
   const rows = screen.rows.map((item) => {
-    if (item.sheetRow === sheetRow && item.transportNumber === transportNumber) {
+    if (
+      item.sheetRow === sheetRow &&
+      item.transportNumber === transportNumber &&
+      item.sheetName === sheetName
+    ) {
       return { ...item, routeName: name, routeRate };
     }
     if (item.routeName === name) {
@@ -402,7 +470,7 @@ export function commitAttach(
     }
     return item;
   });
-  const key = rowKey(sheetRow, transportNumber);
+  const key = rowKey(sheetRow, transportNumber, sheetName);
   const leftRoute = { ...screen.leftRoute };
   delete leftRoute[key];
   const routeDraft = { ...screen.routeDraft };
@@ -432,7 +500,7 @@ export function adoptRows(
   rows: RegisterRow[],
   rates: SettlementRateRow[],
 ): StatementScreen {
-  const keys = new Set(rows.map((row) => rowKey(row.sheetRow, row.transportNumber)));
+  const keys = new Set(rows.map((row) => rowKey(row.sheetRow, row.transportNumber, row.sheetName)));
   const routeNames = new Set(rows.map((row) => row.routeName).filter((name) => name !== ""));
   return {
     rows,
@@ -461,6 +529,7 @@ export function bagsBody(
     bagCount: parsed.kind === "empty" ? null : parsed.value,
     body: {
       action: "patchBags",
+      sheetName: row.sheetName,
       sheetRow: row.sheetRow,
       transportNumber: row.transportNumber,
       iloscWorkow: parsed.kind === "empty" ? "" : parsed.value,
@@ -485,6 +554,7 @@ export function routeRateBody(
     grosze,
     body: {
       action: "patchRouteRate",
+      sheetName: row.sheetName,
       sheetRow: row.sheetRow,
       transportNumber: row.transportNumber,
       trasa: routeName,
@@ -497,6 +567,7 @@ export function routeRateBody(
 export function detachBody(row: RegisterRow, mode?: SettlementMode): Record<string, unknown> {
   return {
     action: "detachRoute",
+    sheetName: row.sheetName,
     sheetRow: row.sheetRow,
     transportNumber: row.transportNumber,
     ...scheduleTrybFields(mode),
@@ -530,6 +601,7 @@ export function attachDecision(
     grosze: parsed.value,
     body: {
       action: "attachRoute",
+      sheetName: row.sheetName,
       sheetRow: row.sheetRow,
       transportNumber: row.transportNumber,
       trasa: name,
@@ -627,6 +699,7 @@ export function statementSums(screen: StatementScreen): { total: Grosze; selecte
 function shopItem(shop: ShopCost): ApproveShop | null {
   if (!shop.happened) {
     return {
+      sheetName: shop.sheetName,
       sheetRow: shop.sheetRow,
       transportNumber: shop.transportNumber,
       nieOdbył: true,
@@ -636,6 +709,7 @@ function shopItem(shop: ShopCost): ApproveShop | null {
     return null;
   }
   const item: ApproveShop = {
+    sheetName: shop.sheetName,
     sheetRow: shop.sheetRow,
     transportNumber: shop.transportNumber,
     koszt: shop.receptionCost,
@@ -768,7 +842,9 @@ function readRegisterRow(value: unknown): RegisterRow | null {
   } catch {
     return null;
   }
+  const sheetName = readText(value.sheetName) ?? "";
   return {
+    sheetName,
     sheetRow,
     transportNumber,
     address,

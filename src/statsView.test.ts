@@ -23,6 +23,7 @@ import { statsParams } from "./range.js";
 
 function row(over: Partial<StatsRow> & Pick<StatsRow, "sheetRow">): StatsRow {
   return {
+    sheetName: over.sheetName ?? "",
     sheetRow: over.sheetRow,
     transportNumber: over.transportNumber ?? String(over.sheetRow),
     address: over.address ?? "Sklepowa 1",

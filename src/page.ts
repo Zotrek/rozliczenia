@@ -16,6 +16,7 @@ import {
   startSearch,
   webAppUrl,
   blocksOnOrder,
+  defaultRangeDates,
   type ContractorListItem,
 } from "./range.js";
 import { rowKey } from "./engine.js";
@@ -46,6 +47,7 @@ import {
   setPickup,
   setRouteBagRate,
   skippedCount,
+  formatPartialApprove,
   statementSums,
   tieBody,
   toggleOpen,
@@ -74,14 +76,17 @@ function todayCalendar(): CalendarDate {
   return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
 }
 
+const todayAtBoot = todayCalendar();
+const defaultDates = defaultRangeDates(todayAtBoot);
+
 const VIEW: RangeViewModel = {
   mode: "report",
   contractorQuery: "",
   contractorOpen: false,
   contractor: "",
   contractors: [],
-  from: "",
-  to: "",
+  from: defaultDates.from,
+  to: defaultDates.to,
   noFrom: false,
   error: "",
   screen: "range",
@@ -107,7 +112,7 @@ const VIEW: RangeViewModel = {
   ratesTarget: "stawki",
   ratesMessage: "",
   ratesMessageOk: false,
-  stats: emptyStats(todayCalendar()),
+  stats: emptyStats(todayAtBoot),
 };
 
 let heldFrom = "";
@@ -323,12 +328,12 @@ function onClick(event: MouseEvent): void {
     if (!ref) {
       return;
     }
-    const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber);
+    const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber, ref.sheetName);
     if (!row) {
       return;
     }
     void writeNow("Odpinam sklep od trasy…", detachBody(row, VIEW.mode), () => {
-      const next = commitDetach(VIEW.statement, ref.sheetRow, ref.transportNumber);
+      const next = commitDetach(VIEW.statement, ref.sheetRow, ref.transportNumber, ref.sheetName);
       if (next) {
         VIEW.statement = next;
       }
@@ -339,11 +344,11 @@ function onClick(event: MouseEvent): void {
     if (!ref) {
       return;
     }
-    const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber);
+    const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber, ref.sheetName);
     if (!row) {
       return;
     }
-    const key = rowKey(ref.sheetRow, ref.transportNumber);
+    const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
     const draft = VIEW.statement.routeDraft[key] ?? { name: "", rate: "" };
     const decision = attachDecision(
       row,
@@ -367,6 +372,7 @@ function onClick(event: MouseEvent): void {
         ref.transportNumber,
         decision.name,
         decision.grosze,
+        ref.sheetName,
       );
       if (next) {
         VIEW.statement = next;
@@ -408,7 +414,7 @@ function onInput(event: Event): void {
     if (!ref) {
       return;
     }
-    const key = rowKey(ref.sheetRow, ref.transportNumber);
+    const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
     const prev = VIEW.statement.routeDraft[key] ?? { name: "", rate: "" };
     const draft =
       el.dataset.draft === "route-name" ? { ...prev, name: el.value } : { ...prev, rate: el.value };
@@ -501,8 +507,8 @@ function onChange(event: Event): void {
     }
     VIEW.statement =
       el.dataset.toggle === "bags-only"
-        ? setBagsOnly(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked)
-        : setDidNotHappen(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked);
+        ? setBagsOnly(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked, ref.sheetName)
+        : setDidNotHappen(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked, ref.sheetName);
     VIEW.status = "";
     paint();
     return;
@@ -885,14 +891,17 @@ function onMouseDown(event: MouseEvent): void {
   pickContractor(pick.dataset.nazwa ?? "");
 }
 
-function sheetRef(el: HTMLElement): { sheetRow: number; transportNumber: string } | null {
+function sheetRef(
+  el: HTMLElement,
+): { sheetName: string; sheetRow: number; transportNumber: string } | null {
   const sheetRow = Number(el.dataset.sheetRow);
   const transportNumber = el.dataset.transport ?? "";
-  // Harmonogram: brak nr zlecenia — wystarczy sheetRow (+ puste transportNumber).
+  const sheetName = el.dataset.sheetName ?? "";
+  // Harmonogram: brak nr zlecenia — wystarczy sheetName + sheetRow (+ puste transportNumber).
   if (!Number.isInteger(sheetRow) || sheetRow < 2) {
     return null;
   }
-  return { sheetRow, transportNumber };
+  return { sheetName, sheetRow, transportNumber };
 }
 
 function decodeLine(value: string): string {
@@ -1074,7 +1083,7 @@ async function commitEdit(el: HTMLInputElement): Promise<void> {
   if (!ref) {
     return;
   }
-  const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber);
+  const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber, ref.sheetName);
   if (!row) {
     return;
   }
@@ -1087,7 +1096,13 @@ async function commitEdit(el: HTMLInputElement): Promise<void> {
       return;
     }
     await writeNow("Zapisuję liczbę worków…", built.body, () => {
-      VIEW.statement = commitBags(VIEW.statement, ref.sheetRow, ref.transportNumber, built.bagCount);
+      VIEW.statement = commitBags(
+        VIEW.statement,
+        ref.sheetRow,
+        ref.transportNumber,
+        built.bagCount,
+        ref.sheetName,
+      );
       VIEW.status = "";
     });
     return;
@@ -1120,9 +1135,21 @@ async function commitEdit(el: HTMLInputElement): Promise<void> {
     }
     VIEW.statement = setRouteBagRate(VIEW.statement, routeName, amount);
   } else if (edit === "bag-rate") {
-    VIEW.statement = setBagRate(VIEW.statement, ref.sheetRow, ref.transportNumber, amount);
+    VIEW.statement = setBagRate(
+      VIEW.statement,
+      ref.sheetRow,
+      ref.transportNumber,
+      amount,
+      ref.sheetName,
+    );
   } else if (edit === "pickup") {
-    VIEW.statement = setPickup(VIEW.statement, ref.sheetRow, ref.transportNumber, amount);
+    VIEW.statement = setPickup(
+      VIEW.statement,
+      ref.sheetRow,
+      ref.transportNumber,
+      amount,
+      ref.sheetName,
+    );
   }
   VIEW.status = "";
   paint();
@@ -1152,7 +1179,7 @@ async function runApprove(): Promise<void> {
       if (!refreshed) {
         VIEW.status = STATEMENT_ERROR.refresh;
       } else {
-        VIEW.status = STATEMENT_ERROR.partial;
+        VIEW.status = formatPartialApprove(result);
       }
     } else {
       VIEW.status = "";

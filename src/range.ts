@@ -1,5 +1,5 @@
 import type { ContractorListItem } from "./search.js";
-import { compareSheetDate, parseSheetDate } from "./sheetDate.js";
+import { compareSheetDate, parseSheetDate, type CalendarDate } from "./sheetDate.js";
 
 export type { ContractorListItem };
 
@@ -151,6 +151,17 @@ export function resolveContractorText(
     return { contractor: hits[0].nazwa, query: hits[0].nazwa };
   }
   return { contractor: "", query: text };
+}
+
+/** `CalendarDate` → `yyyy-mm-dd` pod `input[type=date]`. */
+export function calendarToIsoDate(date: CalendarDate): string {
+  return `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+}
+
+/** Domyślny zakres Zakresu: dzień do dzień = dziś. */
+export function defaultRangeDates(today: CalendarDate): { from: string; to: string } {
+  const iso = calendarToIsoDate(today);
+  return { from: iso, to: iso };
 }
 
 /** `yyyy-mm-dd` → `dd.mm.yyyy`. Zły dzień kalendarza daje null. Bez przesunięcia strefy. */

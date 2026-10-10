@@ -64,6 +64,11 @@ class FakeSheet {
   private readonly cells = new Map<string, Cell>();
   readonly writes: Write[] = [];
   readonly deletes: number[] = [];
+  constructor(readonly name = "Arkusz1") {}
+
+  getName(): string {
+    return this.name;
+  }
 
   cell(row: number, col: number): Cell {
     const value = this.cells.get(`${row},${col}`);
@@ -126,7 +131,7 @@ let maxLock = 0;
 let lastBody = "";
 
 const holder: { register: FakeSheet; rates: FakeSheet | null } = {
-  register: new FakeSheet(),
+  register: new FakeSheet("Arkusz1"),
   rates: null,
 };
 
@@ -148,7 +153,7 @@ beforeAll(() => {
             return [holder.register];
           },
           getSheetByName(name: string) {
-            if (name === "Arkusz1") {
+            if (name === holder.register.name) {
               return holder.register;
             }
             if (name === "Baza stawek") {
@@ -204,8 +209,19 @@ beforeAll(() => {
   }
   postToSheet = (body) => {
     maxLock = 0;
+    const payload: Record<string, unknown> = {
+      ...body,
+      sheetName: body.sheetName != null ? body.sheetName : "Arkusz1",
+      secret: "test-gas-secret",
+    };
+    if (Array.isArray(payload.wiersze)) {
+      payload.wiersze = (payload.wiersze as Record<string, unknown>[]).map((row) => ({
+        ...row,
+        sheetName: row.sheetName != null ? row.sheetName : payload.sheetName,
+      }));
+    }
     doPost({
-      postData: { contents: JSON.stringify({ ...body, secret: "test-gas-secret" }) },
+      postData: { contents: JSON.stringify(payload) },
     });
     expect(lockDepth).toBe(0);
     expect(maxLock).toBe(1);
@@ -214,14 +230,15 @@ beforeAll(() => {
 });
 
 function fresh(): { register: FakeSheet; rates: FakeSheet } {
-  const register = new FakeSheet();
-  const rates = new FakeSheet();
+  const register = new FakeSheet("Arkusz1");
+  const rates = new FakeSheet("Baza stawek");
   holder.register = register;
   holder.rates = rates;
   return { register, rates };
 }
 
 function seedRegister(sheet: FakeSheet, row: number, over: Partial<Record<number, Cell>> = {}): void {
+  // V3: transport@10, trasa 11–12, rozliczenie 15–18 (jak arkusz-mapa settlementWrites).
   const cols: Cell[] = [
     15,
     "Sklepowa 1",
@@ -232,6 +249,7 @@ function seedRegister(sheet: FakeSheet, row: number, over: Partial<Record<number
     "",
     "",
     2,
+    "",
     "trasa-a",
     "150",
     "",
@@ -240,7 +258,6 @@ function seedRegister(sheet: FakeSheet, row: number, over: Partial<Record<number
     "",
     "999",
     "111",
-    "",
   ];
   for (let i = 0; i < cols.length; i += 1) {
     sheet.put(row, i + 1, cols[i]);
@@ -252,12 +269,12 @@ function seedRegister(sheet: FakeSheet, row: number, over: Partial<Record<number
 
 function expectCostsUntouched(sheet: FakeSheet, rows: number[]): void {
   for (const row of rows) {
-    expect(sheet.cell(row, 16)).toBe("999");
-    expect(sheet.cell(row, 17)).toBe("111");
+    expect(sheet.cell(row, 17)).toBe("999");
+    expect(sheet.cell(row, 18)).toBe("111");
   }
   for (const write of sheet.writes) {
     const end = write.col + write.numCols - 1;
-    expect(end < 16 || write.col > 17).toBe(true);
+    expect(end < 17 || write.col > 18).toBe(true);
   }
 }
 
@@ -298,7 +315,7 @@ describe("patchBags", () => {
 
     expect(result).toEqual({ ok: true });
     expect(register.cell(2, 9)).toBe(4);
-    expect(register.cell(2, 10)).toBe("trasa-a");
+    expect(register.cell(2, 11)).toBe("trasa-a");
     expect(register.cell(3, 9)).toBe(2);
     expectCostsUntouched(register, [2, 3]);
   });
@@ -340,7 +357,7 @@ describe("patchBags", () => {
 
   it("test_patchBags_settled_or_bad_count_writes_nothing", () => {
     const { register } = fresh();
-    seedRegister(register, 2, { 14: " TAK " });
+    seedRegister(register, 2, { 15: " TAK " });
 
     expect(
       postToSheet({ action: "patchBags", sheetRow: 2, transportNumber: "15", iloscWorkow: 3 }),
@@ -368,9 +385,9 @@ describe("patchRouteRate", () => {
   it("test_patchRouteRate_same_text_updates_other_contractor_and_date_skips_settled", () => {
     const { register } = fresh();
     seedRegister(register, 2);
-    seedRegister(register, 3, { 1: 16, 5: "01.01.2026", 6: "inny", 11: "10" });
-    seedRegister(register, 4, { 1: 17, 11: "77", 14: "tak" });
-    seedRegister(register, 5, { 1: 18, 10: "inna", 11: "5" });
+    seedRegister(register, 3, { 1: 16, 5: "01.01.2026", 6: "inny", 12: "10" });
+    seedRegister(register, 4, { 1: 17, 12: "77", 15: "tak" });
+    seedRegister(register, 5, { 1: 18, 11: "inna", 12: "5" });
 
     const result = postToSheet({
       action: "patchRouteRate",
@@ -381,11 +398,11 @@ describe("patchRouteRate", () => {
     });
 
     expect(result).toEqual({ ok: true });
-    expect(register.cell(2, 11)).toBe("200");
-    expect(register.cell(3, 11)).toBe("200");
-    expect(register.cell(4, 11)).toBe("77");
-    expect(register.cell(5, 11)).toBe("5");
-    expect(register.cell(2, 10)).toBe("trasa-a");
+    expect(register.cell(2, 12)).toBe("200");
+    expect(register.cell(3, 12)).toBe("200");
+    expect(register.cell(4, 12)).toBe("77");
+    expect(register.cell(5, 12)).toBe("5");
+    expect(register.cell(2, 11)).toBe("trasa-a");
     expectCostsUntouched(register, [2, 3, 4, 5]);
   });
 
@@ -402,7 +419,7 @@ describe("patchRouteRate", () => {
         stawkaTrasy: 0,
       }),
     ).toEqual({ ok: true });
-    expect(register.cell(2, 11)).toBe("0");
+    expect(register.cell(2, 12)).toBe("0");
 
     expect(
       postToSheet({
@@ -413,15 +430,15 @@ describe("patchRouteRate", () => {
         stawkaTrasy: "",
       }),
     ).toEqual({ ok: true });
-    expect(register.cell(2, 11)).toBe("");
+    expect(register.cell(2, 12)).toBe("");
     expectCostsUntouched(register, [2]);
   });
 
   it("test_patchRouteRate_key_mismatch_or_settled_writes_nothing", () => {
     const { register } = fresh();
     seedRegister(register, 2);
-    seedRegister(register, 3, { 1: 16, 11: "10" });
-    seedRegister(register, 4, { 1: 17, 14: "tak" });
+    seedRegister(register, 3, { 1: 16, 12: "10" });
+    seedRegister(register, 4, { 1: 17, 15: "tak" });
 
     expect(
       postToSheet({
@@ -442,8 +459,8 @@ describe("patchRouteRate", () => {
       }),
     ).toEqual({ ok: false, error: "settled" });
     expect(register.writes).toEqual([]);
-    expect(register.cell(2, 11)).toBe("150");
-    expect(register.cell(3, 11)).toBe("10");
+    expect(register.cell(2, 12)).toBe("150");
+    expect(register.cell(3, 12)).toBe("10");
   });
 });
 
@@ -456,10 +473,10 @@ describe("detachRoute", () => {
     expect(
       postToSheet({ action: "detachRoute", sheetRow: 2, transportNumber: "15" }),
     ).toEqual({ ok: true });
-    expect(register.cell(2, 10)).toBe("");
     expect(register.cell(2, 11)).toBe("");
-    expect(register.cell(3, 10)).toBe("trasa-a");
-    expect(register.cell(3, 11)).toBe("150");
+    expect(register.cell(2, 12)).toBe("");
+    expect(register.cell(3, 11)).toBe("trasa-a");
+    expect(register.cell(3, 12)).toBe("150");
     expect(register.cell(2, 9)).toBe(2);
     expectCostsUntouched(register, [2, 3]);
   });
@@ -472,7 +489,7 @@ describe("detachRoute", () => {
       postToSheet({ action: "detachRoute", sheetRow: 9, transportNumber: "15" }),
     ).toEqual({ ok: false, error: "key" });
     expect(register.writes).toEqual([]);
-    expect(register.cell(2, 10)).toBe("trasa-a");
+    expect(register.cell(2, 11)).toBe("trasa-a");
     expectCostsUntouched(register, [2]);
   });
 });
@@ -480,9 +497,9 @@ describe("detachRoute", () => {
 describe("attachRoute", () => {
   it("test_attachRoute_zero_rate_writes_and_propagates_by_name", () => {
     const { register } = fresh();
-    seedRegister(register, 2, { 10: "", 11: "" });
-    seedRegister(register, 3, { 1: 16, 6: "inny", 10: "nowa", 11: "10" });
-    seedRegister(register, 4, { 1: 17, 10: "nowa", 11: "77", 14: "tak" });
+    seedRegister(register, 2, { 11: "", 12: "" });
+    seedRegister(register, 3, { 1: 16, 6: "inny", 11: "nowa", 12: "10" });
+    seedRegister(register, 4, { 1: 17, 11: "nowa", 12: "77", 15: "tak" });
 
     const result = postToSheet({
       action: "attachRoute",
@@ -493,17 +510,17 @@ describe("attachRoute", () => {
     });
 
     expect(result).toEqual({ ok: true });
-    expect(register.cell(2, 10)).toBe("nowa");
-    expect(register.cell(2, 11)).toBe("0");
-    expect(register.cell(3, 10)).toBe("nowa");
-    expect(register.cell(3, 11)).toBe("0");
-    expect(register.cell(4, 11)).toBe("77");
+    expect(register.cell(2, 11)).toBe("nowa");
+    expect(register.cell(2, 12)).toBe("0");
+    expect(register.cell(3, 11)).toBe("nowa");
+    expect(register.cell(3, 12)).toBe("0");
+    expect(register.cell(4, 12)).toBe("77");
     expectCostsUntouched(register, [2, 3, 4]);
   });
 
   it("test_attachRoute_empty_rate_or_name_writes_nothing", () => {
     const { register } = fresh();
-    seedRegister(register, 2, { 10: "", 11: "" });
+    seedRegister(register, 2, { 11: "", 12: "" });
 
     expect(
       postToSheet({
@@ -524,14 +541,14 @@ describe("attachRoute", () => {
       }),
     ).toEqual({ ok: false, error: "name" });
     expect(register.writes).toEqual([]);
-    expect(register.cell(2, 10)).toBe("");
     expect(register.cell(2, 11)).toBe("");
+    expect(register.cell(2, 12)).toBe("");
     expectCostsUntouched(register, [2]);
   });
 
   it("test_attachRoute_key_mismatch_writes_nothing", () => {
     const { register } = fresh();
-    seedRegister(register, 2, { 10: "", 11: "" });
+    seedRegister(register, 2, { 11: "", 12: "" });
 
     expect(
       postToSheet({
@@ -543,7 +560,7 @@ describe("attachRoute", () => {
       }),
     ).toEqual({ ok: false, error: "key" });
     expect(register.writes).toEqual([]);
-    expect(register.cell(2, 10)).toBe("");
+    expect(register.cell(2, 11)).toBe("");
   });
 });
 
@@ -588,8 +605,8 @@ describe("resolveRateTie", () => {
     expect(rates.getLastRow()).toBe(4);
     expect(register.writes).toEqual([]);
     expect(register.deletes).toEqual([]);
-    expect(register.cell(2, 16)).toBe("999");
-    expect(register.cell(2, 17)).toBe("111");
+    expect(register.cell(2, 17)).toBe("999");
+    expect(register.cell(2, 18)).toBe("111");
   });
 
   it("test_resolveRateTie_missing_row_or_sheet_deletes_nothing", () => {
@@ -645,9 +662,9 @@ describe("approve", () => {
       }),
     ).toEqual({ ok: false, error: "invoice" });
     expect(register.writes).toEqual([]);
-    expect(register.cell(2, 14)).toBe("");
-    expect(register.cell(2, 16)).toBe("999");
-    expect(register.cell(2, 18)).toBe("");
+    expect(register.cell(2, 15)).toBe("");
+    expect(register.cell(2, 17)).toBe("999");
+    expect(register.cell(2, 10)).toBe("");
   });
 
   it("test_approve_empty_selection_writes_nothing", () => {
@@ -663,7 +680,7 @@ describe("approve", () => {
       error: "selection",
     });
     expect(register.writes).toEqual([]);
-    expect(register.cell(2, 14)).toBe("");
+    expect(register.cell(2, 15)).toBe("");
   });
 
   it("test_approve_happened_writes_status_invoice_and_both_cost_columns", () => {
@@ -679,23 +696,26 @@ describe("approve", () => {
 
     expect(result).toEqual({
       ok: true,
-      zapisane: [{ sheetRow: 2, transportNumber: "15" }],
+      zapisane: [{ sheetName: "Arkusz1", sheetRow: 2, transportNumber: "15" }],
       pominiete: [],
     });
-    expect(register.cell(2, 14)).toBe("tak");
-    expect(register.cell(2, 15)).toBe("FV/12");
-    expect(register.cell(2, 16)).toBe(30);
-    expect(register.cell(2, 17)).toBe(15);
-    expect(register.cell(2, 18)).toBe("");
+    expect(register.cell(2, 15)).toBe("tak");
+    expect(register.cell(2, 16)).toBe("FV/12");
+    expect(register.cell(2, 17)).toBe(30);
+    expect(register.cell(2, 18)).toBe(15);
+    expect(register.cell(2, 10)).toBe("tak");
     expect(register.cell(2, 9)).toBe(2);
-    expect(register.cell(2, 10)).toBe("trasa-a");
-    expect(register.cell(2, 11)).toBe("150");
-    expect(register.cell(3, 14)).toBe("");
+    expect(register.cell(2, 11)).toBe("trasa-a");
+    expect(register.cell(2, 12)).toBe("150");
     expect(register.cell(3, 15)).toBe("");
-    expect(register.cell(3, 16)).toBe("999");
-    expect(register.cell(3, 17)).toBe("111");
-    expect(register.cell(3, 18)).toBe("");
-    expect(register.writes).toEqual([{ row: 2, col: 14, numRows: 1, numCols: 4 }]);
+    expect(register.cell(3, 16)).toBe("");
+    expect(register.cell(3, 17)).toBe("999");
+    expect(register.cell(3, 18)).toBe("111");
+    expect(register.cell(3, 10)).toBe("");
+    expect(register.writes).toEqual([
+      { row: 2, col: 10, numRows: 1, numCols: 1 },
+      { row: 2, col: 15, numRows: 1, numCols: 4 },
+    ]);
   });
 
   it("test_approve_zero_cost_stays_and_empty_or_zero_bags_divide_by_one", () => {
@@ -716,14 +736,14 @@ describe("approve", () => {
 
     expect(result.ok).toBe(true);
     expect(result.pominiete).toEqual([]);
-    expect(register.cell(2, 14)).toBe("tak");
-    expect(register.cell(2, 15)).toBe("0");
-    expect(register.cell(2, 16)).toBe(0);
+    expect(register.cell(2, 15)).toBe("tak");
+    expect(register.cell(2, 16)).toBe("0");
     expect(register.cell(2, 17)).toBe(0);
-    expect(register.cell(3, 16)).toBe(10);
+    expect(register.cell(2, 18)).toBe(0);
     expect(register.cell(3, 17)).toBe(10);
-    expect(register.cell(4, 16)).toBe(10);
+    expect(register.cell(3, 18)).toBe(10);
     expect(register.cell(4, 17)).toBe(10);
+    expect(register.cell(4, 18)).toBe(10);
   });
 
   it("test_approve_per_bag_rounds_half_up", () => {
@@ -740,10 +760,10 @@ describe("approve", () => {
       ],
     });
 
-    expect(register.cell(2, 16)).toBe(100);
-    expect(register.cell(2, 17)).toBe(33.33);
-    expect(register.cell(3, 16)).toBe(0.01);
+    expect(register.cell(2, 17)).toBe(100);
+    expect(register.cell(2, 18)).toBe(33.33);
     expect(register.cell(3, 17)).toBe(0.01);
+    expect(register.cell(3, 18)).toBe(0.01);
   });
 
   it("test_approve_did_not_happen_writes_only_column_18", () => {
@@ -761,19 +781,19 @@ describe("approve", () => {
     });
 
     expect(result.zapisane).toEqual([
-      { sheetRow: 2, transportNumber: "15" },
-      { sheetRow: 3, transportNumber: "16" },
+      { sheetName: "Arkusz1", sheetRow: 2, transportNumber: "15" },
+      { sheetName: "Arkusz1", sheetRow: 3, transportNumber: "16" },
     ]);
-    expect(register.cell(2, 18)).toBe("nie");
-    expect(register.cell(2, 14)).toBe("");
+    expect(register.cell(2, 10)).toBe("nie");
     expect(register.cell(2, 15)).toBe("");
-    expect(register.cell(2, 16)).toBe("999");
-    expect(register.cell(2, 17)).toBe("111");
-    expect(register.cell(3, 18)).toBe("nie");
-    expect(register.cell(3, 14)).toBe("");
+    expect(register.cell(2, 16)).toBe("");
+    expect(register.cell(2, 17)).toBe("999");
+    expect(register.cell(2, 18)).toBe("111");
+    expect(register.cell(3, 10)).toBe("nie");
+    expect(register.cell(3, 15)).toBe("");
     expect(register.writes).toEqual([
-      { row: 2, col: 18, numRows: 1, numCols: 1 },
-      { row: 3, col: 18, numRows: 1, numCols: 1 },
+      { row: 2, col: 10, numRows: 1, numCols: 1 },
+      { row: 3, col: 10, numRows: 1, numCols: 1 },
     ]);
   });
 
@@ -793,29 +813,29 @@ describe("approve", () => {
     });
 
     expect(result.zapisane).toEqual([
-      { sheetRow: 2, transportNumber: "15" },
-      { sheetRow: 3, transportNumber: "16" },
+      { sheetName: "Arkusz1", sheetRow: 2, transportNumber: "15" },
+      { sheetName: "Arkusz1", sheetRow: 3, transportNumber: "16" },
     ]);
-    expect(register.cell(2, 14)).toBe("tak");
-    expect(register.cell(2, 15)).toBe("FV/9");
-    expect(register.cell(2, 16)).toBe(75);
+    expect(register.cell(2, 15)).toBe("tak");
+    expect(register.cell(2, 16)).toBe("FV/9");
     expect(register.cell(2, 17)).toBe(75);
-    expect(register.cell(2, 18)).toBe("");
-    expect(register.cell(3, 18)).toBe("nie");
-    expect(register.cell(3, 14)).toBe("");
-    expect(register.cell(3, 16)).toBe("999");
-    expect(register.cell(4, 14)).toBe("");
+    expect(register.cell(2, 18)).toBe(75);
+    expect(register.cell(2, 10)).toBe("tak");
+    expect(register.cell(3, 10)).toBe("nie");
+    expect(register.cell(3, 15)).toBe("");
+    expect(register.cell(3, 17)).toBe("999");
     expect(register.cell(4, 15)).toBe("");
-    expect(register.cell(4, 16)).toBe("999");
-    expect(register.cell(4, 18)).toBe("");
-    expect(register.cell(4, 10)).toBe("trasa-a");
+    expect(register.cell(4, 16)).toBe("");
+    expect(register.cell(4, 17)).toBe("999");
+    expect(register.cell(4, 10)).toBe("");
+    expect(register.cell(4, 11)).toBe("trasa-a");
   });
 
   it("test_approve_skips_bad_key_settled_and_writes_open_rows_including_former_tie", () => {
     const { register, rates } = fresh();
     seedRegister(register, 2);
     seedRegister(register, 3, { 1: 16, 2: "Inna 2" });
-    seedRegister(register, 4, { 1: 17, 14: " TAK ", 15: "STARY", 16: "1", 17: "2" });
+    seedRegister(register, 4, { 1: 17, 15: " TAK ", 16: "STARY", 17: "1", 18: "2" });
     seedRegister(register, 5, { 1: 18, 2: "Remisowa 3" });
     seedRate(rates, 2, "Remisowa 3", "gpw", "10.09.2026");
     seedRate(rates, 3, "Remisowa 3", "gpw", "10.09.2026");
@@ -837,26 +857,26 @@ describe("approve", () => {
     expect(result).toEqual({
       ok: true,
       zapisane: [
-        { sheetRow: 5, transportNumber: "18" },
-        { sheetRow: 3, transportNumber: "16" },
+        { sheetName: "Arkusz1", sheetRow: 5, transportNumber: "18" },
+        { sheetName: "Arkusz1", sheetRow: 3, transportNumber: "16" },
       ],
       pominiete: [
-        { sheetRow: 2, transportNumber: "99", reason: "key" },
-        { sheetRow: 4, transportNumber: "17", reason: "settled" },
+        { sheetName: "Arkusz1", sheetRow: 2, transportNumber: "99", reason: "key" },
+        { sheetName: "Arkusz1", sheetRow: 4, transportNumber: "17", reason: "settled" },
       ],
     });
-    expect(register.cell(2, 14)).toBe("");
-    expect(register.cell(2, 16)).toBe("999");
-    expect(register.cell(4, 14)).toBe(" TAK ");
-    expect(register.cell(4, 15)).toBe("STARY");
-    expect(register.cell(4, 16)).toBe("1");
-    expect(register.cell(5, 14)).toBe("tak");
-    expect(register.cell(5, 15)).toBe("FV/2");
-    expect(register.cell(5, 16)).toBe(30);
-    expect(register.cell(3, 14)).toBe("tak");
-    expect(register.cell(3, 15)).toBe("FV/2");
-    expect(register.cell(3, 16)).toBe(20);
-    expect(register.cell(3, 17)).toBe(10);
+    expect(register.cell(2, 15)).toBe("");
+    expect(register.cell(2, 17)).toBe("999");
+    expect(register.cell(4, 15)).toBe(" TAK ");
+    expect(register.cell(4, 16)).toBe("STARY");
+    expect(register.cell(4, 17)).toBe("1");
+    expect(register.cell(5, 15)).toBe("tak");
+    expect(register.cell(5, 16)).toBe("FV/2");
+    expect(register.cell(5, 17)).toBe(30);
+    expect(register.cell(3, 15)).toBe("tak");
+    expect(register.cell(3, 16)).toBe("FV/2");
+    expect(register.cell(3, 17)).toBe(20);
+    expect(register.cell(3, 18)).toBe(10);
     expect(rates.deletes).toEqual([]);
     expect(rates.writes).toEqual([]);
   });
@@ -875,13 +895,13 @@ describe("approve", () => {
     });
 
     expect(result.pominiete).toEqual([]);
-    expect(register.cell(2, 14)).toBe("tak");
-    expect(register.cell(2, 16)).toBe(30);
+    expect(register.cell(2, 15)).toBe("tak");
+    expect(register.cell(2, 17)).toBe(30);
   });
 
   it("test_approve_writes_payload_cost_and_ignores_screen_rates", () => {
     const { register, rates } = fresh();
-    seedRegister(register, 2, { 10: "", 11: "" });
+    seedRegister(register, 2, { 11: "", 12: "" });
     seedRate(rates, 2, "Sklepowa 1", "gpw", "");
 
     postToSheet({
@@ -899,8 +919,8 @@ describe("approve", () => {
       ],
     });
 
-    expect(register.cell(2, 16)).toBe(10);
-    expect(register.cell(2, 17)).toBe(5);
+    expect(register.cell(2, 17)).toBe(10);
+    expect(register.cell(2, 18)).toBe(5);
     expect(rates.writes).toEqual([]);
     expect(functionSource("approve_")).not.toContain("kwotaPodjazd");
     expect(functionSource("approve_")).not.toContain("tylkoWorki");
@@ -920,16 +940,16 @@ describe("approve", () => {
 
     expect(result).toEqual({
       ok: true,
-      zapisane: [{ sheetRow: 2, transportNumber: "15" }],
+      zapisane: [{ sheetName: "Arkusz1", sheetRow: 2, transportNumber: "15" }],
       pominiete: [],
     });
-    expect(register.cell(2, 18)).toBe("nie");
-    expect(register.cell(2, 14)).toBe("");
+    expect(register.cell(2, 10)).toBe("nie");
+    expect(register.cell(2, 15)).toBe("");
   });
 
   it("test_approve_sheet_nie_does_not_receive_cost_columns", () => {
     const { register } = fresh();
-    seedRegister(register, 2, { 18: "nie" });
+    seedRegister(register, 2, { 10: "nie" });
 
     const result = postToSheet({
       action: "approve",
@@ -937,11 +957,11 @@ describe("approve", () => {
       wiersze: [{ sheetRow: 2, transportNumber: "15", koszt: 3000 }],
     });
 
-    expect(result.pominiete).toEqual([{ sheetRow: 2, transportNumber: "15", reason: "nie" }]);
+    expect(result.pominiete).toEqual([{ sheetName: "Arkusz1", sheetRow: 2, transportNumber: "15", reason: "nie" }]);
     expect(register.writes).toEqual([]);
-    expect(register.cell(2, 14)).toBe("");
-    expect(register.cell(2, 16)).toBe("999");
-    expect(register.cell(2, 18)).toBe("nie");
+    expect(register.cell(2, 15)).toBe("");
+    expect(register.cell(2, 17)).toBe("999");
+    expect(register.cell(2, 10)).toBe("nie");
   });
 
   it("test_approve_unreadable_pickup_date_is_skipped", () => {
@@ -958,10 +978,10 @@ describe("approve", () => {
       ],
     });
 
-    expect(result.pominiete).toEqual([{ sheetRow: 2, transportNumber: "15", reason: "date" }]);
-    expect(register.cell(2, 14)).toBe("");
-    expect(register.cell(3, 14)).toBe("tak");
-    expect(register.cell(3, 16)).toBe(10);
+    expect(result.pominiete).toEqual([{ sheetName: "Arkusz1", sheetRow: 2, transportNumber: "15", reason: "date" }]);
+    expect(register.cell(2, 15)).toBe("");
+    expect(register.cell(3, 15)).toBe("tak");
+    expect(register.cell(3, 17)).toBe(10);
   });
 
   it("test_approve_iso_pickup_date_is_accepted", () => {
@@ -975,8 +995,8 @@ describe("approve", () => {
     });
 
     expect(result.pominiete).toEqual([]);
-    expect(register.cell(2, 14)).toBe("tak");
-    expect(register.cell(2, 16)).toBe(30);
+    expect(register.cell(2, 15)).toBe("tak");
+    expect(register.cell(2, 17)).toBe(30);
   });
 
   it("test_approve_bad_cost_skips_row_and_missing_rate_sheet_still_writes", () => {
@@ -994,11 +1014,11 @@ describe("approve", () => {
       ],
     });
 
-    expect(result.zapisane).toEqual([{ sheetRow: 3, transportNumber: "16" }]);
-    expect(result.pominiete).toEqual([{ sheetRow: 2, transportNumber: "15", reason: "cost" }]);
-    expect(register.cell(2, 14)).toBe("");
-    expect(register.cell(3, 16)).toBe(20);
-    expect(register.cell(3, 17)).toBe(10);
+    expect(result.zapisane).toEqual([{ sheetName: "Arkusz1", sheetRow: 3, transportNumber: "16" }]);
+    expect(result.pominiete).toEqual([{ sheetName: "Arkusz1", sheetRow: 2, transportNumber: "15", reason: "cost" }]);
+    expect(register.cell(2, 15)).toBe("");
+    expect(register.cell(3, 17)).toBe(20);
+    expect(register.cell(3, 18)).toBe(10);
   });
 });
 

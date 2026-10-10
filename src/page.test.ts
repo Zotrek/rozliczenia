@@ -29,6 +29,12 @@ describe("page wiring", () => {
     expect(boot).toContain("readWebAppUrl(");
   });
 
+  it("test_page_view_defaults_range_dates_to_today", () => {
+    expect(pageSource).toContain("defaultRangeDates(todayAtBoot)");
+    expect(pageSource).toContain("from: defaultDates.from");
+    expect(pageSource).toContain("to: defaultDates.to");
+  });
+
   it("test_page_onClick_covers_range_statement_stats_and_rates_actions", () => {
     const click = functionBody("onClick");
     for (const action of [

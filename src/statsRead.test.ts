@@ -102,8 +102,8 @@ describe("buildSettlementStats_", () => {
     const result = stats(
       gpw,
       [
-        entry(2, { 13: "tak", 15: 30, 16: 15 }),
-        entry(3, { 4: "01.08.2026", 13: "tak", 15: 99, 16: 99 }),
+        entry(2, { 14: "tak", 16: 30, 17: 15 }),
+        entry(3, { 4: "01.08.2026", 14: "tak", 16: 99, 17: 99 }),
       ],
       [],
     );
@@ -122,7 +122,7 @@ describe("buildSettlementStats_", () => {
   it("test_buildSettlementStats_unsettled_outside_range_stays_for_backlog", () => {
     const result = stats(
       gpw,
-      [entry(2, { 4: "01.01.2020" }), entry(3, { 4: "15.09.2026", 13: "tak", 15: 10, 16: 5 })],
+      [entry(2, { 4: "01.01.2020" }), entry(3, { 4: "15.09.2026", 14: "tak", 16: 10, 17: 5 })],
       [],
     );
     expect(toStatsRows(result).map((row) => row.sheetRow)).toEqual([2, 3]);
@@ -131,7 +131,7 @@ describe("buildSettlementStats_", () => {
   it("test_buildSettlementStats_transport_nie_excluded", () => {
     const result = stats(
       gpw,
-      [entry(2, { 17: "nie" }), entry(3, { 17: "tak" }), entry(4)],
+      [entry(2, { 9: "nie" }), entry(3, { 9: "tak" }), entry(4)],
       [],
     );
     expect(toStatsRows(result).map((row) => row.sheetRow)).toEqual([3, 4]);
@@ -185,9 +185,9 @@ describe("buildSettlementStats_", () => {
     const result = stats(
       gpw,
       [
-        entry(2, { 13: "tak", 15: 40, 16: 20 }),
-        entry(3, { 4: "01.01.2020", 11: 20, 12: 10, 8: 1 }),
-        entry(4, { 17: "nie", 13: "tak", 15: 99 }),
+        entry(2, { 14: "tak", 16: 40, 17: 20 }),
+        entry(3, { 4: "01.01.2020", 12: 20, 13: 10, 8: 1 }),
+        entry(4, { 9: "nie", 14: "tak", 16: 99 }),
       ],
       [],
     );
@@ -234,7 +234,7 @@ describe("buildSettlementStats_", () => {
     };
     const result = stats(
       gpw,
-      [entry(2, { 13: "tak", 15: 10, 16: 5 })],
+      [entry(2, { 14: "tak", 16: 10, 17: 5 })],
       [],
       {
         headers,
@@ -327,7 +327,7 @@ describe("akcja settlementStats w transport-log.gs", () => {
       rates: { sheetRow: number; cells: unknown[] }[],
     ) => SearchResult;
     const read = load();
-    const result = read(gpw, [entry(2, { 13: "tak" }), entry(3, { 0: "16" })], []);
+    const result = read(gpw, [entry(2, { 14: "tak" }), entry(3, { 0: "16" })], []);
     expect(result.ok).toBe(true);
     expect(result.rows.map((row) => row.sheetRow)).toEqual([3]);
   });

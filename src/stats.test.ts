@@ -36,6 +36,7 @@ const TODAY: CalendarDate = { year: 2026, month: 9, day: 23 };
 
 function statsRow(over: Partial<StatsRow> & Pick<StatsRow, "sheetRow">): StatsRow {
   return {
+    sheetName: "",
     transportNumber: String(over.sheetRow),
     address: "Sklepowa 1",
     shopName: "Sklep",

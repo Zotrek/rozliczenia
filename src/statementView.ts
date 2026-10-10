@@ -26,7 +26,7 @@ export function renderStatement(
   const statement = currentStatement(screen);
   const selectedSum = sumSelected(statement, selectedKeys(screen.selected));
   const count = selectedLineCount(statement, screen.selected);
-  const note = status ? `<p class="err">${escapeHtml(status)}</p>` : "";
+  const note = status ? `<p class="err status-block">${escapeHtml(status)}</p>` : "";
   const emptyHint = allowApprove
     ? "Brak nierozliczonych odbiorów tego podwykonawcy w podanym zakresie."
     : "Brak dni podjazdu tego podwykonawcy w podanym zakresie (Baza cen harmonogram).";
@@ -70,7 +70,7 @@ function table(screen: StatementScreen, lines: readonly StatementLine[]): string
 }
 
 function plainRow(screen: StatementScreen, shop: ShopCost): string {
-  const key = rowKey(shop.sheetRow, shop.transportNumber);
+  const key = rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName);
   const line = encodeURIComponent(key);
   const dead = !shop.happened;
   const checked = screen.selected[key] === true;
@@ -153,7 +153,7 @@ function routeRow(screen: StatementScreen, line: Extract<StatementLine, { kind: 
 
 function childRow(screen: StatementScreen, shop: ShopCost, sharedBagRate: boolean): string {
   const dead = !shop.happened;
-  const state = screen.screenByRow[rowKey(shop.sheetRow, shop.transportNumber)] ?? {};
+  const state = screen.screenByRow[rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName)] ?? {};
   const bagCell = shop.tie || sharedBagRate
     ? DASH
     : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie zapisuje kolumn rejestru ani Bazy stawek.");
@@ -232,7 +232,7 @@ function detachButton(shop: ShopCost): string {
 }
 
 function newRouteBox(screen: StatementScreen, shop: ShopCost): string {
-  const key = rowKey(shop.sheetRow, shop.transportNumber);
+  const key = rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName);
   const left = screen.leftRoute[key];
   if (!left) {
     return "";
@@ -304,7 +304,7 @@ function text(value: string, dead: boolean): string {
 }
 
 function ref(shop: ShopCost): string {
-  return `data-sheet-row="${shop.sheetRow}" data-transport="${escapeHtml(shop.transportNumber)}"`;
+  return `data-sheet-name="${escapeHtml(shop.sheetName)}" data-sheet-row="${shop.sheetRow}" data-transport="${escapeHtml(shop.transportNumber)}"`;
 }
 
 function shopsWord(count: number): string {

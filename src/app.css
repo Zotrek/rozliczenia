@@ -68,6 +68,14 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .field input:disabled { background: #f8fafc; color: #94a3b8; }
 .field.is-error input { border-color: #e11d48; }
 .err { color: #e11d48; font-weight: 650; font-size: 12px; line-height: 1.35; }
+.err.status-block {
+  white-space: pre-line;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  max-width: 42rem;
+}
 .btn-teal, .btn-ghost {
   border-radius: 10px;
   padding: 9px 14px;

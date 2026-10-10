@@ -1,7 +1,7 @@
 # Context: Zestawienie z harmonogramu
 
 > **Task:** 0012_zestawienie-harmonogram  
-> **Last Updated:** 2026-09-28  
+> **Last Updated:** 2026-10-01 (lag +1 dzień do zestawienia)  
 > **Status:** implemented
 
 ## Decyzje
@@ -21,6 +21,9 @@
 | 11 | transport się odbył | Zawsze lista tak/nie + przekreślenie przy „nie” |
 | 12 | Sync vs clear | Sync tylko uzupełnia / aktualizuje nierozliczone; **nigdy nie czyści** zakładki |
 | 13 | Zapis stawek → zestawienie | `saveRateHarmonogram` po sukcesie dopisuje stawki/trasę na nierozliczonych wierszach tej pary (bez czekania na pipeline) |
+| 14 | Ilość worków vs usunięcie z odebrane | Sync przy update bierze **max(istniejąca, z odebrane)** — usunięcie pojedynczych worków z „odebrane” **nie cofa** sumy w zestawieniu |
+| 15 | Nazwy przy 0 workach | `Nazwa kontrahenta` i `Nazwa punktu` z worków dnia; gdy 0 worków — z dowolnego wiersza `odebrane` tego adresu |
+| 16 | Lag sync +1 dzień | Wiersz do zestawienia dopiero **dzień po** dacie odbioru (teoretycznej z Bazy / zamknięcia worka): 01.10 → dopisanie gdy sync z `dataDo` ≥ 02.10; kolumna Data odbioru = 01.10 |
 
 ## Pliki
 

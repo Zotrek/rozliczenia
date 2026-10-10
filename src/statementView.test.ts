@@ -15,6 +15,7 @@ import { renderStatement } from "./statementView.js";
 
 function row(over: Partial<RegisterRow> & { sheetRow: number }): RegisterRow {
   return {
+    sheetName: "",
     transportNumber: String(over.sheetRow),
     address: "Sklepowa 1",
     shopName: "Sklep",
@@ -91,7 +92,7 @@ describe("renderStatement", () => {
       ),
     );
     expect(html).toContain('data-kind="child"');
-    expect(html).toContain('data-edit="bags" data-sheet-row="4" data-transport="P4"');
+    expect(html).toContain('data-edit="bags" data-sheet-name="" data-sheet-row="4" data-transport="P4"');
     expect(html).toContain("odepnij od trasy");
     expect(html).not.toContain("tylko za liczbę worków");
   });
@@ -158,7 +159,7 @@ describe("renderStatement", () => {
   it("test_renderStatement_approve_disabled_without_invoice", () => {
     const html = renderStatement(
       screen([row({ sheetRow: 2 })], [rate({ sheetRow: 2, shop: "Sklepowa 1" })], {
-        selected: { "2\t2": true },
+        selected: { "\t2\t2": true },
       }),
     );
     expect(html).toContain("disabled");

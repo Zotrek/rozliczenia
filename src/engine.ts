@@ -19,13 +19,13 @@ import type {
  * Reguły: docs/SPECIFICATION.md — Koszt odbioru ze snapshotu rejestru (kol. 12–13).
  */
 
-export function rowKey(sheetRow: number, transportNumber: string): string {
-  return `${sheetRow}\t${transportNumber}`;
+export function rowKey(sheetRow: number, transportNumber: string, sheetName = ""): string {
+  return `${sheetName}\t${sheetRow}\t${transportNumber}`;
 }
 
 export function lineKey(line: StatementLine): string {
   if (line.kind === "plain") {
-    return rowKey(line.shop.sheetRow, line.shop.transportNumber);
+    return rowKey(line.shop.sheetRow, line.shop.transportNumber, line.shop.sheetName);
   }
   return `route\t${line.routeName}`;
 }
@@ -148,6 +148,7 @@ function buildShop(row: RegisterRow, input: EngineInput, mode: ShopMode): ShopCo
   }
 
   return {
+    sheetName: row.sheetName,
     sheetRow: row.sheetRow,
     transportNumber: row.transportNumber,
     address: row.address,
@@ -182,7 +183,7 @@ function price(row: RegisterRow, screen: ScreenState): Priced {
 }
 
 function screenOf(input: EngineInput, row: RegisterRow): ScreenState {
-  return input.screenByRow[rowKey(row.sheetRow, row.transportNumber)] ?? {};
+  return input.screenByRow[rowKey(row.sheetRow, row.transportNumber, row.sheetName)] ?? {};
 }
 
 function firstRouteRate(rows: readonly RegisterRow[]): Grosze | null {

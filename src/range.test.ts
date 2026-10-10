@@ -29,6 +29,8 @@ import {
   selectedContractor,
   startSearch,
   webAppUrl,
+  calendarToIsoDate,
+  defaultRangeDates,
   type ContractorListItem,
 } from "./range.js";
 import type { SettlementSearchResult } from "./search.js";
@@ -159,6 +161,14 @@ describe("startSearch", () => {
     expect(isoToSheetDate("2026-09-01")).toBe("01.09.2026");
     expect(isoToSheetDate("2024-02-29")).toBe("29.02.2024");
     expect(isoToSheetDate("2026-02-31")).toBeNull();
+  });
+
+  it("test_defaultRangeDates_both_ends_are_today_iso", () => {
+    expect(calendarToIsoDate({ year: 2026, month: 9, day: 28 })).toBe("2026-09-28");
+    expect(defaultRangeDates({ year: 2026, month: 9, day: 28 })).toEqual({
+      from: "2026-09-28",
+      to: "2026-09-28",
+    });
   });
 
   it("test_fieldsForSearch_no_start_date_drops_from", () => {

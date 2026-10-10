@@ -263,7 +263,7 @@ function renderRangeScreen(model: RangeViewModel): string {
   const note = model.webappMissing
     ? '<p class="callout">Brak adresu Web App. Dopisz ?webapp= do adresu tej strony.</p>'
     : "";
-  const status = model.status ? `<p class="err">${escapeHtml(model.status)}</p>` : "";
+  const status = model.status ? `<p class="err status-block">${escapeHtml(model.status)}</p>` : "";
   return (
     '<div class="setup" data-screen="range"><div class="setup-card">' +
     brand(model.mode) +

@@ -76,6 +76,14 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .field input:disabled { background: #f8fafc; color: #94a3b8; }
 .field.is-error input { border-color: #e11d48; }
 .err { color: #e11d48; font-weight: 650; font-size: 12px; line-height: 1.35; }
+.err.status-block {
+  white-space: pre-line;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  max-width: 42rem;
+}
 .btn-teal, .btn-ghost {
   border-radius: 10px;
   padding: 9px 14px;
@@ -1085,6 +1093,15 @@ function resolveContractorText(list, text) {
     }
     return { contractor: "", query: text };
 }
+/** `CalendarDate` → `yyyy-mm-dd` pod `input[type=date]`. */
+function calendarToIsoDate(date) {
+    return `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+}
+/** Domyślny zakres Zakresu: dzień do dzień = dziś. */
+function defaultRangeDates(today) {
+    const iso = calendarToIsoDate(today);
+    return { from: iso, to: iso };
+}
 /** `yyyy-mm-dd` → `dd.mm.yyyy`. Zły dzień kalendarza daje null. Bez przesunięcia strefy. */
 function isoToSheetDate(iso) {
     const match = ISO_DATE.exec(iso);
@@ -1541,12 +1558,12 @@ function roundReal(value) {
  * Kwoty w groszach. Daty tekstem `dd.mm.yyyy`.
  * Reguły: docs/SPECIFICATION.md — Koszt odbioru ze snapshotu rejestru (kol. 12–13).
  */
-function rowKey(sheetRow, transportNumber) {
-    return `${sheetRow}\t${transportNumber}`;
+function rowKey(sheetRow, transportNumber, sheetName = "") {
+    return `${sheetName}\t${sheetRow}\t${transportNumber}`;
 }
 function lineKey(line) {
     if (line.kind === "plain") {
-        return rowKey(line.shop.sheetRow, line.shop.transportNumber);
+        return rowKey(line.shop.sheetRow, line.shop.transportNumber, line.shop.sheetName);
     }
     return `route\t${line.routeName}`;
 }
@@ -1660,6 +1677,7 @@ function buildShop(row, input, mode) {
         perBag = costPerBag(receptionCost, row.bagCount);
     }
     return {
+        sheetName: row.sheetName,
         sheetRow: row.sheetRow,
         transportNumber: row.transportNumber,
         address: row.address,
@@ -1686,7 +1704,7 @@ function price(row, screen) {
     return { pickup, bagRate, bagSum };
 }
 function screenOf(input, row) {
-    return input.screenByRow[rowKey(row.sheetRow, row.transportNumber)] ?? {};
+    return input.screenByRow[rowKey(row.sheetRow, row.transportNumber, row.sheetName)] ?? {};
 }
 function firstRouteRate(rows) {
     for (const row of rows) {
@@ -1757,6 +1775,44 @@ const STATEMENT_ERROR = {
     refresh: "Zapisano, ale nie udało się odświeżyć listy.",
     partial: "Część wierszy nie weszła w zapis.",
 };
+const SKIP_REASON_LABEL = {
+    key: "wiersz się zmienił",
+    settled: "już rozliczony",
+    nie: "status NIE",
+    date: "niespójna data",
+    cost: "niespójny koszt",
+    bags: "niespójna liczba worków",
+    rate: "niespójna stawka",
+};
+function skipReasonLabel(reason) {
+    if (typeof reason === "string" && SKIP_REASON_LABEL[reason]) {
+        return SKIP_REASON_LABEL[reason];
+    }
+    return writeError(reason);
+}
+/** Lista pominiętych przy częściowym zatwierdzeniu — tekst wieloliniowy do UI. */
+function formatPartialApprove(body) {
+    const lines = [STATEMENT_ERROR.partial];
+    if (!isRecord(body) || !Array.isArray(body.pominiete)) {
+        return lines[0];
+    }
+    const saved = Array.isArray(body.zapisane) ? body.zapisane.length : 0;
+    if (saved > 0) {
+        lines.push(`Zapisano: ${saved}.`);
+    }
+    lines.push(`Pominięto (${body.pominiete.length}):`);
+    for (const item of body.pominiete) {
+        if (!isRecord(item)) {
+            lines.push("• pozycja bez szczegółów");
+            continue;
+        }
+        const numer = String(item.transportNumber ?? "").trim() || "?";
+        const reason = skipReasonLabel(item.reason);
+        const row = typeof item.sheetRow === "number" && item.sheetRow > 0 ? ` (wiersz ${item.sheetRow})` : "";
+        lines.push(`• Transport ${numer}${row} — ${reason}`);
+    }
+    return lines.join("\n");
+}
 /** tryb=harmonogram dla zapisów na „zestawienie z harmonogramu”. */
 function scheduleTrybFields(mode) {
     return mode === "schedule" ? { tryb: "harmonogram" } : {};
@@ -1912,8 +1968,10 @@ function readSettlementStats(body) {
     }
     return { ok: true, rows, rates };
 }
-function findRow(rows, sheetRow, transportNumber) {
-    return rows.find((row) => row.sheetRow === sheetRow && row.transportNumber === transportNumber) ?? null;
+function findRow(rows, sheetRow, transportNumber, sheetName = "") {
+    return (rows.find((row) => row.sheetRow === sheetRow &&
+        row.transportNumber === transportNumber &&
+        row.sheetName === sheetName) ?? null);
 }
 function toggleSelected(screen, key) {
     const selected = { ...screen.selected };
@@ -1935,17 +1993,17 @@ function toggleOpen(screen, routeName) {
     }
     return { ...screen, openRoutes };
 }
-function setBagsOnly(screen, sheetRow, transportNumber, on) {
-    return patchScreen(screen, rowKey(sheetRow, transportNumber), { bagsOnly: on });
+function setBagsOnly(screen, sheetRow, transportNumber, on, sheetName = "") {
+    return patchScreen(screen, rowKey(sheetRow, transportNumber, sheetName), { bagsOnly: on });
 }
-function setDidNotHappen(screen, sheetRow, transportNumber, on) {
-    return patchScreen(screen, rowKey(sheetRow, transportNumber), { didNotHappen: on });
+function setDidNotHappen(screen, sheetRow, transportNumber, on, sheetName = "") {
+    return patchScreen(screen, rowKey(sheetRow, transportNumber, sheetName), { didNotHappen: on });
 }
-function setPickup(screen, sheetRow, transportNumber, amount) {
-    return patchScreen(screen, rowKey(sheetRow, transportNumber), { pickupAmount: amount });
+function setPickup(screen, sheetRow, transportNumber, amount, sheetName = "") {
+    return patchScreen(screen, rowKey(sheetRow, transportNumber, sheetName), { pickupAmount: amount });
 }
-function setBagRate(screen, sheetRow, transportNumber, amount) {
-    return patchScreen(screen, rowKey(sheetRow, transportNumber), { bagAmount: amount });
+function setBagRate(screen, sheetRow, transportNumber, amount, sheetName = "") {
+    return patchScreen(screen, rowKey(sheetRow, transportNumber, sheetName), { bagAmount: amount });
 }
 /** Wspólna kwota worka na ekranie, tylko sklepy trasy, które się odbyły. Do Bazy stawek nie idzie. */
 function setRouteBagRate(screen, routeName, amount) {
@@ -1954,7 +2012,7 @@ function setRouteBagRate(screen, routeName, amount) {
         if (row.routeName !== routeName) {
             continue;
         }
-        const key = rowKey(row.sheetRow, row.transportNumber);
+        const key = rowKey(row.sheetRow, row.transportNumber, row.sheetName);
         if (screenByRow[key]?.didNotHappen) {
             continue;
         }
@@ -1962,10 +2020,14 @@ function setRouteBagRate(screen, routeName, amount) {
     }
     return { ...screen, screenByRow };
 }
-function commitBags(screen, sheetRow, transportNumber, bagCount) {
+function commitBags(screen, sheetRow, transportNumber, bagCount, sheetName = "") {
     return {
         ...screen,
-        rows: screen.rows.map((row) => row.sheetRow === sheetRow && row.transportNumber === transportNumber ? { ...row, bagCount } : row),
+        rows: screen.rows.map((row) => row.sheetRow === sheetRow &&
+            row.transportNumber === transportNumber &&
+            row.sheetName === sheetName
+            ? { ...row, bagCount }
+            : row),
     };
 }
 function commitRouteRate(screen, routeName, routeRate) {
@@ -1974,13 +2036,15 @@ function commitRouteRate(screen, routeName, routeRate) {
         rows: screen.rows.map((row) => (row.routeName === routeName ? { ...row, routeRate } : row)),
     };
 }
-function commitDetach(screen, sheetRow, transportNumber) {
-    const row = findRow(screen.rows, sheetRow, transportNumber);
+function commitDetach(screen, sheetRow, transportNumber, sheetName = "") {
+    const row = findRow(screen.rows, sheetRow, transportNumber, sheetName);
     if (!row || row.routeName === "") {
         return null;
     }
     const left = row.routeName;
-    const rows = screen.rows.map((item) => item.sheetRow === sheetRow && item.transportNumber === transportNumber
+    const rows = screen.rows.map((item) => item.sheetRow === sheetRow &&
+        item.transportNumber === transportNumber &&
+        item.sheetName === sheetName
         ? { ...item, routeName: "", routeRate: null }
         : item);
     const selected = { ...screen.selected };
@@ -1991,15 +2055,17 @@ function commitDetach(screen, sheetRow, transportNumber) {
         ...screen,
         rows,
         selected,
-        leftRoute: { ...screen.leftRoute, [rowKey(sheetRow, transportNumber)]: left },
+        leftRoute: { ...screen.leftRoute, [rowKey(sheetRow, transportNumber, sheetName)]: left },
     };
 }
-function commitAttach(screen, sheetRow, transportNumber, name, routeRate) {
-    if (!findRow(screen.rows, sheetRow, transportNumber)) {
+function commitAttach(screen, sheetRow, transportNumber, name, routeRate, sheetName = "") {
+    if (!findRow(screen.rows, sheetRow, transportNumber, sheetName)) {
         return null;
     }
     const rows = screen.rows.map((item) => {
-        if (item.sheetRow === sheetRow && item.transportNumber === transportNumber) {
+        if (item.sheetRow === sheetRow &&
+            item.transportNumber === transportNumber &&
+            item.sheetName === sheetName) {
             return { ...item, routeName: name, routeRate };
         }
         if (item.routeName === name) {
@@ -2007,7 +2073,7 @@ function commitAttach(screen, sheetRow, transportNumber, name, routeRate) {
         }
         return item;
     });
-    const key = rowKey(sheetRow, transportNumber);
+    const key = rowKey(sheetRow, transportNumber, sheetName);
     const leftRoute = { ...screen.leftRoute };
     delete leftRoute[key];
     const routeDraft = { ...screen.routeDraft };
@@ -2028,7 +2094,7 @@ function withoutTiedRates(rates, keptSheetRow) {
 }
 /** Po odświeżeniu odczytu zostaje stan ekranu wierszy, które nadal są. */
 function adoptRows(prev, rows, rates) {
-    const keys = new Set(rows.map((row) => rowKey(row.sheetRow, row.transportNumber)));
+    const keys = new Set(rows.map((row) => rowKey(row.sheetRow, row.transportNumber, row.sheetName)));
     const routeNames = new Set(rows.map((row) => row.routeName).filter((name) => name !== ""));
     return {
         rows,
@@ -2052,6 +2118,7 @@ function bagsBody(row, text, mode) {
         bagCount: parsed.kind === "empty" ? null : parsed.value,
         body: {
             action: "patchBags",
+            sheetName: row.sheetName,
             sheetRow: row.sheetRow,
             transportNumber: row.transportNumber,
             iloscWorkow: parsed.kind === "empty" ? "" : parsed.value,
@@ -2070,6 +2137,7 @@ function routeRateBody(row, routeName, text, mode) {
         grosze,
         body: {
             action: "patchRouteRate",
+            sheetName: row.sheetName,
             sheetRow: row.sheetRow,
             transportNumber: row.transportNumber,
             trasa: routeName,
@@ -2081,6 +2149,7 @@ function routeRateBody(row, routeName, text, mode) {
 function detachBody(row, mode) {
     return {
         action: "detachRoute",
+        sheetName: row.sheetName,
         sheetRow: row.sheetRow,
         transportNumber: row.transportNumber,
         ...scheduleTrybFields(mode),
@@ -2107,6 +2176,7 @@ function attachDecision(row, nameText, rateText, leftName, mode) {
         grosze: parsed.value,
         body: {
             action: "attachRoute",
+            sheetName: row.sheetName,
             sheetRow: row.sheetRow,
             transportNumber: row.transportNumber,
             trasa: name,
@@ -2192,6 +2262,7 @@ function statementSums(screen) {
 function shopItem(shop) {
     if (!shop.happened) {
         return {
+            sheetName: shop.sheetName,
             sheetRow: shop.sheetRow,
             transportNumber: shop.transportNumber,
             nieOdbył: true,
@@ -2201,6 +2272,7 @@ function shopItem(shop) {
         return null;
     }
     const item = {
+        sheetName: shop.sheetName,
         sheetRow: shop.sheetRow,
         transportNumber: shop.transportNumber,
         koszt: shop.receptionCost,
@@ -2322,7 +2394,9 @@ function readRegisterRow(value) {
     catch {
         return null;
     }
+    const sheetName = readText(value.sheetName) ?? "";
     return {
+        sheetName,
         sheetRow,
         transportNumber,
         address,
@@ -2399,7 +2473,7 @@ function renderStatement(screen, status = "", options = {}) {
     const statement = currentStatement(screen);
     const selectedSum = sumSelected(statement, selectedKeys(screen.selected));
     const count = selectedLineCount(statement, screen.selected);
-    const note = status ? `<p class="err">${escapeHtml(status)}</p>` : "";
+    const note = status ? `<p class="err status-block">${escapeHtml(status)}</p>` : "";
     const emptyHint = allowApprove
         ? "Brak nierozliczonych odbiorów tego podwykonawcy w podanym zakresie."
         : "Brak dni podjazdu tego podwykonawcy w podanym zakresie (Baza cen harmonogram).";
@@ -2436,7 +2510,7 @@ function table(screen, lines) {
         `</tr></thead><tbody>${rows.join("")}</tbody></table></div>`);
 }
 function plainRow(screen, shop) {
-    const key = rowKey(shop.sheetRow, shop.transportNumber);
+    const key = rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName);
     const line = encodeURIComponent(key);
     const dead = !shop.happened;
     const checked = screen.selected[key] === true;
@@ -2498,7 +2572,7 @@ function routeRow(screen, line) {
 }
 function childRow(screen, shop, sharedBagRate) {
     const dead = !shop.happened;
-    const state = screen.screenByRow[rowKey(shop.sheetRow, shop.transportNumber)] ?? {};
+    const state = screen.screenByRow[rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName)] ?? {};
     const bagCell = shop.tie || sharedBagRate
         ? DASH
         : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie zapisuje kolumn rejestru ani Bazy stawek.");
@@ -2556,7 +2630,7 @@ function detachButton(shop) {
     return `<button type="button" class="btn-detach" data-action="detach" ${ref(shop)} title="Zapis od razu. Sklep schodzi z trasy i zostaje odbiorem za podjazd.">odepnij od trasy</button>`;
 }
 function newRouteBox(screen, shop) {
-    const key = rowKey(shop.sheetRow, shop.transportNumber);
+    const key = rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName);
     const left = screen.leftRoute[key];
     if (!left) {
         return "";
@@ -2613,7 +2687,7 @@ function text(value, dead) {
     return dead ? `<span class="strike">${safe}</span>` : safe;
 }
 function ref(shop) {
-    return `data-sheet-row="${shop.sheetRow}" data-transport="${escapeHtml(shop.transportNumber)}"`;
+    return `data-sheet-name="${escapeHtml(shop.sheetName)}" data-sheet-row="${shop.sheetRow}" data-transport="${escapeHtml(shop.transportNumber)}"`;
 }
 function shopsWord(count) {
     if (count === 1) {
@@ -3911,7 +3985,7 @@ function renderRangeScreen(model) {
     const note = model.webappMissing
         ? '<p class="callout">Brak adresu Web App. Dopisz ?webapp= do adresu tej strony.</p>'
         : "";
-    const status = model.status ? `<p class="err">${escapeHtml(model.status)}</p>` : "";
+    const status = model.status ? `<p class="err status-block">${escapeHtml(model.status)}</p>` : "";
     return ('<div class="setup" data-screen="range"><div class="setup-card">' +
         brand(model.mode) +
         "<h2>Zakres rozliczenia</h2>" +
@@ -4005,14 +4079,16 @@ function todayCalendar() {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
 }
+const todayAtBoot = todayCalendar();
+const defaultDates = defaultRangeDates(todayAtBoot);
 const VIEW = {
     mode: "report",
     contractorQuery: "",
     contractorOpen: false,
     contractor: "",
     contractors: [],
-    from: "",
-    to: "",
+    from: defaultDates.from,
+    to: defaultDates.to,
     noFrom: false,
     error: "",
     screen: "range",
@@ -4038,7 +4114,7 @@ const VIEW = {
     ratesTarget: "stawki",
     ratesMessage: "",
     ratesMessageOk: false,
-    stats: emptyStats(todayCalendar()),
+    stats: emptyStats(todayAtBoot),
 };
 let heldFrom = "";
 let webapp = "";
@@ -4253,12 +4329,12 @@ function onClick(event) {
         if (!ref) {
             return;
         }
-        const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber);
+        const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber, ref.sheetName);
         if (!row) {
             return;
         }
         void writeNow("Odpinam sklep od trasy…", detachBody(row, VIEW.mode), () => {
-            const next = commitDetach(VIEW.statement, ref.sheetRow, ref.transportNumber);
+            const next = commitDetach(VIEW.statement, ref.sheetRow, ref.transportNumber, ref.sheetName);
             if (next) {
                 VIEW.statement = next;
             }
@@ -4270,11 +4346,11 @@ function onClick(event) {
         if (!ref) {
             return;
         }
-        const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber);
+        const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber, ref.sheetName);
         if (!row) {
             return;
         }
-        const key = rowKey(ref.sheetRow, ref.transportNumber);
+        const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
         const draft = VIEW.statement.routeDraft[key] ?? { name: "", rate: "" };
         const decision = attachDecision(row, draft.name, draft.rate, VIEW.statement.leftRoute[key] ?? "", VIEW.mode);
         if (!decision.ok) {
@@ -4286,7 +4362,7 @@ function onClick(event) {
             return;
         }
         void writeNow("Zapisuję nową trasę…", decision.body, () => {
-            const next = commitAttach(VIEW.statement, ref.sheetRow, ref.transportNumber, decision.name, decision.grosze);
+            const next = commitAttach(VIEW.statement, ref.sheetRow, ref.transportNumber, decision.name, decision.grosze, ref.sheetName);
             if (next) {
                 VIEW.statement = next;
             }
@@ -4328,7 +4404,7 @@ function onInput(event) {
         if (!ref) {
             return;
         }
-        const key = rowKey(ref.sheetRow, ref.transportNumber);
+        const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
         const prev = VIEW.statement.routeDraft[key] ?? { name: "", rate: "" };
         const draft = el.dataset.draft === "route-name" ? { ...prev, name: el.value } : { ...prev, rate: el.value };
         const routeDraftError = { ...VIEW.statement.routeDraftError };
@@ -4421,8 +4497,8 @@ function onChange(event) {
         }
         VIEW.statement =
             el.dataset.toggle === "bags-only"
-                ? setBagsOnly(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked)
-                : setDidNotHappen(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked);
+                ? setBagsOnly(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked, ref.sheetName)
+                : setDidNotHappen(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked, ref.sheetName);
         VIEW.status = "";
         paint();
         return;
@@ -4790,11 +4866,12 @@ function onMouseDown(event) {
 function sheetRef(el) {
     const sheetRow = Number(el.dataset.sheetRow);
     const transportNumber = el.dataset.transport ?? "";
-    // Harmonogram: brak nr zlecenia — wystarczy sheetRow (+ puste transportNumber).
+    const sheetName = el.dataset.sheetName ?? "";
+    // Harmonogram: brak nr zlecenia — wystarczy sheetName + sheetRow (+ puste transportNumber).
     if (!Number.isInteger(sheetRow) || sheetRow < 2) {
         return null;
     }
-    return { sheetRow, transportNumber };
+    return { sheetName, sheetRow, transportNumber };
 }
 function decodeLine(value) {
     try {
@@ -4973,7 +5050,7 @@ async function commitEdit(el) {
     if (!ref) {
         return;
     }
-    const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber);
+    const row = findRow(VIEW.statement.rows, ref.sheetRow, ref.transportNumber, ref.sheetName);
     if (!row) {
         return;
     }
@@ -4986,7 +5063,7 @@ async function commitEdit(el) {
             return;
         }
         await writeNow("Zapisuję liczbę worków…", built.body, () => {
-            VIEW.statement = commitBags(VIEW.statement, ref.sheetRow, ref.transportNumber, built.bagCount);
+            VIEW.statement = commitBags(VIEW.statement, ref.sheetRow, ref.transportNumber, built.bagCount, ref.sheetName);
             VIEW.status = "";
         });
         return;
@@ -5020,10 +5097,10 @@ async function commitEdit(el) {
         VIEW.statement = setRouteBagRate(VIEW.statement, routeName, amount);
     }
     else if (edit === "bag-rate") {
-        VIEW.statement = setBagRate(VIEW.statement, ref.sheetRow, ref.transportNumber, amount);
+        VIEW.statement = setBagRate(VIEW.statement, ref.sheetRow, ref.transportNumber, amount, ref.sheetName);
     }
     else if (edit === "pickup") {
-        VIEW.statement = setPickup(VIEW.statement, ref.sheetRow, ref.transportNumber, amount);
+        VIEW.statement = setPickup(VIEW.statement, ref.sheetRow, ref.transportNumber, amount, ref.sheetName);
     }
     VIEW.status = "";
     paint();
@@ -5054,7 +5131,7 @@ async function runApprove() {
                 VIEW.status = STATEMENT_ERROR.refresh;
             }
             else {
-                VIEW.status = STATEMENT_ERROR.partial;
+                VIEW.status = formatPartialApprove(result);
             }
         }
         else {

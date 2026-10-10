@@ -88,7 +88,7 @@ const open = { podwykonawca: "gpw", dataOd: "01.09.2026", dataDo: "30.09.2026" }
 
 describe("buildSettlementRead_", () => {
   it("test_buildSettlementRead_settled_tak_excluded", () => {
-    const result = read(open, [entry(4, { 13: "tak" }), entry(5, { 0: "16" })], []);
+    const result = read(open, [entry(4, { 14: "tak" }), entry(5, { 0: "16" })], []);
     expect(result).toMatchObject({ ok: true });
     if (!result.ok) {
       return;
@@ -99,7 +99,7 @@ describe("buildSettlementRead_", () => {
   it("test_buildSettlementRead_transport_nie_excluded", () => {
     const result = read(
       open,
-      [entry(4, { 17: "nie" }), entry(6, { 17: "NIE" }), entry(7, { 17: "tak" })],
+      [entry(4, { 9: "nie" }), entry(6, { 9: "NIE" }), entry(7, { 9: "tak" })],
       [],
     );
     expect(result.ok).toBe(true);
@@ -110,7 +110,7 @@ describe("buildSettlementRead_", () => {
   });
 
   it("test_buildSettlementRead_other_than_tak_stays", () => {
-    const result = read(open, [entry(3, { 13: "nie" }), entry(4, { 13: " TAK " })], []);
+    const result = read(open, [entry(3, { 14: "nie" }), entry(4, { 14: " TAK " })], []);
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -232,8 +232,8 @@ describe("buildSettlementRead_", () => {
     const result = read(
       open,
       [
-        entry(2, { 8: 0, 9: "trasa-1", 10: 0, 11: 20, 12: "10,5" }),
-        entry(3, { 8: "", 10: "", 11: "", 12: "" }),
+        entry(2, { 8: 0, 10: "trasa-1", 11: 0, 12: 20, 13: "10,5" }),
+        entry(3, { 8: "", 11: "", 12: "", 13: "" }),
       ],
       [
         { sheetRow: 2, cells: ["Sklepowa 1", "gpw", 20, "10,5", ""] },
@@ -321,7 +321,7 @@ describe("buildSettlementRead_", () => {
   });
 
   it("test_buildSettlementRead_rows_feed_engine", () => {
-    const result = read({ podwykonawca: "gpw", dataDo: "30.09.2026" }, [entry(2, { 8: 1, 11: 20, 12: 10 })], [
+    const result = read({ podwykonawca: "gpw", dataDo: "30.09.2026" }, [entry(2, { 8: 1, 12: 20, 13: 10 })], [
       { sheetRow: 2, cells: ["Sklepowa 1", "gpw", 20, 10, ""] },
     ]);
     expect(result.ok).toBe(true);

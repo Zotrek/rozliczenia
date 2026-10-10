@@ -38,6 +38,7 @@ import {
   setPickup,
   setRouteBagRate,
   skippedCount,
+  formatPartialApprove,
   statementSums,
   tieBody,
   toggleOpen,
@@ -49,6 +50,7 @@ import {
 
 function row(over: Partial<RegisterRow> & { sheetRow: number }): RegisterRow {
   return {
+    sheetName: "",
     transportNumber: String(over.sheetRow),
     address: "Sklepowa 1",
     shopName: "Sklep",
@@ -121,7 +123,7 @@ describe("screen edits", () => {
     const base = screen([row({ sheetRow: 2, bagCount: 2, bagRate: 1_000 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]);
     const next = setBagRate(setPickup(base, 2, "2", 5_000), 2, "2", 250);
     expect(next.rows).toEqual(base.rows);
-    expect(next.screenByRow["2\t2"]).toEqual({ pickupAmount: 5_000, bagAmount: 250 });
+    expect(next.screenByRow["\t2\t2"]).toEqual({ pickupAmount: 5_000, bagAmount: 250 });
     expect(JSON.stringify(next)).not.toContain("saveRate");
   });
 
@@ -168,6 +170,7 @@ describe("writes", () => {
       expect(built.bagCount).toBe(6);
       expect(built.body).toEqual({
         action: "patchBags",
+        sheetName: "",
         sheetRow: 4,
         transportNumber: "P4",
         iloscWorkow: 6,
@@ -218,7 +221,7 @@ describe("writes", () => {
     );
     expect(next?.rows[0].routeName).toBe("");
     expect(next?.rows[0].routeRate).toBeNull();
-    expect(next?.leftRoute["2\t2"]).toBe("stara");
+    expect(next?.leftRoute["\t2\t2"]).toBe("stara");
   });
 });
 
@@ -226,9 +229,9 @@ describe("buildApprove", () => {
   it("test_buildApprove_needs_invoice_and_selection", () => {
     const base = screen([row({ sheetRow: 2 })], [rate({ sheetRow: 2, shop: "Sklepowa 1" })]);
     const statement = currentStatement(base);
-    expect(buildApprove("  ", statement, { "2\t2": true }).ok).toBe(false);
+    expect(buildApprove("  ", statement, { "\t2\t2": true }).ok).toBe(false);
     expect(buildApprove("FV/1", statement, {})).toEqual({ ok: false, error: "selection" });
-    const built = buildApprove(" FV/1 ", statement, { "2\t2": true });
+    const built = buildApprove(" FV/1 ", statement, { "\t2\t2": true });
     expect(built.ok).toBe(true);
     if (built.ok) {
       expect(built.body.numerFaktury).toBe("FV/1");
@@ -236,7 +239,7 @@ describe("buildApprove", () => {
       expect(built.body.wiersze[0].koszt).toBe(2_000);
       expect(built.body).not.toHaveProperty("tryb");
     }
-    const schedule = buildApprove("FV/1", statement, { "2\t2": true }, "schedule");
+    const schedule = buildApprove("FV/1", statement, { "\t2\t2": true }, "schedule");
     expect(schedule.ok).toBe(true);
     if (schedule.ok) {
       expect(schedule.body.tryb).toBe("harmonogram");
@@ -264,7 +267,7 @@ describe("buildApprove", () => {
       }),
     ];
     const statement = currentStatement(screen(rows, []));
-    const both = buildApprove("FV/1", statement, { "2\t2": true, [routeSelectionKey("trasa")]: true });
+    const both = buildApprove("FV/1", statement, { "\t2\t2": true, [routeSelectionKey("trasa")]: true });
     expect(both.ok).toBe(true);
     if (both.ok) {
       expect(both.body.wiersze.map((item) => item.sheetRow).sort()).toEqual([2, 3, 4]);
@@ -278,11 +281,11 @@ describe("buildApprove", () => {
       "2",
       true,
     );
-    const built = buildApprove("FV/9", currentStatement(next), { "2\t2": true });
+    const built = buildApprove("FV/9", currentStatement(next), { "\t2\t2": true });
     expect(built.ok).toBe(true);
     if (built.ok) {
       expect(built.body.wiersze).toEqual([
-        { sheetRow: 2, transportNumber: "2", nieOdbył: true },
+        { sheetName: "", sheetRow: 2, transportNumber: "2", nieOdbył: true },
       ]);
     }
   });
@@ -301,8 +304,8 @@ describe("adoptRows", () => {
     );
     const next = adoptRows(prev, [row({ sheetRow: 2, address: "Zostaje" })], []);
     expect(next.rows.map((item) => item.sheetRow)).toEqual([2]);
-    expect(next.screenByRow["2\t2"]?.bagsOnly).toBe(true);
-    expect(next.screenByRow["3\t3"]).toBeUndefined();
+    expect(next.screenByRow["\t2\t2"]?.bagsOnly).toBe(true);
+    expect(next.screenByRow["\t3\t3"]).toBeUndefined();
   });
 });
 
@@ -356,10 +359,10 @@ describe("labels and parsers", () => {
 describe("selection and open routes", () => {
   it("test_toggleSelected_and_selectedKeys", () => {
     const base = screen([row({ sheetRow: 2 })]);
-    const on = toggleSelected(base, "2\t2");
-    expect(selectedKeys(on.selected).has("2\t2")).toBe(true);
-    const off = toggleSelected(on, "2\t2");
-    expect(off.selected["2\t2"]).toBeUndefined();
+    const on = toggleSelected(base, "\t2\t2");
+    expect(selectedKeys(on.selected).has("\t2\t2")).toBe(true);
+    const off = toggleSelected(on, "\t2\t2");
+    expect(off.selected["\t2\t2"]).toBeUndefined();
   });
 
   it("test_toggleOpen_and_selectedLineCount", () => {
@@ -393,8 +396,8 @@ describe("route edits and commits", () => {
       true,
     );
     const next = setRouteBagRate(base, "trasa", 250);
-    expect(next.screenByRow["2\t2"]?.bagAmount).toBeUndefined();
-    expect(next.screenByRow["3\t3"]?.bagAmount).toBe(250);
+    expect(next.screenByRow["\t2\t2"]?.bagAmount).toBeUndefined();
+    expect(next.screenByRow["\t3\t3"]?.bagAmount).toBe(250);
   });
 
   it("test_commitBags_and_commitRouteRate_update_rows", () => {
@@ -412,17 +415,17 @@ describe("route edits and commits", () => {
   it("test_commitAttach_propagates_rate_and_clears_draft", () => {
     const base = {
       ...screen([row({ sheetRow: 2, routeName: "" }), row({ sheetRow: 3, routeName: "nowa", routeRate: 1_000 })]),
-      leftRoute: { "2\t2": "stara" },
-      routeDraft: { "2\t2": { name: "nowa", rate: "50" } },
-      routeDraftError: { "2\t2": "x" },
+      leftRoute: { "\t2\t2": "stara" },
+      routeDraft: { "\t2\t2": { name: "nowa", rate: "50" } },
+      routeDraftError: { "\t2\t2": "x" },
     };
     const next = commitAttach(base, 2, "2", "nowa", 5_000);
     expect(next?.rows[0].routeName).toBe("nowa");
     expect(next?.rows[0].routeRate).toBe(5_000);
     expect(next?.rows[1].routeRate).toBe(5_000);
-    expect(next?.leftRoute["2\t2"]).toBeUndefined();
-    expect(next?.routeDraft["2\t2"]).toBeUndefined();
-    expect(next?.routeDraftError["2\t2"]).toBeUndefined();
+    expect(next?.leftRoute["\t2\t2"]).toBeUndefined();
+    expect(next?.routeDraft["\t2\t2"]).toBeUndefined();
+    expect(next?.routeDraftError["\t2\t2"]).toBeUndefined();
   });
 
   it("test_findRow_detachBody_tieBody_withoutTiedRates", () => {
@@ -431,6 +434,7 @@ describe("route edits and commits", () => {
     expect(findRow(rows, 2, "x")).toBeNull();
     expect(detachBody(rows[0])).toEqual({
       action: "detachRoute",
+      sheetName: "",
       sheetRow: 2,
       transportNumber: "P2",
     });
@@ -447,10 +451,23 @@ describe("route edits and commits", () => {
     const base = screen([row({ sheetRow: 2, bagCount: 1, bagRate: 1_000 })], [
       rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 }),
     ]);
-    const selected = toggleSelected(base, "2\t2");
+    const selected = toggleSelected(base, "\t2\t2");
     expect(statementSums(selected)).toEqual({ total: 3_000, selected: 3_000 });
     expect(skippedCount({ pominiete: [1, 2] })).toBe(2);
     expect(skippedCount({})).toBe(0);
+    expect(formatPartialApprove({
+      pominiete: [
+        { sheetRow: 2, transportNumber: "99", reason: "key" },
+        { sheetRow: 4, transportNumber: "17", reason: "settled" },
+      ],
+      zapisane: [{ sheetRow: 5, transportNumber: "18" }],
+    })).toBe(
+      "Część wierszy nie weszła w zapis.\n" +
+        "Zapisano: 1.\n" +
+        "Pominięto (2):\n" +
+        "• Transport 99 (wiersz 2) — wiersz się zmienił\n" +
+        "• Transport 17 (wiersz 4) — już rozliczony",
+    );
     expect(writeError("bags")).toBe(STATEMENT_ERROR.badBags);
     expect(writeError("key")).toBe(STATEMENT_ERROR.stale);
     expect(writeError("settled")).toBe(STATEMENT_ERROR.stale);
@@ -521,7 +538,7 @@ describe("route edits and commits", () => {
       true,
     );
     const statement = currentStatement(base);
-    const built = buildApprove("FV/1", statement, { "2\t2": true });
+    const built = buildApprove("FV/1", statement, { "\t2\t2": true });
     expect(built.ok).toBe(true);
     if (built.ok) {
       expect(built.body.wiersze[0]).toMatchObject({ tylkoWorki: true, koszt: 1_000 });
@@ -544,7 +561,7 @@ describe("route edits and commits", () => {
         },
       ],
     };
-    expect(buildApprove("FV/1", tied, { "2\t2": true })).toEqual({ ok: false, error: "tie" });
+    expect(buildApprove("FV/1", tied, { "\t2\t2": true })).toEqual({ ok: false, error: "tie" });
   });
 
   it("test_parseAmountText_rejects_empty_frac_and_double_dot", () => {

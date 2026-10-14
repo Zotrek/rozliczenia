@@ -69,6 +69,7 @@ ${css}
   </style>
 </head>
 <body>
+  <div id="roz-error-stack" class="roz-error-stack" aria-live="polite" hidden></div>
   <div id="app"></div>
   <script>
 ${webAppBootstrap(process.env.TRANSPORT_WEBAPP_URL)}

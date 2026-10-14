@@ -785,3 +785,57 @@ td input[type="text"]:focus { border-color: var(--teal); background: #fff; outli
   min-width: 4.5rem;
   text-align: center;
 }
+.roz-error-stack {
+  position: fixed;
+  z-index: 32000;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.roz-error-stack[hidden] { display: none !important; }
+.roz-error-card {
+  pointer-events: auto;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(176, 42, 55, 0.4);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+  color: #1e293b;
+  text-align: left;
+}
+.roz-error-card-title { margin: 0 0 6px; font-size: 14px; font-weight: 700; line-height: 1.35; color: #b02a37; }
+.roz-error-card-effect { margin: 0 0 6px; font-size: 13.5px; font-weight: 500; line-height: 1.45; color: #1e293b; }
+.roz-error-card-continue { margin: 0 0 10px; font-size: 13.5px; font-weight: 600; line-height: 1.45; color: #1e293b; }
+.roz-error-card-label { display: block; margin: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; color: #64748b; }
+.roz-error-card-report {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  min-height: 7.2em;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: #f8fafc;
+  color: #334155;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  resize: vertical;
+}
+.roz-error-card-actions { display: flex; justify-content: space-between; gap: 8px; }
+.roz-error-card-actions button {
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.roz-error-card-copy { border: 1px solid rgba(15, 118, 110, 0.45); background: #fff; color: #0f766e; }
+.roz-error-card-dismiss { border: 1px solid rgba(176, 42, 55, 0.35); background: #fff; color: #b02a37; }

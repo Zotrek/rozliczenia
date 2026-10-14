@@ -126,7 +126,35 @@ describe("buildPage bundle", () => {
     expect(html).toContain("function renderStatsScreen");
     expect(html).toContain("function renderStatement");
     expect(html).toContain("function renderApp");
+    expect(html).toContain('id="roz-error-stack"');
+    expect(html).toContain("function showRozErrorCard");
+    expect(html).toContain("ROZ-E-AUTH-MISMATCH");
     expect(html).not.toMatch(/\bimport\s/);
     expect(html).not.toMatch(/\bexport\s/);
+  });
+});
+
+describe("error cards", () => {
+  it("test_page_operational_failures_keep_a_copyable_card", () => {
+    for (const code of [
+      "ROZ-E-CONTRACTORS",
+      "ROZ-E-SEARCH",
+      "ROZ-E-ADDRESSES",
+      "ROZ-E-RATE-SAVE",
+      "ROZ-E-WRITE",
+      "ROZ-E-APPROVE",
+      "ROZ-E-APPROVE-PARTIAL",
+      "ROZ-E-REFRESH",
+      "ROZ-E-STATS",
+      "ROZ-E-WEBAPP",
+      "ROZ-E-STORAGE",
+    ]) {
+      expect(pageSource).toContain(code);
+    }
+    const edit = functionBody("commitEdit");
+    const approveAt = edit.indexOf("async function runApprove");
+    const editOnly = approveAt < 0 ? edit : edit.slice(0, approveAt);
+    expect(editOnly).not.toContain("reportFailure(");
+    expect(functionBody("runApprove")).toContain("STATEMENT_ERROR[built.error]");
   });
 });

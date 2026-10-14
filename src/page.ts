@@ -68,6 +68,7 @@ import {
   writeStatsFold,
 } from "./statsView.js";
 import type { CalendarDate } from "./sheetDate.js";
+import { readRozJson, showRozFailure } from "./rozErrorReport.js";
 
 const STATS_SECTION_IDS = ["pickups", "bags", "costs", "q", "contractors", "empty-bags", "gaps"] as const;
 
@@ -118,6 +119,53 @@ const VIEW: RangeViewModel = {
 let heldFrom = "";
 let webapp = "";
 
+function faultText(value: unknown): string {
+  if (value instanceof Error && value.message !== "") {
+    return value.message;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    return value.trim();
+  }
+  if (value == null || value === "") {
+    return "brak szczegółu";
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function reportFailure(
+  code: string,
+  place: string,
+  summary: string,
+  effect: string,
+  detail: { technical?: unknown; notJson?: boolean; error?: unknown },
+): void {
+  showRozFailure(
+    { code, place, summary, effect },
+    {
+      technical: faultText(detail.technical ?? detail.error),
+      notJson: detail.notJson === true,
+      error: detail.error,
+    },
+  );
+}
+
+function reportMissingWebApp(place: string): void {
+  if (typeof document !== "undefined" && document.querySelector('[data-roz-code="ROZ-E-WEBAPP"]')) {
+    return;
+  }
+  reportFailure(
+    "ROZ-E-WEBAPP",
+    place,
+    "Brak adresu Web App.",
+    "Bez adresu lista, wyszukanie, stawki i statystyki nie dojdą. Dopisz ?webapp= do adresu tej strony albo ustaw adres przy buildzie.",
+    { technical: "webapp empty" },
+  );
+}
+
 function fieldByKeep(root: ParentNode, keep: string): HTMLInputElement | null {
   return (root.querySelector(`[data-keep="${keep}"]`) ??
     root.querySelector(`[data-filter="${keep}"]`)) as HTMLInputElement | null;
@@ -151,13 +199,31 @@ function builtWebAppUrl(): string {
 }
 
 function boot(): void {
-  const read = readWebAppUrl(
-    location.search,
-    localStorage.getItem("rozliczenia.webapp"),
-    builtWebAppUrl(),
-  );
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem("rozliczenia.webapp");
+  } catch (err) {
+    reportFailure(
+      "ROZ-E-STORAGE",
+      "page.ts boot",
+      "Nie udało się odczytać zapisanego adresu Web App.",
+      "Strona użyje adresu z buildu albo z ?webapp=. Adres z poprzedniej wizyty nie wszedł.",
+      { technical: err },
+    );
+  }
+  const read = readWebAppUrl(location.search, stored, builtWebAppUrl());
   if (read.persist) {
-    localStorage.setItem("rozliczenia.webapp", read.persist);
+    try {
+      localStorage.setItem("rozliczenia.webapp", read.persist);
+    } catch (err) {
+      reportFailure(
+        "ROZ-E-STORAGE",
+        "page.ts boot",
+        "Nie udało się zapamiętać adresu Web App.",
+        "Adres działa w tej wizycie. Po odświeżeniu trzeba podać go jeszcze raz.",
+        { technical: err },
+      );
+    }
   }
   webapp = read.url;
   VIEW.webappMissing = webapp === "";
@@ -173,9 +239,11 @@ function boot(): void {
   root.addEventListener("mousedown", onMouseDown);
   root.addEventListener("keydown", onKeyDown);
   paint();
-  if (webapp !== "") {
-    void loadContractors();
+  if (webapp === "") {
+    reportMissingWebApp("page.ts boot");
+    return;
   }
+  void loadContractors();
 }
 
 async function loadContractors(): Promise<void> {
@@ -185,20 +253,50 @@ async function loadContractors(): Promise<void> {
   paint();
   try {
     const response = await fetch(webAppUrl(webapp, { action: "listContractors" }));
-    const body = (await response.json()) as {
+    const parsed = await readRozJson(response);
+    if (!parsed.ok) {
+      VIEW.contractors = [];
+      if (!parsed.silent) {
+        VIEW.status = "Nie udało się wczytać listy podwykonawców.";
+        reportFailure(
+          "ROZ-E-CONTRACTORS",
+          "page.ts loadContractors",
+          "Nie udało się wczytać listy podwykonawców.",
+          "Lista jest pusta. Bez niej nie wybierzesz podwykonawcy.",
+          parsed,
+        );
+      }
+      return;
+    }
+    const body = parsed.body as {
       ok?: boolean;
       data?: ContractorListItem[];
+      error?: unknown;
     };
     if (!body.ok || !Array.isArray(body.data)) {
       VIEW.contractors = [];
       VIEW.status = "Nie udało się wczytać listy podwykonawców.";
+      reportFailure(
+        "ROZ-E-CONTRACTORS",
+        "page.ts loadContractors",
+        "Nie udało się wczytać listy podwykonawców.",
+        "Lista jest pusta. Bez niej nie wybierzesz podwykonawcy.",
+        { error: body.error, technical: body.error ?? "ok: false" },
+      );
     } else {
       VIEW.contractors = body.data;
       VIEW.status = "";
     }
-  } catch {
+  } catch (err) {
     VIEW.contractors = [];
     VIEW.status = "Nie udało się wczytać listy podwykonawców.";
+    reportFailure(
+      "ROZ-E-CONTRACTORS",
+      "page.ts loadContractors",
+      "Nie udało się wczytać listy podwykonawców.",
+      "Lista jest pusta. Bez niej nie wybierzesz podwykonawcy.",
+      { technical: err },
+    );
   } finally {
     VIEW.loading = false;
     paint();
@@ -224,6 +322,7 @@ async function runSearch(): Promise<void> {
   }
   if (webapp === "") {
     VIEW.webappMissing = true;
+    reportMissingWebApp("page.ts runSearch");
     paint();
     return;
   }
@@ -234,9 +333,30 @@ async function runSearch(): Promise<void> {
   paint();
   try {
     const response = await fetch(webAppUrl(webapp, searchParams(started)));
-    const read = readSettlement(await response.json());
+    const parsed = await readRozJson(response);
+    if (!parsed.ok) {
+      if (!parsed.silent) {
+        VIEW.status = "Wyszukanie nie doszło.";
+        reportFailure(
+          "ROZ-E-SEARCH",
+          "page.ts runSearch",
+          "Wyszukanie nie doszło.",
+          "Zestawienie się nie zmieniło. Możesz poprawić zakres i szukać jeszcze raz.",
+          parsed,
+        );
+      }
+      return;
+    }
+    const read = readSettlement(parsed.body);
     if (!read.ok) {
       VIEW.status = read.error;
+      reportFailure(
+        "ROZ-E-SEARCH",
+        "page.ts runSearch",
+        "Wyszukanie nie doszło.",
+        "Zestawienie się nie zmieniło. Możesz poprawić zakres i szukać jeszcze raz.",
+        { technical: read.error },
+      );
       return;
     }
     VIEW.applied = started;
@@ -244,8 +364,15 @@ async function runSearch(): Promise<void> {
     VIEW.statement = freshStatement(read.rows, read.rates);
     VIEW.status = "";
     VIEW.ratesOpen = false;
-  } catch {
+  } catch (err) {
     VIEW.status = "Wyszukanie nie doszło.";
+    reportFailure(
+      "ROZ-E-SEARCH",
+      "page.ts runSearch",
+      "Wyszukanie nie doszło.",
+      "Zestawienie się nie zmieniło. Możesz poprawić zakres i szukać jeszcze raz.",
+      { technical: err },
+    );
   } finally {
     VIEW.loading = false;
     paint();
@@ -386,9 +513,18 @@ function onClick(event: MouseEvent): void {
     }
     void writeNow("Rozstrzygam remis stawek…", tieBody(rateRow), async () => {
       const refreshed = await reloadStatement();
-      if (!refreshed) {
+      if (!refreshed.ok) {
         VIEW.statement = { ...VIEW.statement, rates: withoutTiedRates(VIEW.statement.rates, rateRow) };
         VIEW.status = STATEMENT_ERROR.refresh;
+        if (!refreshed.silent) {
+          reportFailure(
+            "ROZ-E-REFRESH",
+            "page.ts resolve-tie",
+            STATEMENT_ERROR.refresh,
+            "Remis mógł już zniknąć z arkusza. Lista na ekranie może być nieaktualna — szukaj jeszcze raz.",
+            refreshed,
+          );
+        }
         return;
       }
       VIEW.status = "";
@@ -921,6 +1057,9 @@ async function openRates(): Promise<void> {
   VIEW.ratesMessage = "";
   VIEW.ratesMessageOk = false;
   if (webapp === "") {
+    VIEW.ratesMessage = "Brak adresu Web App.";
+    VIEW.ratesMessageOk = false;
+    reportMissingWebApp("page.ts openRates");
     paint();
     return;
   }
@@ -930,38 +1069,90 @@ async function openRates(): Promise<void> {
   paint();
   try {
     const response = await fetch(webAppUrl(webapp, { action: "listStoreAddresses" }));
-    const read = readAddressList(await response.json());
-    if (!read.ok) {
+    const parsed = await readRozJson(response);
+    if (!parsed.ok) {
       VIEW.addresses = [];
       VIEW.ratesShop = "";
       VIEW.ratesShopQuery = "";
-      VIEW.ratesMessage = rateSaveMessage("addresses");
+      if (!parsed.silent) {
+        VIEW.ratesMessage = rateSaveMessage("addresses");
+        reportFailure(
+          "ROZ-E-ADDRESSES",
+          "page.ts openRates",
+          "Nie udało się wczytać adresów.",
+          "Okno stawek jest bez listy sklepów. Zapis stawki poczeka na adresy.",
+          parsed,
+        );
+      }
     } else {
-      VIEW.addresses = read.addresses;
-      const current = read.addresses.find((item) => item.address === VIEW.ratesShop);
-      if (!current) {
+      const read = readAddressList(parsed.body);
+      if (!read.ok) {
+        VIEW.addresses = [];
         VIEW.ratesShop = "";
         VIEW.ratesShopQuery = "";
+        VIEW.ratesMessage = rateSaveMessage("addresses");
+        reportFailure(
+          "ROZ-E-ADDRESSES",
+          "page.ts openRates",
+          "Nie udało się wczytać adresów.",
+          "Okno stawek jest bez listy sklepów. Zapis stawki poczeka na adresy.",
+          { technical: "ok: false" },
+        );
       } else {
-        VIEW.ratesShopQuery = storeAddressLabel(current);
+        VIEW.addresses = read.addresses;
+        const current = read.addresses.find((item) => item.address === VIEW.ratesShop);
+        if (!current) {
+          VIEW.ratesShop = "";
+          VIEW.ratesShopQuery = "";
+        } else {
+          VIEW.ratesShopQuery = storeAddressLabel(current);
+        }
       }
     }
     if (VIEW.contractors.length === 0) {
       const listed = await fetch(webAppUrl(webapp, { action: "listContractors" }));
-      const body = (await listed.json()) as { ok?: boolean; data?: ContractorListItem[] };
-      if (body.ok && Array.isArray(body.data)) {
-        VIEW.contractors = body.data;
+      const listedParsed = await readRozJson(listed);
+      if (!listedParsed.ok) {
+        if (!listedParsed.silent) {
+          reportFailure(
+            "ROZ-E-CONTRACTORS",
+            "page.ts openRates",
+            "Nie udało się wczytać listy podwykonawców.",
+            "Lista w oknie stawek zostaje pusta.",
+            listedParsed,
+          );
+        }
+      } else {
+        const body = listedParsed.body as { ok?: boolean; data?: ContractorListItem[]; error?: unknown };
+        if (body.ok && Array.isArray(body.data)) {
+          VIEW.contractors = body.data;
+        } else {
+          reportFailure(
+            "ROZ-E-CONTRACTORS",
+            "page.ts openRates",
+            "Nie udało się wczytać listy podwykonawców.",
+            "Lista w oknie stawek zostaje pusta.",
+            { error: body.error, technical: body.error ?? "ok: false" },
+          );
+        }
       }
     }
     if (!rateContractorNames(VIEW.contractors).includes(VIEW.ratesContractor)) {
       VIEW.ratesContractor = "";
       VIEW.ratesContractorQuery = "";
     }
-  } catch {
+  } catch (err) {
     VIEW.addresses = [];
     VIEW.ratesShop = "";
     VIEW.ratesShopQuery = "";
     VIEW.ratesMessage = rateSaveMessage("addresses");
+    reportFailure(
+      "ROZ-E-ADDRESSES",
+      "page.ts openRates",
+      "Nie udało się wczytać adresów.",
+      "Okno stawek jest bez listy sklepów. Zapis stawki poczeka na adresy.",
+      { technical: err },
+    );
   } finally {
     VIEW.loading = false;
     paint();
@@ -990,6 +1181,7 @@ async function saveRates(): Promise<void> {
   if (webapp === "") {
     VIEW.ratesMessage = "Brak adresu Web App.";
     VIEW.ratesMessageOk = false;
+    reportMissingWebApp("page.ts saveRates");
     paint();
     return;
   }
@@ -999,9 +1191,19 @@ async function saveRates(): Promise<void> {
   paint();
   try {
     const result = await postSheet(built.body);
+    if (result.error === "unauthorized") {
+      return;
+    }
     if (result.ok !== true) {
       VIEW.ratesMessage = rateSaveMessage(result.error);
       VIEW.ratesMessageOk = false;
+      reportFailure(
+        "ROZ-E-RATE-SAVE",
+        "page.ts saveRates",
+        rateSaveMessage(result.error),
+        "Stawka nie weszła do bazy. Poprzednie stawki zostają.",
+        { error: result.error, technical: result.technical ?? result.error, notJson: result.notJson === true },
+      );
       return;
     }
     VIEW.ratesPickup = "";
@@ -1013,26 +1215,64 @@ async function saveRates(): Promise<void> {
     VIEW.ratesMessageOk = true;
     if (VIEW.screen === "statement") {
       const refreshed = await reloadStatement();
-      if (!refreshed) {
+      if (!refreshed.ok) {
         VIEW.status = STATEMENT_ERROR.refresh;
+        if (!refreshed.silent) {
+          reportFailure(
+            "ROZ-E-REFRESH",
+            "page.ts saveRates",
+            STATEMENT_ERROR.refresh,
+            "Stawka jest zapisana. Lista odbiorów na ekranie może być nieaktualna — szukaj jeszcze raz.",
+            refreshed,
+          );
+        }
       }
     }
-  } catch {
+  } catch (err) {
     VIEW.ratesMessage = rateSaveMessage("write");
     VIEW.ratesMessageOk = false;
+    reportFailure(
+      "ROZ-E-RATE-SAVE",
+      "page.ts saveRates",
+      rateSaveMessage("write"),
+      "Stawka nie weszła do bazy. Poprzednie stawki zostają.",
+      { technical: err },
+    );
   } finally {
     VIEW.loading = false;
     paint();
   }
 }
 
-async function postSheet(body: Record<string, unknown>): Promise<{ ok?: boolean; error?: unknown; pominiete?: unknown }> {
+async function postSheet(body: Record<string, unknown>): Promise<{
+  ok?: boolean;
+  error?: unknown;
+  pominiete?: unknown;
+  zapisane?: unknown;
+  notJson?: boolean;
+  technical?: string;
+}> {
   const response = await fetch(webapp, {
     method: "POST",
     headers: { "Content-Type": "text/plain" },
     body: JSON.stringify(body),
   });
-  return (await response.json()) as { ok?: boolean; error?: unknown; pominiete?: unknown };
+  const parsed = await readRozJson(response);
+  if (!parsed.ok) {
+    if (parsed.silent) {
+      return { ok: false, error: "unauthorized" };
+    }
+    return { ok: false, error: "not_json", notJson: true, technical: parsed.technical };
+  }
+  if (!parsed.body || typeof parsed.body !== "object") {
+    return { ok: false, error: "not_json", notJson: true, technical: "pusta odpowiedź" };
+  }
+  return parsed.body as {
+    ok?: boolean;
+    error?: unknown;
+    pominiete?: unknown;
+    zapisane?: unknown;
+  };
 }
 
 async function writeNow(
@@ -1042,6 +1282,7 @@ async function writeNow(
 ): Promise<void> {
   if (webapp === "") {
     VIEW.status = "Brak adresu Web App.";
+    reportMissingWebApp("page.ts writeNow");
     paint();
     return;
   }
@@ -1051,13 +1292,34 @@ async function writeNow(
   paint();
   try {
     const result = await postSheet(body);
+    if (result.error === "unauthorized") {
+      return;
+    }
     if (result.ok !== true) {
       VIEW.status = writeError(result.error);
+      reportFailure(
+        "ROZ-E-WRITE",
+        "page.ts writeNow",
+        writeError(result.error),
+        "Ten zapis nie wszedł do arkusza. Reszta zestawienia zostaje.",
+        {
+          error: result.error,
+          technical: `${String(body.action ?? "zapis")}: ${faultText(result.technical ?? result.error)}`,
+          notJson: result.notJson === true,
+        },
+      );
       return;
     }
     await apply();
-  } catch {
+  } catch (err) {
     VIEW.status = STATEMENT_ERROR.write;
+    reportFailure(
+      "ROZ-E-WRITE",
+      "page.ts writeNow",
+      STATEMENT_ERROR.write,
+      "Ten zapis nie wszedł do arkusza. Reszta zestawienia zostaje.",
+      { technical: `${String(body.action ?? "zapis")}: ${faultText(err)}` },
+    );
   } finally {
     VIEW.loading = false;
     VIEW.loadKind = "logo";
@@ -1065,17 +1327,30 @@ async function writeNow(
   }
 }
 
-async function reloadStatement(): Promise<boolean> {
+async function reloadStatement(): Promise<
+  { ok: true } | { ok: false; silent: true } | { ok: false; silent: false; notJson: boolean; technical: string }
+> {
   if (!VIEW.applied || webapp === "") {
-    return false;
+    return { ok: false, silent: false, notJson: false, technical: "brak zakresu albo adresu Web App" };
   }
-  const response = await fetch(webAppUrl(webapp, searchParams(VIEW.applied)));
-  const read = readSettlement(await response.json());
-  if (!read.ok) {
-    return false;
+  try {
+    const response = await fetch(webAppUrl(webapp, searchParams(VIEW.applied)));
+    const parsed = await readRozJson(response);
+    if (!parsed.ok) {
+      if (parsed.silent) {
+        return { ok: false, silent: true };
+      }
+      return { ok: false, silent: false, notJson: true, technical: parsed.technical };
+    }
+    const read = readSettlement(parsed.body);
+    if (!read.ok) {
+      return { ok: false, silent: false, notJson: false, technical: read.error };
+    }
+    VIEW.statement = adoptRows(VIEW.statement, read.rows, read.rates);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, silent: false, notJson: false, technical: faultText(err) };
   }
-  VIEW.statement = adoptRows(VIEW.statement, read.rows, read.rates);
-  return true;
 }
 
 async function commitEdit(el: HTMLInputElement): Promise<void> {
@@ -1172,22 +1447,56 @@ async function runApprove(): Promise<void> {
   paint();
   try {
     const result = await postSheet(built.body);
+    if (result.error === "unauthorized") {
+      return;
+    }
     if (result.ok !== true) {
       VIEW.status = writeError(result.error);
+      reportFailure(
+        "ROZ-E-APPROVE",
+        "page.ts runApprove",
+        writeError(result.error),
+        "Rozliczenie nie zostało zatwierdzone. Zaznaczenie i numer faktury zostają.",
+        { error: result.error, technical: result.technical ?? result.error, notJson: result.notJson === true },
+      );
     } else if (skippedCount(result) > 0) {
       const refreshed = await reloadStatement();
-      if (!refreshed) {
+      const partial = formatPartialApprove(result);
+      if (!refreshed.ok) {
         VIEW.status = STATEMENT_ERROR.refresh;
+        if (!refreshed.silent) {
+          reportFailure(
+            "ROZ-E-REFRESH",
+            "page.ts runApprove",
+            STATEMENT_ERROR.refresh,
+            "Część wierszy mogła już wejść. Lista na ekranie może być nieaktualna — szukaj jeszcze raz.",
+            { technical: `${refreshed.technical} | ${partial}`, notJson: refreshed.notJson },
+          );
+        }
       } else {
-        VIEW.status = formatPartialApprove(result);
+        VIEW.status = partial;
+        reportFailure(
+          "ROZ-E-APPROVE-PARTIAL",
+          "page.ts runApprove",
+          STATEMENT_ERROR.partial,
+          "Zapisane wiersze są rozliczone. Pominięte trzeba poprawić i zatwierdzić jeszcze raz.",
+          { technical: partial },
+        );
       }
     } else {
       VIEW.status = "";
       VIEW.screen = screenAfterApprove();
       VIEW.ratesOpen = false;
     }
-  } catch {
+  } catch (err) {
     VIEW.status = STATEMENT_ERROR.write;
+    reportFailure(
+      "ROZ-E-APPROVE",
+      "page.ts runApprove",
+      STATEMENT_ERROR.write,
+      "Rozliczenie nie zostało zatwierdzone. Zaznaczenie i numer faktury zostają.",
+      { technical: err },
+    );
   } finally {
     if (kind === "unicorn") {
       const left = UNICORN_HOLD_MS - (Date.now() - started);
@@ -1295,6 +1604,7 @@ function shiftStatsPage(pager: string, dir: string): void {
 async function runStats(): Promise<void> {
   if (webapp === "") {
     VIEW.stats = { ...VIEW.stats, status: "Brak adresu Web App. Dopisz ?webapp= do adresu tej strony." };
+    reportMissingWebApp("page.ts runStats");
     paint();
     return;
   }
@@ -1332,10 +1642,30 @@ async function runStats(): Promise<void> {
         }),
       ),
     );
-    const body: unknown = await response.json();
-    const parsed = readSettlementStats(body);
+    const loaded = await readRozJson(response);
+    if (!loaded.ok) {
+      if (!loaded.silent) {
+        VIEW.stats = { ...VIEW.stats, status: "Odczyt statystyk nie doszedł.", report: null };
+        reportFailure(
+          "ROZ-E-STATS",
+          "page.ts runStats",
+          "Odczyt statystyk nie doszedł.",
+          "Wykresy zostają puste albo przy poprzednim odczycie. Możesz zmienić okres i spróbować jeszcze raz.",
+          loaded,
+        );
+      }
+      return;
+    }
+    const parsed = readSettlementStats(loaded.body);
     if (!parsed.ok) {
       VIEW.stats = { ...VIEW.stats, status: parsed.error, report: null };
+      reportFailure(
+        "ROZ-E-STATS",
+        "page.ts runStats",
+        "Odczyt statystyk nie doszedł.",
+        "Wykresy zostają puste albo przy poprzednim odczycie. Możesz zmienić okres i spróbować jeszcze raz.",
+        { technical: parsed.error },
+      );
       return;
     }
     const report = buildStatsReport(parsed.rows, parsed.rates, {
@@ -1364,8 +1694,15 @@ async function runStats(): Promise<void> {
       pickupsPage: 1,
       tablesCollapsed: loadTablesCollapsed(storage, ["bags", "costs"], stacked),
     };
-  } catch {
+  } catch (err) {
     VIEW.stats = { ...VIEW.stats, status: "Odczyt statystyk nie doszedł.", report: null };
+    reportFailure(
+      "ROZ-E-STATS",
+      "page.ts runStats",
+      "Odczyt statystyk nie doszedł.",
+      "Wykresy zostają puste albo przy poprzednim odczycie. Możesz zmienić okres i spróbować jeszcze raz.",
+      { technical: err },
+    );
   } finally {
     VIEW.loading = false;
     paint();

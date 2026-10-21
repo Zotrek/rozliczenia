@@ -57,6 +57,39 @@ describe("renderStatement", () => {
     expect(html).toContain('<td><span class="tag">podjazd</span></td><td class="num"><input type="text" inputmode="decimal" data-edit="pickup"');
   });
 
+  it("test_renderStatement_plainPickup_sumaTrasy_showsFullFinalCost", () => {
+    const html = renderStatement(
+      screen(
+        [row({ sheetRow: 2, pickupRate: 2_000, bagCount: 2, bagRate: 500 })],
+        [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 500 })],
+      ),
+    );
+    const finalCost = formatPln(3_000);
+    const rowHtml = html.slice(html.indexOf('data-kind="plain"'), html.indexOf("</tr>", html.indexOf('data-kind="plain"')));
+    const cells = rowHtml.split('<td class="num">');
+    expect(cells.at(-2)).toContain(finalCost);
+    expect(cells.at(-1)).toContain(finalCost);
+    expect(cells.at(-1)).not.toContain(">—<");
+  });
+
+  it("test_renderStatement_bagsOnly_sumaTrasy_showsBagCostAsFinal", () => {
+    const html = renderStatement(
+      setBagsOnly(
+        screen(
+          [row({ sheetRow: 2, bagCount: 4, bagRate: 250 })],
+          [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 250 })],
+        ),
+        2,
+        "2",
+        true,
+      ),
+    );
+    const rowHtml = html.slice(html.indexOf('data-kind="plain"'), html.indexOf("</tr>", html.indexOf('data-kind="plain"')));
+    const cells = rowHtml.split('<td class="num">');
+    expect(cells.at(-1)).toContain(formatPln(1_000));
+    expect(cells.at(-1)).not.toContain(">—<");
+  });
+
   it("test_renderStatement_bagsOnly_under_shop_name_dash_in_leg", () => {
     const html = renderStatement(
       setBagsOnly(

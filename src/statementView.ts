@@ -97,7 +97,7 @@ function plainRow(screen: StatementScreen, shop: ShopCost): string {
     `<td class="num">${bagCell}</td>` +
     `<td class="num">${money(shop.bagSum, dead)}</td>` +
     `<td class="num">${money(shop.receptionCost, dead)}</td>` +
-    `<td class="num">${DASH}</td>` +
+    `<td class="num">${money(shop.receptionCost, dead)}</td>` +
     `<td>${tripBox(shop)}</td>` +
     "</tr>"
   );

@@ -926,7 +926,7 @@
         + '<td class="num">' + numInput(row.id, 'bagRate', row.bagRate, null, 'Zmiana kwoty za worek tylko na tym ekranie, nie w Bazie stawek') + '</td>'
         + '<td class="num">' + moneyOut(row.id + '-bagsum', eco.bagsSum, dead) + '</td>'
         + '<td class="num">' + moneyOut(row.id + '-cost', eco.cost, dead) + '</td>'
-        + '<td class="num">' + dash() + '</td>'
+        + '<td class="num">' + moneyOut(row.id + '-suma', eco.cost, dead) + '</td>'
         + '<td>' + tripBox(row.id, row.noTrip) + '</td>';
     }
 
@@ -1031,7 +1031,7 @@
           + cardMoney('Kwota za worek', numInput(row.id, 'bagRate', row.bagRate, null, 'Tylko ten ekran'))
           + cardMoney('Suma za worki', moneyOut(row.id + '-bagsum', bagsSum, dead))
           + cardMoney('Koszt odbioru', moneyOut(row.id + '-cost', cost, dead))
-          + cardMoney('Suma trasy', dash())
+          + cardMoney('Suma trasy', moneyOut(row.id + '-suma', cost, dead))
           + '</div></article>';
       }).join('') + '</div>';
     }
@@ -1079,6 +1079,7 @@
           const eco = shopEconomics(row);
           setOut(row.id + '-bagsum', pln(eco.bagsSum));
           setOut(row.id + '-cost', pln(eco.cost));
+          setOut(row.id + '-suma', pln(eco.cost));
         } else {
           const eco = routeEconomics(row);
           setOut(row.id + '-bags', String(eco.bagsCount));

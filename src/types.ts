@@ -93,7 +93,7 @@ export interface ShopCost {
   happened: boolean;
   bagsOnly: boolean;
   /**
-   * Kwota w Podjazd/Trasa.
+   * Kwota w kolumnie Kwota podjazdu/trasy.
    * null = „—” (tylko worki, albo remis przy odbiorze zwykłym).
    */
   legAmount: Grosze | null;

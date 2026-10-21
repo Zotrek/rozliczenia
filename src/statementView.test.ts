@@ -49,6 +49,14 @@ function screen(
 }
 
 describe("renderStatement", () => {
+  it("test_renderStatement_leg_amount_has_header_between_kind_and_bags", () => {
+    const html = renderStatement(screen([row({ sheetRow: 2, pickupRate: 14_000 })], [rate({ sheetRow: 2, shop: "Sklepowa 1" })]));
+    expect(html).toContain(
+      '<th>Podjazd/Trasa</th><th class="num">Kwota podjazdu/trasy</th><th class="num">Liczba worków</th>',
+    );
+    expect(html).toContain('<td><span class="tag">podjazd</span></td><td class="num"><input type="text" inputmode="decimal" data-edit="pickup"');
+  });
+
   it("test_renderStatement_bagsOnly_under_shop_name_dash_in_leg", () => {
     const html = renderStatement(
       setBagsOnly(

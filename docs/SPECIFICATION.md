@@ -101,13 +101,13 @@ Odepnij od trasy: sklep traci nazwę i stawkę tej trasy. Nie jest rozliczony. S
 
 **Koszt odbioru** to kwota jednego sklepu. Ta sama nazwa jest na ekranie i w kolumnie 17 rejestru. Na ekranie widać ją od razu. W kolumnach 17 i 18 jest pusta do Zatwierdź. Dopiero wtedy koszt jest zaakceptowany i te dwie kolumny dostają kwotę. Po Zatwierdź się nie zmienia.
 
-Koszt odbioru = koszt z kolumny Podjazd/Trasa plus suma za worki tego sklepu. Przy trasie w Podjazd/Trasa sklepu wchodzi udział w stawce, nie cała stawka.
+Koszt odbioru = koszt z kolumny Kwota podjazdu/trasy plus suma za worki tego sklepu. Przy trasie do kosztu sklepu wchodzi udział w stawce, nie cała stawka.
 
 Suma za worki to iloczyn liczby worków i kwoty za worek.
 
-- Zwykły odbiór: w Podjazd/Trasa jest podjazd. Koszt odbioru = podjazd + suma za worki.
+- Zwykły odbiór: w Podjazd/Trasa jest znacznik podjazd, a kwota jest w Kwota podjazdu/trasy. Koszt odbioru = podjazd + suma za worki.
 - Trasa: udział = `stawka za trasę / liczba sklepów`, zaokrąglony matematycznie do dwóch miejsc po przecinku. Cyfra 5 i wyższa w górę. Każdy sklep liczy się osobno. Reszta grosza nie jest dopisywana do żadnego sklepu. Koszt odbioru sklepu = ten udział + suma za worki tego sklepu.
-- Tylko worki: w Podjazd/Trasa jest „—”. Koszt odbioru = suma za worki. Wygląd wiersza jest taki sam jak przy odbiorze za podjazd. To nie jest trasa.
+- Tylko worki: w Podjazd/Trasa i w Kwota podjazdu/trasy jest „—”. Koszt odbioru = suma za worki. Wygląd wiersza jest taki sam jak przy odbiorze za podjazd. To nie jest trasa.
 
 **Suma trasy** jest tylko na ekranie, na zgrupowanym wierszu trasy. To stawka trasy raz plus suma za worki wszystkich sklepów tej trasy. Nie jest kolumną rejestru. Przy zatwierdzeniu żaden sklep nie dostaje całej sumy trasy, tylko swój Koszt odbioru.
 
@@ -308,7 +308,7 @@ Trzy widoki aplikacji + okno Bazy stawek. Tabeli na Zakresie nie ma. Na Zestawie
 
 Opcja **tylko za liczbę worków** stoi pod nazwą sklepu przy odbiorze zwykłym, nie w osobnej kolumnie. Na wierszu trasy jej nie ma.
 
-Kolumny tabeli, od lewej: Rozliczone, Numer protokołu, Adres, Sklep, Data, Podjazd/Trasa, Liczba worków, Kwota za worek, Suma za worki, Koszt odbioru, Suma trasy, transport się odbył. Komórka bez wartości pokazuje „—”. Na odbiorze zwykłym Suma trasy jest „—”. Na wierszu trasy nazwa trasy jest w Adres, a „—” jest w Numer protokołu, Sklep, Koszt odbioru i transport się odbył. Adresy są pogrubione. Nazwy sklepów nie. W Podjazd/Trasa stoi znacznik podjazd albo trasa.
+Kolumny tabeli, od lewej: Rozliczone, Numer protokołu, Adres, Sklep, Data, Podjazd/Trasa, Kwota podjazdu/trasy, Liczba worków, Kwota za worek, Suma za worki, Koszt odbioru, Suma trasy, transport się odbył. Komórka bez wartości pokazuje „—”. Na odbiorze zwykłym Suma trasy jest „—”. Na wierszu trasy nazwa trasy jest w Adres, a „—” jest w Numer protokołu, Sklep, Koszt odbioru i transport się odbył. Adresy są pogrubione. Nazwy sklepów nie. W Podjazd/Trasa stoi znacznik podjazd albo trasa. Kwota jest w osobnej kolumnie obok.
 
 ### Edycja stawek
 
@@ -348,9 +348,9 @@ Po wyszukaniu widać tylko odbiory nierozliczone tego podwykonawcy w tym zakresi
 
 Jeden wiersz na jeden odbiór (jeden sklep, jeden numer protokołu). Tak samo wygląda wiersz, gdy rozliczenie jest tylko za worki.
 
-Kolumny, od lewej: Rozliczone, Numer protokołu, Adres, Sklep, Data, Podjazd/Trasa, Liczba worków, Kwota za worek, Suma za worki, Koszt odbioru, Suma trasy, transport się odbył. Na odbiorze zwykłym w Suma trasy jest „—". Adres jest pogrubiony, nazwa sklepu nie. Kolejność jest w [Układ ekranu](#układ-ekranu).
+Kolumny, od lewej: Rozliczone, Numer protokołu, Adres, Sklep, Data, Podjazd/Trasa, Kwota podjazdu/trasy, Liczba worków, Kwota za worek, Suma za worki, Koszt odbioru, Suma trasy, transport się odbył. Na odbiorze zwykłym w Suma trasy jest „—". Adres jest pogrubiony, nazwa sklepu nie. Kolejność jest w [Układ ekranu](#układ-ekranu).
 
-Podjazd i trasa są jedną kolumną **Podjazd/Trasa**, bo w jednym wierszu nigdy nie ma obu kwot naraz. W tej kolumnie jest koszt za podjazd albo „—”, gdy rozliczenie jest tylko za worki.
+Znacznik podjazd albo trasa stoi w **Podjazd/Trasa**. Kwota jest obok, w **Kwota podjazdu/trasy**, bo w jednym wierszu nigdy nie ma obu kwot naraz: albo koszt za podjazd, albo stawka trasy. Gdy rozliczenie jest tylko za worki, w obu kolumnach jest „—”.
 
 **Koszt odbioru** na tym ekranie to koszt za podjazd albo „—” plus suma za worki. Suma za worki to iloczyn liczby worków i kwoty za worek. Gdy stawki za worek nie ma, jest pusta albo równa 0, suma za worki wynosi 0 zł.
 
@@ -369,11 +369,12 @@ Na wierszu trasy:
 | Adres | Nazwa trasy |
 | Sklep | „—" |
 | Data | Dzień wspólny sklepów tej trasy w zestawieniu. Gdy dzień nie jest jeden, „—" |
-| Podjazd/Trasa | Stawka trasy, raz, do zmiany. Podjazdu nie ma |
+| Podjazd/Trasa | Znacznik trasa. Podjazdu nie ma |
+| Kwota podjazdu/trasy | Stawka trasy, raz, do zmiany |
 | Liczba worków | Suma ilości worków sklepów tej trasy, bez sklepów, w których transport się nie odbył |
 | Kwota za worek | Stawka za worek tego adresu. Na wierszu trasy widać ją tylko wtedy, gdy każdy adres trasy, który się odbył, ma tę samą kwotę. Inaczej jest „—" |
 | Suma za worki | Suma kosztów worków sklepów tej trasy, bez sklepów, w których transport się nie odbył |
-| Suma trasy | Koszt z Podjazd/Trasa plus suma za worki. Stawka trasy raz. Nie zapisuje się jako jedna kwota w rejestrze |
+| Suma trasy | Koszt z Kwota podjazdu/trasy plus suma za worki. Stawka trasy raz. Nie zapisuje się jako jedna kwota w rejestrze |
 | Rozliczone | Jeden checkbox na cały wiersz |
 
 Kolumna Numer protokołu jest w tabeli, ale na wierszu trasy pokazuje „—". Numery protokołów sklepów zostają w rejestrze i widać je po rozwinięciu.
@@ -382,7 +383,7 @@ Rozwinięcie wiersza pokazuje sklepy tej trasy: numer protokołu, adres, nazwę 
 
 Liczbę worków edytuje się przy adresie, nie na zsumowanym wierszu trasy. Zapisuje się od razu do **Ilość worków** wiersza tego adresu. Kwota za worek, gdy jest wspólna, jest na wierszu trasy. Jej zmiana dotyczy na ekranie każdego adresu tej trasy, który się odbył, i nie zapisuje się w Bazie stawek. Gdy kwoty się różnią, zmianę robi się przy adresie i dotyczy tylko jego, też tylko na ekranie. Po zaznaczeniu rozliczenia i Zatwierdź Koszt odbioru tego adresu trafia do kolumny **Koszt odbioru**, a **Koszt odbioru per worek** to **Koszt odbioru** podzielony przez **Ilość worków** (przy pustej ilości albo 0 dzielimy przez 1). Suma trasy po rozwinięciu nadal jest raz. Rozwinięcie nie służy do rozliczania pojedynczego sklepu osobno.
 
-Stawkę trasy edytuje się na zsumowanym wierszu, w Podjazd/Trasa, nie przy sklepie. Zapis jest od razu, nie czeka na Zatwierdź i nie idzie do Bazy stawek.
+Stawkę trasy edytuje się na zsumowanym wierszu, w Kwota podjazdu/trasy, nie przy sklepie. Zapis jest od razu, nie czeka na Zatwierdź i nie idzie do Bazy stawek.
 
 Nowa kwota nadpisuje **Stawka za trasę** na każdym nierozliczonym wierszu rejestru z tą samą nazwą w **Trasa**, bez względu na **Kto odbiera** i na datę odbioru. Tak samo jak zmiana przy protokole. Dzielnik tego nie powtarza: liczy tylko sklepy wybranego podwykonawcy w tym zestawieniu. System nie ostrzega i nie blokuje. Kolumny 17 i 18 zostają puste. Wiersze już rozliczone są pominięte.
 
@@ -404,7 +405,7 @@ Każdy wiersz (sklep albo trasa) ma checkbox Rozliczone.
 
 Przy odbiorze zwykłym, pod nazwą sklepu, jest opcja **tylko za liczbę worków**. Na wierszu trasy i przy sklepie w rozwinięciu tej opcji nie ma.
 
-Włączona: koszt to same worki, w kolumnie Podjazd/Trasa jest „—”, bez podjazdu. Wyłączona: obowiązuje podjazd i worki. Opcja stoi pod nazwą sklepu, nie w osobnej kolumnie.
+Włączona: koszt to same worki, w kolumnach Podjazd/Trasa i Kwota podjazdu/trasy jest „—”, bez podjazdu. Wyłączona: obowiązuje podjazd i worki. Opcja stoi pod nazwą sklepu, nie w osobnej kolumnie.
 
 Przy wierszu tabeli odbioru zwykłego i przy sklepie w rozwinięciu trasy da się ustawić, że transport się nie odbył. Na zsumowanym wierszu trasy tej opcji nie ma. Do Zatwierdź zostaje to na ekranie: wiersz jest przekreślony i nie wchodzi w koszt, jak w [rejestrze Na zgłoszenie](#rejestr-na-zgłoszenie-miesięczne--arkusz1). W rejestrze wartość `nie` zapisuje się przy Zatwierdź wiersza, który ten sklep obejmuje. Zdjęcie opcji przed zatwierdzeniem nic nie zapisuje. Wiersz z powrotem liczy się jako odbyty. Gdy w kolumnie jest już `nie`, wiersza w wyszukiwaniu nie ma.
 

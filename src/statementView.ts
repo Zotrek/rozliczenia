@@ -61,7 +61,7 @@ function table(screen: StatementScreen, lines: readonly StatementLine[]): string
   return (
     '<div class="table-wrap"><table><thead><tr>' +
     `<th class="c"><span class="col-check"><span>Rozliczone</span>${selectAllBox(lines, screen.selected)}</span></th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>` +
-    "<th>Podjazd/Trasa</th><th class=\"num\">Liczba worków</th><th class=\"num\">Kwota za worek</th>" +
+    "<th>Podjazd/Trasa</th><th class=\"num\">Kwota podjazdu/trasy</th><th class=\"num\">Liczba worków</th><th class=\"num\">Kwota za worek</th>" +
     "<th class=\"num\">Suma za worki</th><th class=\"num\">Koszt odbioru</th>" +
     "<th class=\"num\" title=\"Tylko na ekranie. Nie zapisuje się jako jedna kwota.\">Suma trasy</th>" +
     "<th>transport się odbył</th>" +
@@ -75,11 +75,12 @@ function plainRow(screen: StatementScreen, shop: ShopCost): string {
   const dead = !shop.happened;
   const checked = screen.selected[key] === true;
   const state = screen.screenByRow[key] ?? {};
-  const leg = shop.bagsOnly || shop.tie
+  const legKind = shop.bagsOnly || shop.tie || dead ? DASH : `<span class="tag">podjazd</span>`;
+  const legAmount = shop.bagsOnly || shop.tie
     ? DASH
     : dead
       ? money(shop.legAmount, true)
-      : `<span class="tag">podjazd</span>${amountInput(shop, "pickup", state.pickupAmount, shop.legAmount, "Zmiana kwoty za podjazd tylko na tym ekranie — nie w rejestrze ani w Bazie stawek")}`;
+      : amountInput(shop, "pickup", state.pickupAmount, shop.legAmount, "Zmiana kwoty za podjazd tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
   const bagCell = shop.tie
     ? DASH
     : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
@@ -90,7 +91,8 @@ function plainRow(screen: StatementScreen, shop: ShopCost): string {
     `<td class="adres">${text(addressWithCommaAfterLocality(shop.address), dead)}</td>` +
     `<td class="sklep"><div>${text(shop.shopName, dead)}${bagsOnlyBox(shop, shop.bagsOnly)}${tieBox(shop.tie, screen.rates)}${newRouteBox(screen, shop)}</div></td>` +
     `<td>${text(shop.pickupDate, dead)}</td>` +
-    `<td>${leg}</td>` +
+    `<td>${legKind}</td>` +
+    `<td class="num">${legAmount}</td>` +
     `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków")}</td>` +
     `<td class="num">${bagCell}</td>` +
     `<td class="num">${money(shop.bagSum, dead)}</td>` +
@@ -140,7 +142,8 @@ function routeRow(screen: StatementScreen, line: Extract<StatementLine, { kind: 
     `<div><div>${escapeHtml(line.routeName)}</div><div class="sub">trasa · ${escapeHtml(sub)}</div>${none}${tie}</div></div></td>` +
     `<td class="sklep">${DASH}</td>` +
     `<td data-out="route-date">${date}</td>` +
-    `<td><span class="tag tag-route">trasa</span>${rateInput}</td>` +
+    `<td><span class="tag tag-route">trasa</span></td>` +
+    `<td class="num">${rateInput}</td>` +
     `<td class="num"><span>${line.bagCount}</span></td>` +
     `<td class="num">${bagRate}</td>` +
     `<td class="num">${money(line.bagSum, false)}</td>` +
@@ -165,6 +168,7 @@ function childRow(screen: StatementScreen, shop: ShopCost, sharedBagRate: boolea
     `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}</div></td>` +
     `<td>${text(shop.pickupDate, dead)}</td>` +
     `<td>${DASH}</td>` +
+    `<td class="num">${DASH}</td>` +
     `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków tego adresu")}</td>` +
     `<td class="num">${bagCell}</td>` +
     `<td class="num">${DASH}</td>` +

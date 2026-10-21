@@ -416,7 +416,7 @@
           <ul>
             <li>Na zgłoszenie włączone, Harmonogram widać i nie da się go zaznaczyć.</li>
             <li>Podwykonawcę znajduje się jak na mapie: fragment Nazwa albo Dane do Worda. Adres jest w Dane do Worda. Wybór jest z listy, do rozliczenia wchodzi Nazwa. Data początkowa ma opcję „bez daty początkowej”. Data końcowa jest wymagana. Obie daty są włącznie. Data początkowa późniejsza niż końcowa nie startuje Szukaj.</li>
-            <li>Wiersz sklepu i wiersz trasy, rozwinięcie sklepów, jedna Suma trasy.</li>
+            <li>Wiersz sklepu i wiersz trasy, rozwinięcie sklepów, jedno Razem.</li>
             <li>Liczba worków zmienia się od razu. Stawka podjazdu i worka tylko na ekranie. Stawka za trasę zapisuje się od razu do Stawka za trasę. Koszt odbioru i Koszt odbioru per worek, kolumny 16 i 17, dopiero przy Zatwierdź. Podjazd 0 zł wpisuje się w kwotę podjazdu. Opcji „tylko za liczbę worków” nie ma.</li>
             <li>Transport się nie odbył przekreśla wiersz i wyjmuje go z kosztu. Przy Zatwierdź dostaje samo „nie”: bez Rozliczony, bez faktury, bez kolumn 16 i 17 i bez stawki trasy. W następnym wyszukaniu go nie ma.</li>
             <li>Odepnij od trasy zabiera sklep z trasy od razu. Zostaje odbiorem za podjazd. Nowa nazwa i stawka robią osobną trasę. Stawka jest wymagana, pusta nie zapisuje trasy. Kwota 0 jest wpisana. Starej nazwy nie da się wpisać. Ta sama nowa nazwa łączy sklepy w jedną trasę.</li>
@@ -889,7 +889,7 @@
     }
 
     function headRow() {
-      return '<tr><th class="c">Rozliczone</th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th><th>Podjazd/Trasa</th><th class="num">Liczba worków</th><th class="num">Kwota za worek</th><th class="num">Suma za worki</th><th class="num">Koszt odbioru</th><th class="num" title="Tylko na ekranie. Nie zapisuje się jako jedna kwota.">Suma trasy</th><th>transport się odbył</th></tr>';
+      return '<tr><th class="c">Rozliczone</th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th><th>Podjazd/Trasa</th><th class="num">Liczba worków</th><th class="num">Kwota za worek</th><th class="num">Suma za worki</th><th class="num" title="Podjazd: kwota podjazdu plus worki. Trasa: stawka raz plus worki.">Razem</th><th>transport się odbył</th></tr>';
     }
 
     function rowClass(dead, checked, kind) {
@@ -909,7 +909,6 @@
         + '<td class="num">' + numInput(row.id, 'bagRate', row.bagRate, null, 'Zmiana kwoty za worek tylko na tym ekranie, nie w Bazie stawek') + '</td>'
         + '<td class="num">' + moneyOut(row.id + '-bagsum', eco.bagsSum, dead) + '</td>'
         + '<td class="num">' + moneyOut(row.id + '-cost', eco.cost, dead) + '</td>'
-        + '<td class="num">' + moneyOut(row.id + '-suma', eco.cost, dead) + '</td>'
         + '<td>' + tripBox(row.id, row.noTrip) + '</td>';
     }
 
@@ -928,7 +927,6 @@
         + '<td class="num"><span data-out="' + row.id + '-bags">' + eco.bagsCount + '</span></td>'
         + '<td class="num">' + (sharedBagRate(row) == null ? dash() : numInput(row.id, 'bagRate', sharedBagRate(row), null, 'Jedna kwota, bo każdy adres, który się odbył, ma tę samą. Zmiana tylko na tym ekranie.')) + '</td>'
         + '<td class="num">' + moneyOut(row.id + '-bagsum', eco.bagsSum, false) + '</td>'
-        + '<td class="num">' + dash() + '</td>'
         + '<td class="num">' + moneyOut(row.id + '-suma', eco.suma, false) + '</td>'
         + '<td>' + dash() + '</td>';
     }
@@ -942,7 +940,7 @@
         + '<td>' + tx(shop.date, dead) + '</td>'
         + '<td>' + dash() + '</td>'
         + '<td class="num">' + numInput(row.id, 'bags', shop.bags, index, 'Zapis od razu do Ilość worków tego adresu') + '</td>'
-        + '<td class="num">' + (sharedBagRate(row) == null ? numInput(row.id, 'bagRate', shopBagRate(row, shop), index, 'Kwota tego adresu, tylko ten ekran. Nie w Bazie stawek.') : dash()) + '</td><td>' + dash() + '</td><td>' + dash() + '</td><td>' + dash() + '</td>'
+        + '<td class="num">' + (sharedBagRate(row) == null ? numInput(row.id, 'bagRate', shopBagRate(row, shop), index, 'Kwota tego adresu, tylko ten ekran. Nie w Bazie stawek.') : dash()) + '</td><td>' + dash() + '</td><td>' + dash() + '</td>'
         + '<td><div class="trip-stack">' + tripBox(row.id, shop.noTrip, index) + detachBtn(row.id, index) + '</div></td>';
     }
 
@@ -990,8 +988,7 @@
             + cardMoney('Liczba worków', '<span data-out="' + row.id + '-bags">' + eco.bagsCount + '</span>')
             + cardMoney('Kwota za worek', sharedBagRate(row) == null ? dash() : numInput(row.id, 'bagRate', sharedBagRate(row), null, 'Jedna kwota, bo adresy mają tę samą. Tylko ten ekran'))
             + cardMoney('Suma za worki', moneyOut(row.id + '-bagsum', eco.bagsSum, false))
-            + cardMoney('Koszt odbioru', dash())
-            + cardMoney('Suma trasy', moneyOut(row.id + '-suma', eco.suma, false))
+            + cardMoney('Razem', moneyOut(row.id + '-suma', eco.suma, false))
             + '</div>' + (eco.active === 0 ? '<p class="sub">Żaden sklep się nie odbył — kosztu trasy nie ma.</p>' : '') + '</article>';
         }
         const row = item.row;
@@ -1009,8 +1006,7 @@
           + cardMoney('Liczba worków', numInput(row.id, 'bags', row.bags, null, 'Zapis od razu do Ilość worków'))
           + cardMoney('Kwota za worek', numInput(row.id, 'bagRate', row.bagRate, null, 'Tylko ten ekran'))
           + cardMoney('Suma za worki', moneyOut(row.id + '-bagsum', bagsSum, dead))
-          + cardMoney('Koszt odbioru', moneyOut(row.id + '-cost', cost, dead))
-          + cardMoney('Suma trasy', moneyOut(row.id + '-suma', cost, dead))
+          + cardMoney('Razem', moneyOut(row.id + '-cost', cost, dead))
           + '</div></article>';
       }).join('') + '</div>';
     }

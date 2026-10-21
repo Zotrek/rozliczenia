@@ -57,7 +57,7 @@ describe("renderStatement", () => {
     expect(html).toContain('<td><span class="tag">podjazd</span></td><td class="num"><input type="text" inputmode="decimal" data-edit="pickup"');
   });
 
-  it("test_renderStatement_plainPickup_sumaTrasy_showsFullFinalCost", () => {
+  it("test_renderStatement_plainPickup_razem_showsFullFinalCost", () => {
     const html = renderStatement(
       screen(
         [row({ sheetRow: 2, pickupRate: 2_000, bagCount: 2, bagRate: 500 })],
@@ -65,14 +65,17 @@ describe("renderStatement", () => {
       ),
     );
     const finalCost = formatPln(3_000);
+    expect(html).toContain(">Razem</th>");
+    expect(html).not.toContain(">Koszt odbioru</th>");
+    expect(html).not.toContain(">Suma trasy</th>");
     const rowHtml = html.slice(html.indexOf('data-kind="plain"'), html.indexOf("</tr>", html.indexOf('data-kind="plain"')));
     const cells = rowHtml.split('<td class="num">');
-    expect(cells.at(-2)).toContain(finalCost);
     expect(cells.at(-1)).toContain(finalCost);
+    expect(rowHtml.split(finalCost).length - 1).toBe(1);
     expect(cells.at(-1)).not.toContain(">—<");
   });
 
-  it("test_renderStatement_zeroPickup_sumaTrasy_showsBagCostAsFinal", () => {
+  it("test_renderStatement_zeroPickup_razem_showsBagCostAsFinal", () => {
     const html = renderStatement(
       setPickup(
         screen(
@@ -86,6 +89,8 @@ describe("renderStatement", () => {
     );
     const rowHtml = html.slice(html.indexOf('data-kind="plain"'), html.indexOf("</tr>", html.indexOf('data-kind="plain"')));
     const cells = rowHtml.split('<td class="num">');
+    expect(html).toContain(">Razem</th>");
+    expect(html).not.toContain(">Suma trasy</th>");
     expect(cells.at(-1)).toContain(formatPln(1_000));
     expect(cells.at(-1)).not.toContain(">—<");
     expect(html).toContain('data-edit="pickup"');
@@ -152,6 +157,9 @@ describe("renderStatement", () => {
     const html = renderStatement(
       screen(rows, rates, { selected: { [routeSelectionKey("trasa")]: true }, invoice: "FV/1" }),
     );
+    expect(html).toContain(">Razem</th>");
+    const routeHtml = html.slice(html.indexOf('data-kind="route"'), html.indexOf("</tr>", html.indexOf('data-kind="route"')));
+    expect(routeHtml).toContain(`<td class="num"><span class="money">${formatPln(10_000)}</span></td>`);
     expect(html).toContain(`data-out="sum-all">${formatPln(10_000)}`);
     expect(html).toContain(`data-out="sum-sel">${formatPln(10_000)}`);
     expect(html).toContain('data-out="sel-count">1<');

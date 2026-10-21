@@ -64,8 +64,8 @@ function table(screen: StatementScreen, lines: readonly StatementLine[]): string
     '<div class="table-wrap"><table><thead><tr>' +
     `<th class="c"><span class="col-check"><span>Rozliczone</span>${selectAllBox(lines, screen.selected)}</span></th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>` +
     "<th>Podjazd/Trasa</th><th class=\"num\">Kwota podjazdu/trasy</th><th class=\"num\">Liczba worków</th><th class=\"num\">Kwota za worek</th>" +
-    "<th class=\"num\">Suma za worki</th><th class=\"num\">Koszt odbioru</th>" +
-    "<th class=\"num\" title=\"Tylko na ekranie. Nie zapisuje się jako jedna kwota.\">Suma trasy</th>" +
+    "<th class=\"num\">Suma za worki</th>" +
+    "<th class=\"num\" title=\"Podjazd: kwota podjazdu plus worki. Trasa: stawka raz plus worki.\">Razem</th>" +
     "<th>transport się odbył</th>" +
     `</tr></thead><tbody>${rows.join("")}</tbody></table></div>`
   );
@@ -98,7 +98,6 @@ function plainRow(screen: StatementScreen, shop: ShopCost): string {
     `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków")}</td>` +
     `<td class="num">${bagCell}</td>` +
     `<td class="num">${money(shop.bagSum, dead)}</td>` +
-    `<td class="num">${money(shop.receptionCost, dead)}</td>` +
     `<td class="num">${money(shop.receptionCost, dead)}</td>` +
     `<td>${tripBox(shop)}</td>` +
     "</tr>"
@@ -157,7 +156,6 @@ function routeRow(screen: StatementScreen, line: Extract<StatementLine, { kind: 
     `<td class="num"><span>${line.bagCount}</span></td>` +
     `<td class="num">${bagRate}</td>` +
     `<td class="num">${money(line.bagSum, false)}</td>` +
-    `<td class="num">${DASH}</td>` +
     `<td class="num">${money(line.routeSum, false)}</td>` +
     `<td>${DASH}</td>` +
     "</tr>"
@@ -181,7 +179,6 @@ function childRow(screen: StatementScreen, shop: ShopCost, sharedBagRate: boolea
     `<td class="num">${DASH}</td>` +
     `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków tego adresu")}</td>` +
     `<td class="num">${bagCell}</td>` +
-    `<td class="num">${DASH}</td>` +
     `<td class="num">${DASH}</td>` +
     `<td class="num">${DASH}</td>` +
     `<td><div class="trip-stack">${tripBox(shop)}${detachButton(shop)}</div></td>` +

@@ -195,7 +195,7 @@ Trzy widoki + okno:
 2. **Zestawienie.** Po Szukaj. Zmień zakres wraca do karty. Liczba pozycji bez sklepów z rozwinięcia. Tabela. Stopka: Suma zestawienia, Suma zaznaczonych, numer faktury, Zatwierdź. Baza stawek w nagłówku. Statystyk stąd nie otwiera się.
 3. **Statystyki.** Z Zakresu; ← Powrót wraca na Zakres. Filtry okresu (bieżący miesiąc domyślnie, poprzednie miesiące, bieżący kwartał, poprzednie kwartały, dokładny zakres), podwykonawca, Pokaż raport. KPI, rankingi, serie czasowe (CSS), listy ze stronicowaniem 5, zwijanie sekcji (`localStorage`). Agregacje w `src/stats.ts` (+ planowany `statsView.ts`). Copy UI: język zarządu (SPEC § Statystyki).
 
-Kolumny Zestawienia od lewej: Rozliczone, Numer protokołu, Adres, Sklep, Data, Podjazd/Trasa, Kwota podjazdu/trasy, Liczba worków, Kwota za worek, Suma za worki, Koszt odbioru, Suma trasy, transport się odbył. Pusta komórka pokazuje „—”. Remis stawek widać na wierszu z błędem, nie w oknie Baza stawek. Wskazanie woła `resolveRateTie`.
+Kolumny Zestawienia od lewej: Rozliczone, Numer protokołu, Adres, Sklep, Data, Podjazd/Trasa, Kwota podjazdu/trasy, Liczba worków, Kwota za worek, Suma za worki, Razem, transport się odbył. Pusta komórka pokazuje „—”. Remis stawek widać na wierszu z błędem, nie w oknie Baza stawek. Wskazanie woła `resolveRateTie`.
 
 Ładowanie (wyszukanie, zapis stawek, zatwierdzenie poniżej 10 000 zł, **odczyt Statystyk**): tylko `rozliczenia/logo.png`, puls 1,2 s. Pod spodem krótki komunikat. Od 10 000 zł przy Zatwierdź: `rozliczenia/jednorozec-deba.gif`, cykl 1,7 s, minimum dwa cykle, dłużej jeśli zapis trwa dłużej.
 

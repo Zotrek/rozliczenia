@@ -69,20 +69,27 @@ describe("page wiring", () => {
     expect(click).toContain("withoutTiedRates(");
   });
 
-  it("test_page_paint_keeps_table_scroll_after_rerender", () => {
-    const paint = functionBody("paint");
-    expect(paint).toContain("readTableScroll(root)");
-    expect(paint).toContain("writeTableScroll(root, spots)");
-    expect(paint).toContain("window.scrollTo(pageLeft, pageTop)");
-    expect(paint).toContain("requestAnimationFrame(");
-    expect(paint).toContain("epoch !== tableScrollEpoch");
-    const read = functionBody("readTableScroll");
-    expect(read).toContain('querySelectorAll(".table-wrap")');
-    expect(read).toContain("scrollTop");
-    expect(read).toContain("scrollLeft");
-    const write = functionBody("writeTableScroll");
-    expect(write).toContain("scrollTop");
-    expect(write).toContain("scrollLeft");
+  it("test_page_check_updates_the_row_without_repainting_the_list", () => {
+    const change = functionBody("onChange");
+    const all = change.slice(
+      change.indexOf('el.dataset.toggle === "checked-all"'),
+      change.indexOf('el.dataset.toggle === "checked"'),
+    );
+    const one = change.slice(
+      change.indexOf('el.dataset.toggle === "checked"'),
+      change.indexOf('el.dataset.toggle === "bags-only"'),
+    );
+    for (const branch of [all, one]) {
+      expect(branch).toContain("syncCheckedRows()");
+      expect(branch).not.toContain("paint(");
+    }
+    const sync = functionBody("syncCheckedRows");
+    expect(sync).toContain("is-checked");
+    expect(sync).toContain('data-out="sel-count"');
+    expect(sync).toContain('data-out="sum-sel"');
+    expect(sync).toContain('data-toggle="checked-all"');
+    expect(sync).toContain('data-action="approve"');
+    expect(sync).not.toContain("innerHTML");
   });
 
   it("test_page_onChange_toggles_and_commits_edits", () => {

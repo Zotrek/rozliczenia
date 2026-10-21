@@ -19,7 +19,7 @@ import {
   defaultRangeDates,
   type ContractorListItem,
 } from "./range.js";
-import { rowKey } from "./engine.js";
+import { lineKey, rowKey, sumSelected } from "./engine.js";
 import {
   STATEMENT_ERROR,
   UNICORN_HOLD_MS,
@@ -28,6 +28,7 @@ import {
   attachDecision,
   bagsBody,
   buildApprove,
+  canPressApprove,
   commitAttach,
   commitBags,
   commitDetach,
@@ -36,11 +37,14 @@ import {
   detachBody,
   emptyStatement,
   findRow,
+  formatPln,
   freshStatement,
   parseAmountText,
   readSettlement,
   readSettlementStats,
   routeRateBody,
+  selectedKeys,
+  selectedLineCount,
   setAllSelected,
   setBagRate,
   setBagsOnly,
@@ -119,29 +123,6 @@ const VIEW: RangeViewModel = {
 
 let heldFrom = "";
 let webapp = "";
-let tableScrollEpoch = 0;
-
-type TableScroll = { top: number; left: number };
-
-function readTableScroll(root: ParentNode): TableScroll[] {
-  return [...root.querySelectorAll(".table-wrap")].map((el) => ({
-    top: el.scrollTop,
-    left: el.scrollLeft,
-  }));
-}
-
-function writeTableScroll(root: ParentNode, spots: readonly TableScroll[]): void {
-  const boxes = root.querySelectorAll(".table-wrap");
-  for (let index = 0; index < spots.length; index += 1) {
-    const box = boxes[index];
-    const spot = spots[index];
-    if (!(box instanceof HTMLElement) || !spot) {
-      continue;
-    }
-    box.scrollTop = spot.top;
-    box.scrollLeft = spot.left;
-  }
-}
 
 function faultText(value: unknown): string {
   if (value instanceof Error && value.message !== "") {
@@ -203,39 +184,62 @@ function paint(keep?: string): void {
   const current = keep ? fieldByKeep(document, keep) : null;
   const start = current?.selectionStart ?? null;
   const end = current?.selectionEnd ?? null;
-  const spots = readTableScroll(root);
-  const pageLeft = window.scrollX;
-  const pageTop = window.scrollY;
-  const epoch = ++tableScrollEpoch;
-  if (!keep) {
-    const active = document.activeElement;
-    if (active instanceof HTMLElement && root.contains(active)) {
-      active.blur();
-    }
-  }
   root.innerHTML = renderApp(VIEW);
-  writeTableScroll(root, spots);
-  window.scrollTo(pageLeft, pageTop);
-  if (keep) {
-    const next = fieldByKeep(root, keep);
-    if (next) {
-      next.focus();
-      if (start != null && end != null) {
-        next.setSelectionRange(start, end);
-      }
-    }
+  if (!keep) {
+    return;
   }
-  requestAnimationFrame(() => {
-    if (epoch !== tableScrollEpoch) {
+  const next = fieldByKeep(root, keep);
+  if (!next) {
+    return;
+  }
+  next.focus();
+  if (start != null && end != null) {
+    next.setSelectionRange(start, end);
+  }
+}
+
+/** Zaznaczenie nie przebudowuje listy: zostaje przewinięcie i fokus na checkboxie. */
+function syncCheckedRows(): void {
+  const root = document.querySelector(".statement");
+  if (!(root instanceof HTMLElement)) {
+    paint();
+    return;
+  }
+  root.querySelector(":scope > p.status-block")?.remove();
+  const statement = currentStatement(VIEW.statement);
+  const selected = VIEW.statement.selected;
+  for (const line of statement.lines) {
+    const key = lineKey(line);
+    const box = root.querySelector(
+      `input[data-toggle="checked"][data-line="${CSS.escape(encodeURIComponent(key))}"]`,
+    );
+    const row = box?.closest("tr");
+    if (!(box instanceof HTMLInputElement) || !row) {
+      paint();
       return;
     }
-    const live = document.getElementById("app");
-    if (!live) {
-      return;
-    }
-    writeTableScroll(live, spots);
-    window.scrollTo(pageLeft, pageTop);
-  });
+    const on = selected[key] === true;
+    box.checked = on;
+    row.classList.toggle("is-checked", on);
+  }
+  const all = root.querySelector('input[data-toggle="checked-all"]');
+  if (all instanceof HTMLInputElement) {
+    all.checked =
+      statement.lines.length > 0 && statement.lines.every((line) => selected[lineKey(line)] === true);
+  }
+  const countEl = root.querySelector('[data-out="sel-count"]');
+  const sumEl = root.querySelector('[data-out="sum-sel"]');
+  if (!countEl || !sumEl) {
+    paint();
+    return;
+  }
+  const count = selectedLineCount(statement, selected);
+  countEl.textContent = String(count);
+  sumEl.textContent = formatPln(sumSelected(statement, selectedKeys(selected)));
+  const approve = root.querySelector('[data-action="approve"]');
+  if (approve instanceof HTMLButtonElement) {
+    approve.disabled = !canPressApprove(VIEW.statement.invoice, count);
+  }
 }
 
 function builtWebAppUrl(): string {
@@ -674,7 +678,7 @@ function onChange(event: Event): void {
   if (el.dataset.toggle === "checked-all") {
     VIEW.statement = setAllSelected(VIEW.statement, el.checked);
     VIEW.status = "";
-    paint();
+    syncCheckedRows();
     return;
   }
   if (el.dataset.toggle === "checked") {
@@ -684,7 +688,7 @@ function onChange(event: Event): void {
     }
     VIEW.statement = toggleSelected(VIEW.statement, key);
     VIEW.status = "";
-    paint();
+    syncCheckedRows();
     return;
   }
   if (el.dataset.toggle === "bags-only" || el.dataset.toggle === "notrip") {

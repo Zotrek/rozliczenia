@@ -60,7 +60,7 @@ function table(screen: StatementScreen, lines: readonly StatementLine[]): string
   }
   return (
     '<div class="table-wrap"><table><thead><tr>' +
-    `<th class="c">${selectAllBox(lines, screen.selected)} Rozliczone</th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>` +
+    `<th class="c"><span class="col-check"><span>Rozliczone</span>${selectAllBox(lines, screen.selected)}</span></th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>` +
     "<th>Podjazd/Trasa</th><th class=\"num\">Liczba worków</th><th class=\"num\">Kwota za worek</th>" +
     "<th class=\"num\">Suma za worki</th><th class=\"num\">Koszt odbioru</th>" +
     "<th class=\"num\" title=\"Tylko na ekranie. Nie zapisuje się jako jedna kwota.\">Suma trasy</th>" +

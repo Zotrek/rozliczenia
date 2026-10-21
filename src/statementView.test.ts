@@ -162,6 +162,7 @@ describe("renderStatement", () => {
       row({ sheetRow: 3, address: "Inna 2", shopName: "Drugi" }),
     ];
     const partial = renderStatement(screen(rows, [], { selected: { "\t2\t2": true } }));
+    expect(partial).toContain('class="col-check"');
     expect(partial).toContain('data-toggle="checked-all"');
     expect(partial).toContain('aria-label="Zaznacz wszystkie jako rozliczone"');
     expect(partial).not.toContain('data-toggle="checked-all" checked');

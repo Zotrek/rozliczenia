@@ -285,7 +285,43 @@ th {
 }
 th.num, td.num { text-align: right; }
 th.c, td.c { text-align: center; }
-th.c input { margin: 0 4px 0 0; vertical-align: -1px; }
+th.c .col-check {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.2;
+}
+table input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1.5px solid #94a3b8;
+  border-radius: 4px;
+  background: #fff;
+  display: inline-grid;
+  place-content: center;
+  vertical-align: middle;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+table input[type="checkbox"]::after {
+  content: "";
+  width: 7px;
+  height: 4px;
+  border: solid transparent;
+  border-width: 0 0 2px 2px;
+  transform: rotate(-45deg) translateY(-1px);
+}
+table input[type="checkbox"]:hover { border-color: var(--teal); }
+table input[type="checkbox"]:checked {
+  background: var(--teal);
+  border-color: var(--teal);
+}
+table input[type="checkbox"]:checked::after { border-color: #fff; }
+table input[type="checkbox"]:focus-visible { outline-offset: 2px; }
 tr.is-route td { background: #f0fdfa; }
 tr.is-child td { background: #f8fafc; }
 tr.is-checked td { background: rgba(13, 148, 136, 0.08); }

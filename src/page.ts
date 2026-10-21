@@ -176,26 +176,59 @@ function fieldByKeep(root: ParentNode, keep: string): HTMLInputElement | null {
     root.querySelector(`[data-filter="${keep}"]`)) as HTMLInputElement | null;
 }
 
+/** Przewinięcie listy zestawienia. Przebudowa HTML tworzy nowy kontener i bez tego wraca na górę. */
+function readListScroll(): { top: number; left: number } | null {
+  const wrap = document.querySelector(".table-wrap");
+  if (!(wrap instanceof HTMLElement)) {
+    return null;
+  }
+  return { top: wrap.scrollTop, left: wrap.scrollLeft };
+}
+
+let listScrollGen = 0;
+
+function writeListScroll(scroll: { top: number; left: number } | null): void {
+  if (!scroll) {
+    return;
+  }
+  const apply = (): void => {
+    const wrap = document.querySelector(".table-wrap");
+    if (!(wrap instanceof HTMLElement)) {
+      return;
+    }
+    wrap.scrollTop = scroll.top;
+    wrap.scrollLeft = scroll.left;
+  };
+  apply();
+  const gen = ++listScrollGen;
+  requestAnimationFrame(() => {
+    if (gen !== listScrollGen) {
+      return;
+    }
+    apply();
+  });
+}
+
 function paint(keep?: string): void {
   const root = document.getElementById("app");
   if (!root) {
     return;
   }
+  const scroll = readListScroll();
   const current = keep ? fieldByKeep(document, keep) : null;
   const start = current?.selectionStart ?? null;
   const end = current?.selectionEnd ?? null;
   root.innerHTML = renderApp(VIEW);
-  if (!keep) {
-    return;
+  if (keep) {
+    const next = fieldByKeep(root, keep);
+    if (next) {
+      next.focus({ preventScroll: true });
+      if (start != null && end != null) {
+        next.setSelectionRange(start, end);
+      }
+    }
   }
-  const next = fieldByKeep(root, keep);
-  if (!next) {
-    return;
-  }
-  next.focus();
-  if (start != null && end != null) {
-    next.setSelectionRange(start, end);
-  }
+  writeListScroll(scroll);
 }
 
 /** Zaznaczenie nie przebudowuje listy: zostaje przewinięcie i fokus na checkboxie. */

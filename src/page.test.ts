@@ -92,6 +92,24 @@ describe("page wiring", () => {
     expect(sync).not.toContain("innerHTML");
   });
 
+  it("test_page_paint_keeps_statement_list_scroll", () => {
+    const paint = functionBody("paint");
+    const htmlAt = paint.indexOf("root.innerHTML");
+    expect(paint).toContain("readListScroll()");
+    expect(paint).toContain("writeListScroll(scroll)");
+    expect(paint.indexOf("readListScroll()")).toBeLessThan(htmlAt);
+    expect(paint.lastIndexOf("writeListScroll(scroll)")).toBeGreaterThan(htmlAt);
+    expect(paint).toContain("preventScroll: true");
+    const read = functionBody("readListScroll");
+    const write = functionBody("writeListScroll");
+    expect(read).toContain(".table-wrap");
+    expect(read).toContain("scrollTop");
+    expect(read).toContain("scrollLeft");
+    expect(write).toContain("scrollTop");
+    expect(write).toContain("scrollLeft");
+    expect(write).toContain("requestAnimationFrame");
+  });
+
   it("test_page_onChange_toggles_and_commits_edits", () => {
     const change = functionBody("onChange");
     expect(change).toContain('el.dataset.toggle === "bags-only"');

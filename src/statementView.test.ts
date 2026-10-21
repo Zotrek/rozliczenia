@@ -115,7 +115,9 @@ describe("renderStatement", () => {
     expect(html.split('data-kind="route"').length - 1).toBe(1);
     expect(html).not.toContain("tylko za liczbę worków");
     expect(html).not.toContain("nie odbył się");
-    expect(html).toContain('data-out="route-date"><span class="muted">—</span>');
+    expect(html).toContain('data-out="route-date"');
+    expect(html).toContain('data-edit="route-date"');
+    expect(html).toContain('data-route="trasa" value=""');
     expect(html).toContain('data-edit="route-rate"');
   });
 
@@ -132,6 +134,7 @@ describe("renderStatement", () => {
     );
     expect(html).toContain('data-kind="child"');
     expect(html).toContain('data-edit="bags" data-sheet-name="" data-sheet-row="4" data-transport="P4"');
+    expect(html).toContain('data-edit="pickup-date" data-sheet-name="" data-sheet-row="4" data-transport="P4" value="2026-09-18"');
     expect(html).toContain("odepnij od trasy");
     expect(html).not.toContain("tylko za liczbę worków");
   });

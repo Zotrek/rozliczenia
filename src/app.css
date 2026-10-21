@@ -360,6 +360,16 @@ td input[type="text"] {
   font-variant-numeric: tabular-nums;
 }
 td input[data-edit="bags"] { width: 56px; }
+td input[type="date"] {
+  width: 9.2rem;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  font-variant-numeric: tabular-nums;
+}
+td input[type="date"]:hover { border-color: var(--line); }
+td input[type="date"]:focus { border-color: var(--teal); background: #fff; outline: none; }
 td input[type="text"]:hover { border-color: var(--line); }
 td input[type="text"]:focus { border-color: var(--teal); background: #fff; outline: none; }
 .tag {

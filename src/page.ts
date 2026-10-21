@@ -27,6 +27,7 @@ import {
   approveShow,
   attachDecision,
   bagsBody,
+  pickupDateBody,
   buildApprove,
   canPressApprove,
   commitAttach,
@@ -742,6 +743,8 @@ function onChange(event: Event): void {
   if (
     el.dataset.edit === "bags" ||
     el.dataset.edit === "pickup" ||
+    el.dataset.edit === "pickup-date" ||
+    el.dataset.edit === "route-date" ||
     el.dataset.edit === "bag-rate" ||
     el.dataset.edit === "bag-rate-route" ||
     el.dataset.edit === "route-rate"
@@ -1482,6 +1485,30 @@ async function commitEdit(el: HTMLInputElement): Promise<void> {
     }
     await writeNow("Zapisuję stawkę trasy…", built.body, () => {
       VIEW.statement = commitRouteRate(VIEW.statement, routeName, built.grosze);
+      VIEW.status = "";
+    });
+    return;
+  }
+  if (edit === "pickup-date" || edit === "route-date") {
+    const routeName = el.dataset.route ?? "";
+    const targets =
+      edit === "route-date" ? VIEW.statement.rows.filter((item) => routeName !== "" && item.routeName === routeName) : [row];
+    const built = pickupDateBody(targets, el.value, VIEW.mode);
+    if (!built.ok) {
+      VIEW.status = built.error;
+      paint();
+      return;
+    }
+    if (built.unchanged) {
+      VIEW.status = "";
+      return;
+    }
+    await writeNow("Zapisuję datę odbioru…", built.body, async () => {
+      const refreshed = await reloadStatement();
+      if (!refreshed.ok) {
+        VIEW.status = STATEMENT_ERROR.refresh;
+        return;
+      }
       VIEW.status = "";
     });
     return;

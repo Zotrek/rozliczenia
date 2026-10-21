@@ -1,6 +1,8 @@
 import { lineKey, rowKey, sumSelected } from "./engine.js";
 import { escapeHtml } from "./html.js";
+import { calendarToIsoDate } from "./range.js";
 import { addressWithCommaAfterLocality } from "./rateWindow.js";
+import { parseSheetDate } from "./sheetDate.js";
 import type { SettlementRateRow } from "./search.js";
 import {
   canPressApprove,
@@ -90,7 +92,7 @@ function plainRow(screen: StatementScreen, shop: ShopCost): string {
     `<td>${text(shop.transportNumber, dead)}</td>` +
     `<td class="adres">${text(addressWithCommaAfterLocality(shop.address), dead)}</td>` +
     `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}${newRouteBox(screen, shop)}</div></td>` +
-    `<td>${text(shop.pickupDate, dead)}</td>` +
+    `<td>${dateInput(shop, "pickup-date", shop.pickupDate, "Zapis od razu do Data odbioru.")}</td>` +
     `<td>${legKind}</td>` +
     `<td class="num">${legAmount}</td>` +
     `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków")}</td>` +
@@ -112,7 +114,15 @@ function routeRow(screen: StatementScreen, line: Extract<StatementLine, { kind: 
   const sub = happened === line.shops.length ? shopsWord(line.shops.length) : `${happened} z ${line.shops.length} w koszcie`;
   const none = happened === 0 ? '<div class="sub">Żaden sklep się nie odbył — kosztu trasy nie ma.</div>' : "";
   const tie = line.shops.some((shop) => shop.tie) ? '<div class="err">Remis stawek. Rozwiń i wskaż wiersz.</div>' : "";
-  const date = line.date === null ? DASH : escapeHtml(line.date);
+  const date = anchor
+    ? dateInput(
+        anchor,
+        "route-date",
+        line.date ?? "",
+        "Zapis od razu. Ta data wchodzi na każdy sklep tej trasy w zestawieniu.",
+        line.routeName,
+      )
+    : DASH;
   const bagRate =
     line.bagRate === null || !anchor
       ? DASH
@@ -166,7 +176,7 @@ function childRow(screen: StatementScreen, shop: ShopCost, sharedBagRate: boolea
     `<td>${text(shop.transportNumber, dead)}</td>` +
     `<td class="adres">${text(addressWithCommaAfterLocality(shop.address), dead)}</td>` +
     `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}</div></td>` +
-    `<td>${text(shop.pickupDate, dead)}</td>` +
+    `<td>${dateInput(shop, "pickup-date", shop.pickupDate, "Zapis od razu do Data odbioru tego sklepu.")}</td>` +
     `<td>${DASH}</td>` +
     `<td class="num">${DASH}</td>` +
     `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków tego adresu")}</td>` +
@@ -270,6 +280,18 @@ function tieBox(tie: RateTie | null, rates: readonly SettlementRateRow[]): strin
     })
     .join("");
   return `<div class="tie"><span class="err">Dwie stawki na ten dzień. Wskaż, która obowiązuje.</span>${buttons}</div>`;
+}
+
+function dateInput(shop: ShopCost, edit: string, shown: string, title: string, routeName?: string): string {
+  const route = routeName ? ` data-route="${escapeHtml(routeName)}"` : "";
+  return `<input type="date" data-edit="${edit}" ${ref(shop)}${route} value="${escapeHtml(sheetDateInputValue(shown))}" title="${escapeHtml(title)}" aria-label="Data odbioru">`;
+}
+
+function sheetDateInputValue(text: string): string {
+  if (text === "") {
+    return "";
+  }
+  return calendarToIsoDate(parseSheetDate(text));
 }
 
 function bagCountInput(shop: ShopCost, title: string): string {

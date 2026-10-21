@@ -10,6 +10,7 @@ import {
   approveShow,
   attachDecision,
   bagsBody,
+  pickupDateBody,
   buildApprove,
   canPressApprove,
   commitAttach,
@@ -486,6 +487,7 @@ describe("route edits and commits", () => {
         "• Transport 17 (wiersz 4) — już rozliczony",
     );
     expect(writeError("bags")).toBe(STATEMENT_ERROR.badBags);
+    expect(writeError("date")).toBe(STATEMENT_ERROR.badDate);
     expect(writeError("key")).toBe(STATEMENT_ERROR.stale);
     expect(writeError("settled")).toBe(STATEMENT_ERROR.stale);
     expect(writeError("nie")).toBe(STATEMENT_ERROR.stale);
@@ -514,6 +516,23 @@ describe("route edits and commits", () => {
 
   it("test_bagsBody_and_routeRateBody_reject_bad_text", () => {
     expect(bagsBody(row({ sheetRow: 2 }), "x")).toEqual({ ok: false, error: STATEMENT_ERROR.badBags });
+    const dated = row({ sheetRow: 2, sheetName: "Na zgłoszenie Wrzesień 2026", pickupDate: "18.09.2026" });
+    expect(pickupDateBody([dated], "")).toEqual({ ok: false, error: STATEMENT_ERROR.badDate });
+    expect(pickupDateBody([dated], "2026-09-18")).toEqual({ ok: true, unchanged: true });
+    expect(pickupDateBody([dated, row({ sheetRow: 3, routeName: "trasa", pickupDate: "19.09.2026" })], "2026-10-02", "schedule")).toEqual({
+      ok: true,
+      unchanged: false,
+      pickupDate: "02.10.2026",
+      body: {
+        action: "patchPickupDate",
+        dataOdbioru: "02.10.2026",
+        tryb: "harmonogram",
+        wiersze: [
+          { sheetName: "Na zgłoszenie Wrzesień 2026", sheetRow: 2, transportNumber: "2" },
+          { sheetName: "", sheetRow: 3, transportNumber: "3" },
+        ],
+      },
+    });
     expect(bagsBody(row({ sheetRow: 2 }), "").ok).toBe(true);
     expect(routeRateBody(row({ sheetRow: 2, routeName: "t" }), "t", "bad")).toEqual({
       ok: false,

@@ -149,6 +149,8 @@ describe("page wiring", () => {
     expect(writeNow).toContain("postSheet(");
     expect(writeNow).toContain("reloadStatement(");
     expect(functionBody("commitEdit")).toContain("commitBags(");
+    expect(functionBody("commitEdit")).toContain("pickupDateBody(");
+    expect(functionBody("commitEdit")).toContain("reloadStatement(");
     expect(functionBody("commitEdit")).toContain("commitRouteRate(");
     expect(functionBody("runApprove")).toContain("buildApprove(");
     expect(functionBody("saveRates")).toContain("saveRateBody(");

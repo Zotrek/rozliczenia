@@ -354,6 +354,8 @@ Znacznik podjazd albo trasa stoi w **Podjazd/Trasa**. Kwota jest obok, w **Kwota
 
 **Koszt odbioru** na tym ekranie to koszt za podjazd plus suma za worki. Suma za worki to iloczyn liczby worków i kwoty za worek. Gdy stawki za worek nie ma, jest pusta albo równa 0, suma za worki wynosi 0 zł. **Suma trasy** na tym wierszu to ta sama kwota co Koszt odbioru: całość kosztu ostatecznego.
 
+**Data** to **Data odbioru** tego wiersza. Da się ją zmienić. Zapis idzie od razu, nie czeka na Zatwierdź. Tekst w arkuszu zostaje `dd.mm.yyyy`. Gdy nowa data jest w innym miesiącu, wiersz przechodzi na zakładkę tego miesiąca i znika ze starej. Stawki podjazdu i worka na wierszu zostają. Po zapisie zestawienie ładuje się jeszcze raz: wiersz poza zakresem dat schodzi z listy.
+
 Liczba worków to **Ilość worków** tego odbioru. Na tym ekranie da się ją zmienić. Nowa liczba zapisuje się od razu do **Ilość worków** tego konkretnego wiersza na zakładce rejestru (`sheetName`) w pliku `1hvSvy9c069SefhYH3rCUDtCViRhAoRQ6DDj_EIlmWNk`. Nie czeka na Zatwierdź. Suma za worki i Koszt odbioru na ekranie liczą się od nowa. W rejestrze **Koszt odbioru** i **Koszt odbioru per worek** powstają dopiero przy zatwierdzeniu.
 
 Kwota za worek na starcie to stawka obowiązująca w dniu odbioru. Kwotę za podjazd i kwotę za worek też da się tu zmienić. Te zmiany nie zapisują się w Bazie stawek. Inne odbiory tego sklepu dalej biorą stawkę z bazy. Do zatwierdzenia obowiązują tylko na ekranie i wchodzą w Koszt odbioru tego wiersza. Gdy wiersz jest zaznaczony jako rozliczony i użytkownik klika Zatwierdź, ten Koszt odbioru zapisuje się w kolumnie **Koszt odbioru**. **Koszt odbioru per worek** to **Koszt odbioru** podzielony przez **Ilość worków**. Gdy Ilość worków jest pusta albo równa 0, dzielimy przez 1.
@@ -368,7 +370,7 @@ Na wierszu trasy:
 |---------|---------|
 | Adres | Nazwa trasy |
 | Sklep | „—" |
-| Data | Dzień wspólny sklepów tej trasy w zestawieniu. Gdy dzień nie jest jeden, „—" |
+| Data | Dzień wspólny sklepów tej trasy w zestawieniu, do zmiany. Gdy dzień nie jest jeden, pole jest puste. Zapis stawia tę datę na każdym sklepie tej trasy w zestawieniu |
 | Podjazd/Trasa | Znacznik trasa. Podjazdu nie ma |
 | Kwota podjazdu/trasy | Stawka trasy, raz, do zmiany |
 | Liczba worków | Suma ilości worków sklepów tej trasy, bez sklepów, w których transport się nie odbył |
@@ -379,7 +381,7 @@ Na wierszu trasy:
 
 Kolumna Numer protokołu jest w tabeli, ale na wierszu trasy pokazuje „—". Numery protokołów sklepów zostają w rejestrze i widać je po rozwinięciu.
 
-Rozwinięcie wiersza pokazuje sklepy tej trasy: numer protokołu, adres, nazwę sklepu, datę, liczbę worków, opcję, że transport się nie odbył, i **odepnij od trasy**. Adres rozróżnia sklep, nie nazwa. Sumy za worki w rozwinięciu nie ma. Kwota za worek jest w rozwinięciu tylko wtedy, gdy adresy nie mają jednej wspólnej kwoty.
+Rozwinięcie wiersza pokazuje sklepy tej trasy: numer protokołu, adres, nazwę sklepu, datę, liczbę worków, opcję, że transport się nie odbył, i **odepnij od trasy**. Datę jednego sklepu zmienia się przy tym sklepie. Data na wierszu trasy zmienia wszystkie sklepy tej trasy widoczne w zestawieniu. Zapis jest od razu, te same reguły co przy odbiorze zwykłym. Adres rozróżnia sklep, nie nazwa. Sumy za worki w rozwinięciu nie ma. Kwota za worek jest w rozwinięciu tylko wtedy, gdy adresy nie mają jednej wspólnej kwoty.
 
 Liczbę worków edytuje się przy adresie, nie na zsumowanym wierszu trasy. Zapisuje się od razu do **Ilość worków** wiersza tego adresu. Kwota za worek, gdy jest wspólna, jest na wierszu trasy. Jej zmiana dotyczy na ekranie każdego adresu tej trasy, który się odbył, i nie zapisuje się w Bazie stawek. Gdy kwoty się różnią, zmianę robi się przy adresie i dotyczy tylko jego, też tylko na ekranie. Po zaznaczeniu rozliczenia i Zatwierdź Koszt odbioru tego adresu trafia do kolumny **Koszt odbioru**, a **Koszt odbioru per worek** to **Koszt odbioru** podzielony przez **Ilość worków** (przy pustej ilości albo 0 dzielimy przez 1). Suma trasy po rozwinięciu nadal jest raz. Rozwinięcie nie służy do rozliczania pojedynczego sklepu osobno.
 

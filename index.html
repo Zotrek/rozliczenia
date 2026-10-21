@@ -368,6 +368,16 @@ td input[type="text"] {
   font-variant-numeric: tabular-nums;
 }
 td input[data-edit="bags"] { width: 56px; }
+td input[type="date"] {
+  width: 9.2rem;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.8);
+  font-variant-numeric: tabular-nums;
+}
+td input[type="date"]:hover { border-color: var(--line); }
+td input[type="date"]:focus { border-color: var(--teal); background: #fff; outline: none; }
 td input[type="text"]:hover { border-color: var(--line); }
 td input[type="text"]:focus { border-color: var(--teal); background: #fff; outline: none; }
 .tag {
@@ -1846,6 +1856,7 @@ function sumLines(lines) {
 
 
 
+
 /**
  * Zestawienie. Kwoty liczy `settle`. Ten plik trzyma stan ekranu i body zapisów.
  * Drugiego wzoru kosztu tu nie ma.
@@ -1861,6 +1872,7 @@ const STATEMENT_ERROR = {
     emptyRate: "Pusta stawka nie zapisuje trasy.",
     badRate: "Stawka jest niepoprawna.",
     badBags: "Liczba worków jest niepoprawna.",
+    badDate: "Data odbioru jest niepoprawna.",
     write: "Zapis nie doszedł.",
     stale: "Wiersz się zmienił. Szukaj jeszcze raz.",
     refresh: "Zapisano, ale nie udało się odświeżyć listy.",
@@ -2245,6 +2257,30 @@ function routeRateBody(row, routeName, text, mode) {
         },
     };
 }
+function pickupDateBody(rows, iso, mode) {
+    const pickupDate = isoToSheetDate(iso);
+    if (!pickupDate || rows.length === 0) {
+        return { ok: false, error: STATEMENT_ERROR.badDate };
+    }
+    if (rows.every((row) => row.pickupDate === pickupDate)) {
+        return { ok: true, unchanged: true };
+    }
+    return {
+        ok: true,
+        unchanged: false,
+        pickupDate,
+        body: {
+            action: "patchPickupDate",
+            dataOdbioru: pickupDate,
+            wiersze: rows.map((row) => ({
+                sheetName: row.sheetName,
+                sheetRow: row.sheetRow,
+                transportNumber: row.transportNumber,
+            })),
+            ...scheduleTrybFields(mode),
+        },
+    };
+}
 function detachBody(row, mode) {
     return {
         action: "detachRoute",
@@ -2333,6 +2369,9 @@ function writeError(code) {
     }
     if (code === "bags") {
         return STATEMENT_ERROR.badBags;
+    }
+    if (code === "date") {
+        return STATEMENT_ERROR.badDate;
     }
     if (code === "rate") {
         return STATEMENT_ERROR.badRate;
@@ -2563,6 +2602,8 @@ function readRateRow(value) {
 
 
 
+
+
 const DASH = '<span class="muted">—</span>';
 function renderStatement(screen, status = "", options = {}) {
     const allowApprove = options.allowApprove !== false;
@@ -2625,7 +2666,7 @@ function plainRow(screen, shop) {
         `<td>${text(shop.transportNumber, dead)}</td>` +
         `<td class="adres">${text(addressWithCommaAfterLocality(shop.address), dead)}</td>` +
         `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}${newRouteBox(screen, shop)}</div></td>` +
-        `<td>${text(shop.pickupDate, dead)}</td>` +
+        `<td>${dateInput(shop, "pickup-date", shop.pickupDate, "Zapis od razu do Data odbioru.")}</td>` +
         `<td>${legKind}</td>` +
         `<td class="num">${legAmount}</td>` +
         `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków")}</td>` +
@@ -2645,7 +2686,9 @@ function routeRow(screen, line) {
     const sub = happened === line.shops.length ? shopsWord(line.shops.length) : `${happened} z ${line.shops.length} w koszcie`;
     const none = happened === 0 ? '<div class="sub">Żaden sklep się nie odbył — kosztu trasy nie ma.</div>' : "";
     const tie = line.shops.some((shop) => shop.tie) ? '<div class="err">Remis stawek. Rozwiń i wskaż wiersz.</div>' : "";
-    const date = line.date === null ? DASH : escapeHtml(line.date);
+    const date = anchor
+        ? dateInput(anchor, "route-date", line.date ?? "", "Zapis od razu. Ta data wchodzi na każdy sklep tej trasy w zestawieniu.", line.routeName)
+        : DASH;
     const bagRate = line.bagRate === null || !anchor
         ? DASH
         : amountInput(anchor, "bag-rate-route", undefined, line.bagRate, "Jedna kwota, bo każdy adres, który się odbył, ma tę samą. Zmiana tylko na tym ekranie.", line.routeName);
@@ -2680,7 +2723,7 @@ function childRow(screen, shop, sharedBagRate) {
         `<td>${text(shop.transportNumber, dead)}</td>` +
         `<td class="adres">${text(addressWithCommaAfterLocality(shop.address), dead)}</td>` +
         `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}</div></td>` +
-        `<td>${text(shop.pickupDate, dead)}</td>` +
+        `<td>${dateInput(shop, "pickup-date", shop.pickupDate, "Zapis od razu do Data odbioru tego sklepu.")}</td>` +
         `<td>${DASH}</td>` +
         `<td class="num">${DASH}</td>` +
         `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków tego adresu")}</td>` +
@@ -2763,6 +2806,16 @@ function tieBox(tie, rates) {
     })
         .join("");
     return `<div class="tie"><span class="err">Dwie stawki na ten dzień. Wskaż, która obowiązuje.</span>${buttons}</div>`;
+}
+function dateInput(shop, edit, shown, title, routeName) {
+    const route = routeName ? ` data-route="${escapeHtml(routeName)}"` : "";
+    return `<input type="date" data-edit="${edit}" ${ref(shop)}${route} value="${escapeHtml(sheetDateInputValue(shown))}" title="${escapeHtml(title)}" aria-label="Data odbioru">`;
+}
+function sheetDateInputValue(text) {
+    if (text === "") {
+        return "";
+    }
+    return calendarToIsoDate(parseSheetDate(text));
 }
 function bagCountInput(shop, title) {
     const shown = shop.bagCount === null ? "" : String(shop.bagCount);
@@ -4937,6 +4990,8 @@ function onChange(event) {
     }
     if (el.dataset.edit === "bags" ||
         el.dataset.edit === "pickup" ||
+        el.dataset.edit === "pickup-date" ||
+        el.dataset.edit === "route-date" ||
         el.dataset.edit === "bag-rate" ||
         el.dataset.edit === "bag-rate-route" ||
         el.dataset.edit === "route-rate") {
@@ -5579,6 +5634,29 @@ async function commitEdit(el) {
         }
         await writeNow("Zapisuję stawkę trasy…", built.body, () => {
             VIEW.statement = commitRouteRate(VIEW.statement, routeName, built.grosze);
+            VIEW.status = "";
+        });
+        return;
+    }
+    if (edit === "pickup-date" || edit === "route-date") {
+        const routeName = el.dataset.route ?? "";
+        const targets = edit === "route-date" ? VIEW.statement.rows.filter((item) => routeName !== "" && item.routeName === routeName) : [row];
+        const built = pickupDateBody(targets, el.value, VIEW.mode);
+        if (!built.ok) {
+            VIEW.status = built.error;
+            paint();
+            return;
+        }
+        if (built.unchanged) {
+            VIEW.status = "";
+            return;
+        }
+        await writeNow("Zapisuję datę odbioru…", built.body, async () => {
+            const refreshed = await reloadStatement();
+            if (!refreshed.ok) {
+                VIEW.status = STATEMENT_ERROR.refresh;
+                return;
+            }
             VIEW.status = "";
         });
         return;

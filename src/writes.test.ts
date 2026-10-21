@@ -58,12 +58,25 @@ class FakeRange {
       }
     }
   }
+
+  setNumberFormat(): this {
+    return this;
+  }
+
+  getDataValidation(): null {
+    return null;
+  }
+
+  setDataValidation(): this {
+    return this;
+  }
 }
 
 class FakeSheet {
   private readonly cells = new Map<string, Cell>();
   readonly writes: Write[] = [];
   readonly deletes: number[] = [];
+  private rules: unknown[] = [];
   constructor(readonly name = "Arkusz1") {}
 
   getName(): string {
@@ -91,6 +104,37 @@ class FakeSheet {
       }
     }
     return max;
+  }
+
+  getLastColumn(): number {
+    let max = 0;
+    for (const [key, value] of this.cells) {
+      if (value == null || value === "") {
+        continue;
+      }
+      const col = Number(key.split(",")[1]);
+      if (col > max) {
+        max = col;
+      }
+    }
+    return max;
+  }
+
+  getMaxRows(): number {
+    return 1000;
+  }
+
+  getConditionalFormatRules(): unknown[] {
+    return this.rules;
+  }
+
+  setConditionalFormatRules(rules: unknown[]): void {
+    this.rules = rules;
+  }
+
+  appendRow(values: Cell[]): void {
+    const row = this.getLastRow() + 1;
+    this.getRange(row, 1, 1, values.length).setValues([values]);
   }
 
   getRange(row: number, col: number, numRows?: number, numCols?: number): FakeRange {
@@ -134,11 +178,12 @@ const holder: { register: FakeSheet; rates: FakeSheet | null } = {
   register: new FakeSheet("Arkusz1"),
   rates: null,
 };
+const extraSheets = new Map<string, FakeSheet>();
 
 type PostResult = {
   ok: boolean;
   error?: string;
-  zapisane?: { sheetRow: number; transportNumber: string }[];
+  zapisane?: { sheetName?: string; sheetRow: number; transportNumber: string }[];
   pominiete?: { sheetRow: number | null; transportNumber: string; reason: string }[];
 };
 
@@ -146,22 +191,65 @@ let postToSheet: (body: Record<string, unknown>) => PostResult;
 
 beforeAll(() => {
   const context: Record<string, unknown> = {
+    Logger: { log() {} },
     SpreadsheetApp: {
       getActiveSpreadsheet() {
         return {
           getSheets() {
-            return [holder.register];
+            return [holder.register, ...extraSheets.values()];
           },
           getSheetByName(name: string) {
-            if (name === holder.register.name) {
-              return holder.register;
-            }
             if (name === "Baza stawek") {
               return holder.rates;
             }
+            const extra = extraSheets.get(name);
+            if (extra) {
+              return extra;
+            }
+            if (name === holder.register.name) {
+              return holder.register;
+            }
             return null;
           },
+          insertSheet(name: string) {
+            const sheet = new FakeSheet(name);
+            extraSheets.set(name, sheet);
+            return sheet;
+          },
         };
+      },
+      newDataValidation() {
+        const builder = {
+          requireValueInList() {
+            return builder;
+          },
+          setAllowInvalid() {
+            return builder;
+          },
+          build() {
+            return { getCriteriaValues: () => [["tak", "nie"]] };
+          },
+        };
+        return builder;
+      },
+      newConditionalFormatRule() {
+        let formula = "";
+        const builder = {
+          whenFormulaSatisfied(value: string) {
+            formula = value;
+            return builder;
+          },
+          setStrikethrough() {
+            return builder;
+          },
+          setRanges() {
+            return builder;
+          },
+          build() {
+            return { getBooleanCondition: () => ({ getCriteriaValues: () => [formula] }) };
+          },
+        };
+        return builder;
       },
     },
     LockService: {
@@ -229,11 +317,12 @@ beforeAll(() => {
   };
 });
 
-function fresh(): { register: FakeSheet; rates: FakeSheet } {
-  const register = new FakeSheet("Arkusz1");
+function fresh(name = "Arkusz1"): { register: FakeSheet; rates: FakeSheet } {
+  const register = new FakeSheet(name);
   const rates = new FakeSheet("Baza stawek");
   holder.register = register;
   holder.rates = rates;
+  extraSheets.clear();
   return { register, rates };
 }
 
@@ -258,6 +347,36 @@ function seedRegister(sheet: FakeSheet, row: number, over: Partial<Record<number
     "",
     "999",
     "111",
+  ];
+  for (let i = 0; i < cols.length; i += 1) {
+    sheet.put(row, i + 1, cols[i]);
+  }
+  for (const [key, value] of Object.entries(over)) {
+    sheet.put(row, Number(key), value as Cell);
+  }
+}
+
+function seedSchedule(sheet: FakeSheet, row: number, over: Partial<Record<number, Cell>> = {}): void {
+  const cols: Cell[] = [
+    "Sklepowa 1",
+    "Firma",
+    "Sklep",
+    "18.09.2026",
+    "gpw",
+    "",
+    "",
+    2,
+    "",
+    "trasa-a",
+    "150",
+    "",
+    "",
+    "",
+    "",
+    "999",
+    "111",
+    "",
+    "",
   ];
   for (let i = 0; i < cols.length; i += 1) {
     sheet.put(row, i + 1, cols[i]);
@@ -378,6 +497,110 @@ describe("patchBags", () => {
     ).toEqual({ ok: false, error: "bags" });
     expect(register.writes).toEqual([]);
     expectCostsUntouched(register, [2]);
+  });
+});
+
+describe("patchPickupDate", () => {
+  it("test_patchPickupDate_same_month_sheet_writes_date_cell_only", () => {
+    const { register } = fresh("Na zgłoszenie Wrzesień 2026");
+    seedRegister(register, 2);
+
+    const result = postToSheet({
+      action: "patchPickupDate",
+      sheetName: "Na zgłoszenie Wrzesień 2026",
+      sheetRow: 2,
+      transportNumber: "15",
+      dataOdbioru: "19.09.2026",
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      zapisane: [{ sheetName: "Na zgłoszenie Wrzesień 2026", sheetRow: 2, transportNumber: "15" }],
+    });
+    expect(register.cell(2, 5)).toBe("19.09.2026");
+    expect(register.deletes).toEqual([]);
+    expect(extraSheets.size).toBe(0);
+    expectCostsUntouched(register, [2]);
+  });
+
+  it("test_patchPickupDate_other_month_moves_row_and_keeps_cost", () => {
+    const { register } = fresh();
+    seedRegister(register, 2);
+    seedRegister(register, 3, { 1: 16 });
+
+    const result = postToSheet({
+      action: "patchPickupDate",
+      dataOdbioru: "02.10.2026",
+      wiersze: [
+        { sheetRow: 3, transportNumber: "16" },
+        { sheetRow: 2, transportNumber: "15" },
+      ],
+    });
+
+    const dest = extraSheets.get("Na zgłoszenie Październik 2026");
+    expect(dest).toBeTruthy();
+    expect(result.ok).toBe(true);
+    expect(result.zapisane).toEqual([
+      { sheetName: "Na zgłoszenie Październik 2026", sheetRow: 2, transportNumber: "16" },
+      { sheetName: "Na zgłoszenie Październik 2026", sheetRow: 3, transportNumber: "15" },
+    ]);
+    expect(register.cell(2, 1)).toBe("");
+    expect(register.cell(3, 1)).toBe("");
+    expect(dest?.cell(2, 1)).toBe(16);
+    expect(dest?.cell(2, 5)).toBe("02.10.2026");
+    expect(dest?.cell(2, 17)).toBe("999");
+    expect(dest?.cell(2, 18)).toBe("111");
+    expect(dest?.cell(3, 1)).toBe(15);
+    expect(dest?.cell(3, 5)).toBe("02.10.2026");
+  });
+
+  it("test_patchPickupDate_bad_date_or_settled_row_writes_nothing", () => {
+    const { register } = fresh("Na zgłoszenie Wrzesień 2026");
+    seedRegister(register, 2);
+    seedRegister(register, 3, { 1: 16, 15: "tak" });
+
+    expect(
+      postToSheet({
+        action: "patchPickupDate",
+        sheetName: "Na zgłoszenie Wrzesień 2026",
+        sheetRow: 2,
+        transportNumber: "15",
+        dataOdbioru: "31.02.2026",
+      }),
+    ).toEqual({ ok: false, error: "date" });
+    expect(
+      postToSheet({
+        action: "patchPickupDate",
+        sheetName: "Na zgłoszenie Wrzesień 2026",
+        dataOdbioru: "20.09.2026",
+        wiersze: [
+          { sheetRow: 2, transportNumber: "15" },
+          { sheetRow: 3, transportNumber: "16" },
+        ],
+      }),
+    ).toEqual({ ok: false, error: "settled" });
+    expect(register.cell(2, 5)).toBe("18.09.2026");
+    expect(register.writes).toEqual([]);
+    expect(register.deletes).toEqual([]);
+  });
+
+  it("test_patchPickupDate_schedule_same_month_writes_column_4", () => {
+    const { register } = fresh("Harmonogram Wrzesień 2026");
+    seedSchedule(register, 2);
+
+    const result = postToSheet({
+      action: "patchPickupDate",
+      tryb: "harmonogram",
+      sheetName: "Harmonogram Wrzesień 2026",
+      sheetRow: 2,
+      dataOdbioru: "2026-09-21",
+    });
+
+    expect(result.zapisane).toEqual([
+      { sheetName: "Harmonogram Wrzesień 2026", sheetRow: 2, transportNumber: "" },
+    ]);
+    expect(register.cell(2, 4)).toBe("21.09.2026");
+    expect(register.deletes).toEqual([]);
   });
 });
 
@@ -1038,6 +1261,7 @@ describe("zapis w transport-log.gs", () => {
     for (const action of [
       "patchBags",
       "patchRouteRate",
+      "patchPickupDate",
       "detachRoute",
       "attachRoute",
       "resolveRateTie",
@@ -1050,7 +1274,7 @@ describe("zapis w transport-log.gs", () => {
     expect(run).not.toContain("saveRate");
     expect(functionSource("resolveRateTie_")).not.toContain("getDataSheet_");
     expect(functionSource("resolveRateTie_")).not.toContain("getOrCreateRateSheet_");
-    for (const name of ["patchBags_", "patchRouteRate_", "detachRoute_", "attachRoute_"]) {
+    for (const name of ["patchBags_", "patchRouteRate_", "patchPickupDate_", "detachRoute_", "attachRoute_"]) {
       const src = functionSource(name);
       expect(src).not.toContain("kosztOdbioru");
       expect(src).not.toContain("kosztPerWorek");

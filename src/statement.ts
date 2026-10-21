@@ -1,5 +1,5 @@
 import { lineKey, rowKey, settle, sumSelected } from "./engine.js";
-import type { SettlementMode } from "./range.js";
+import { isoToSheetDate, type SettlementMode } from "./range.js";
 import { parseSheetDate } from "./sheetDate.js";
 import type {
   SettlementRateRow,
@@ -33,6 +33,7 @@ export const STATEMENT_ERROR = {
   emptyRate: "Pusta stawka nie zapisuje trasy.",
   badRate: "Stawka jest niepoprawna.",
   badBags: "Liczba worków jest niepoprawna.",
+  badDate: "Data odbioru jest niepoprawna.",
   write: "Zapis nie doszedł.",
   stale: "Wiersz się zmienił. Szukaj jeszcze raz.",
   refresh: "Zapisano, ale nie udało się odświeżyć listy.",
@@ -565,6 +566,38 @@ export function routeRateBody(
   };
 }
 
+export function pickupDateBody(
+  rows: readonly RegisterRow[],
+  iso: string,
+  mode?: SettlementMode,
+):
+  | { ok: false; error: string }
+  | { ok: true; unchanged: true }
+  | { ok: true; unchanged: false; pickupDate: string; body: Record<string, unknown> } {
+  const pickupDate = isoToSheetDate(iso);
+  if (!pickupDate || rows.length === 0) {
+    return { ok: false, error: STATEMENT_ERROR.badDate };
+  }
+  if (rows.every((row) => row.pickupDate === pickupDate)) {
+    return { ok: true, unchanged: true };
+  }
+  return {
+    ok: true,
+    unchanged: false,
+    pickupDate,
+    body: {
+      action: "patchPickupDate",
+      dataOdbioru: pickupDate,
+      wiersze: rows.map((row) => ({
+        sheetName: row.sheetName,
+        sheetRow: row.sheetRow,
+        transportNumber: row.transportNumber,
+      })),
+      ...scheduleTrybFields(mode),
+    },
+  };
+}
+
 export function detachBody(row: RegisterRow, mode?: SettlementMode): Record<string, unknown> {
   return {
     action: "detachRoute",
@@ -669,6 +702,9 @@ export function writeError(code: unknown): string {
   }
   if (code === "bags") {
     return STATEMENT_ERROR.badBags;
+  }
+  if (code === "date") {
+    return STATEMENT_ERROR.badDate;
   }
   if (code === "rate") {
     return STATEMENT_ERROR.badRate;

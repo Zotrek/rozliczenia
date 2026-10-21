@@ -316,6 +316,18 @@ export function toggleSelected(screen: StatementScreen, key: string): StatementS
   return { ...screen, selected };
 }
 
+/** Zaznacza albo czyści każdą pozycję zestawienia (sklep albo cała trasa). */
+export function setAllSelected(screen: StatementScreen, on: boolean): StatementScreen {
+  if (!on) {
+    return { ...screen, selected: {} };
+  }
+  const selected: Record<string, true> = {};
+  for (const line of currentStatement(screen).lines) {
+    selected[lineKey(line)] = true;
+  }
+  return { ...screen, selected };
+}
+
 export function toggleOpen(screen: StatementScreen, routeName: string): StatementScreen {
   const openRoutes = { ...screen.openRoutes };
   if (openRoutes[routeName]) {

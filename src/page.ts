@@ -41,6 +41,7 @@ import {
   readSettlement,
   readSettlementStats,
   routeRateBody,
+  setAllSelected,
   setBagRate,
   setBagsOnly,
   setDidNotHappen,
@@ -668,6 +669,12 @@ function onChange(event: Event): void {
   }
   if (el.dataset.stats === "from" || el.dataset.stats === "to") {
     applyStatsField(el.dataset.stats, el.value);
+    return;
+  }
+  if (el.dataset.toggle === "checked-all") {
+    VIEW.statement = setAllSelected(VIEW.statement, el.checked);
+    VIEW.status = "";
+    paint();
     return;
   }
   if (el.dataset.toggle === "checked") {

@@ -36,6 +36,7 @@ import {
   setBagsOnly,
   setDidNotHappen,
   setPickup,
+  setAllSelected,
   setRouteBagRate,
   skippedCount,
   formatPartialApprove,
@@ -363,6 +364,24 @@ describe("selection and open routes", () => {
     expect(selectedKeys(on.selected).has("\t2\t2")).toBe(true);
     const off = toggleSelected(on, "\t2\t2");
     expect(off.selected["\t2\t2"]).toBeUndefined();
+  });
+
+  it("test_setAllSelected_marks_every_line_then_clears", () => {
+    const base = screen(
+      [
+        row({ sheetRow: 2 }),
+        row({ sheetRow: 3, address: "A", routeName: "trasa", routeRate: 15_000 }),
+        row({ sheetRow: 4, address: "B", routeName: "trasa", routeRate: 15_000 }),
+      ],
+      [rate({ sheetRow: 3, shop: "A" }), rate({ sheetRow: 4, shop: "B" })],
+    );
+    base.selected.stale = true;
+    const on = setAllSelected(base, true);
+    expect(on.selected["\t2\t2"]).toBe(true);
+    expect(on.selected[routeSelectionKey("trasa")]).toBe(true);
+    expect(Object.keys(on.selected)).toEqual(["\t2\t2", routeSelectionKey("trasa")]);
+    expect(base.selected.stale).toBe(true);
+    expect(setAllSelected(on, false).selected).toEqual({});
   });
 
   it("test_toggleOpen_and_selectedLineCount", () => {

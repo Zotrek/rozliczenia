@@ -1,4 +1,4 @@
-import { rowKey, sumSelected } from "./engine.js";
+import { lineKey, rowKey, sumSelected } from "./engine.js";
 import { escapeHtml } from "./html.js";
 import { addressWithCommaAfterLocality } from "./rateWindow.js";
 import type { SettlementRateRow } from "./search.js";
@@ -60,7 +60,7 @@ function table(screen: StatementScreen, lines: readonly StatementLine[]): string
   }
   return (
     '<div class="table-wrap"><table><thead><tr>' +
-    "<th class=\"c\">Rozliczone</th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>" +
+    `<th class="c">${selectAllBox(lines, screen.selected)} Rozliczone</th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>` +
     "<th>Podjazd/Trasa</th><th class=\"num\">Liczba worków</th><th class=\"num\">Kwota za worek</th>" +
     "<th class=\"num\">Suma za worki</th><th class=\"num\">Koszt odbioru</th>" +
     "<th class=\"num\" title=\"Tylko na ekranie. Nie zapisuje się jako jedna kwota.\">Suma trasy</th>" +
@@ -210,6 +210,11 @@ function rowClass(dead: boolean, checked: boolean, kind: "plain" | "route" | "ch
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+function selectAllBox(lines: readonly StatementLine[], selected: StatementScreen["selected"]): string {
+  const on = lines.length > 0 && lines.every((line) => selected[lineKey(line)] === true);
+  return `<input type="checkbox" data-toggle="checked-all"${on ? " checked" : ""} aria-label="Zaznacz wszystkie jako rozliczone" title="Zaznacz wszystkie jako rozliczone">`;
 }
 
 function lineBox(line: string, checked: boolean): string {

@@ -285,6 +285,7 @@ th {
 }
 th.num, td.num { text-align: right; }
 th.c, td.c { text-align: center; }
+th.c input { margin: 0 4px 0 0; vertical-align: -1px; }
 tr.is-route td { background: #f0fdfa; }
 tr.is-child td { background: #f8fafc; }
 tr.is-checked td { background: rgba(13, 148, 136, 0.08); }

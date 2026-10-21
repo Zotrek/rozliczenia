@@ -293,6 +293,7 @@ th {
 }
 th.num, td.num { text-align: right; }
 th.c, td.c { text-align: center; }
+th.c input { margin: 0 4px 0 0; vertical-align: -1px; }
 tr.is-route td { background: #f0fdfa; }
 tr.is-child td { background: #f8fafc; }
 tr.is-checked td { background: rgba(13, 148, 136, 0.08); }
@@ -2045,6 +2046,17 @@ function toggleSelected(screen, key) {
     }
     return { ...screen, selected };
 }
+/** Zaznacza albo czyści każdą pozycję zestawienia (sklep albo cała trasa). */
+function setAllSelected(screen, on) {
+    if (!on) {
+        return { ...screen, selected: {} };
+    }
+    const selected = {};
+    for (const line of currentStatement(screen).lines) {
+        selected[lineKey(line)] = true;
+    }
+    return { ...screen, selected };
+}
 function toggleOpen(screen, routeName) {
     const openRoutes = { ...screen.openRoutes };
     if (openRoutes[routeName]) {
@@ -2564,7 +2576,7 @@ function table(screen, lines) {
         }
     }
     return ('<div class="table-wrap"><table><thead><tr>' +
-        "<th class=\"c\">Rozliczone</th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>" +
+        `<th class="c">${selectAllBox(lines, screen.selected)} Rozliczone</th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>` +
         "<th>Podjazd/Trasa</th><th class=\"num\">Liczba worków</th><th class=\"num\">Kwota za worek</th>" +
         "<th class=\"num\">Suma za worki</th><th class=\"num\">Koszt odbioru</th>" +
         "<th class=\"num\" title=\"Tylko na ekranie. Nie zapisuje się jako jedna kwota.\">Suma trasy</th>" +
@@ -2677,6 +2689,10 @@ function rowClass(dead, checked, kind) {
     ]
         .filter(Boolean)
         .join(" ");
+}
+function selectAllBox(lines, selected) {
+    const on = lines.length > 0 && lines.every((line) => selected[lineKey(line)] === true);
+    return `<input type="checkbox" data-toggle="checked-all"${on ? " checked" : ""} aria-label="Zaznacz wszystkie jako rozliczone" title="Zaznacz wszystkie jako rozliczone">`;
 }
 function lineBox(line, checked) {
     return `<input type="checkbox" data-toggle="checked" data-line="${escapeHtml(line)}"${checked ? " checked" : ""} aria-label="Rozliczone">`;
@@ -4837,6 +4853,12 @@ function onChange(event) {
     }
     if (el.dataset.stats === "from" || el.dataset.stats === "to") {
         applyStatsField(el.dataset.stats, el.value);
+        return;
+    }
+    if (el.dataset.toggle === "checked-all") {
+        VIEW.statement = setAllSelected(VIEW.statement, el.checked);
+        VIEW.status = "";
+        paint();
         return;
     }
     if (el.dataset.toggle === "checked") {

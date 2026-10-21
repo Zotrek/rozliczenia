@@ -75,8 +75,8 @@ function plainRow(screen: StatementScreen, shop: ShopCost): string {
   const dead = !shop.happened;
   const checked = screen.selected[key] === true;
   const state = screen.screenByRow[key] ?? {};
-  const legKind = shop.bagsOnly || shop.tie || dead ? DASH : `<span class="tag">podjazd</span>`;
-  const legAmount = shop.bagsOnly || shop.tie
+  const legKind = shop.tie || dead ? DASH : `<span class="tag">podjazd</span>`;
+  const legAmount = shop.tie
     ? DASH
     : dead
       ? money(shop.legAmount, true)
@@ -89,7 +89,7 @@ function plainRow(screen: StatementScreen, shop: ShopCost): string {
     `<td class="c">${lineBox(line, checked)}</td>` +
     `<td>${text(shop.transportNumber, dead)}</td>` +
     `<td class="adres">${text(addressWithCommaAfterLocality(shop.address), dead)}</td>` +
-    `<td class="sklep"><div>${text(shop.shopName, dead)}${bagsOnlyBox(shop, shop.bagsOnly)}${tieBox(shop.tie, screen.rates)}${newRouteBox(screen, shop)}</div></td>` +
+    `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}${newRouteBox(screen, shop)}</div></td>` +
     `<td>${text(shop.pickupDate, dead)}</td>` +
     `<td>${legKind}</td>` +
     `<td class="num">${legAmount}</td>` +
@@ -223,12 +223,6 @@ function selectAllBox(lines: readonly StatementLine[], selected: StatementScreen
 
 function lineBox(line: string, checked: boolean): string {
   return `<input type="checkbox" data-toggle="checked" data-line="${escapeHtml(line)}"${checked ? " checked" : ""} aria-label="Rozliczone">`;
-}
-
-function bagsOnlyBox(shop: ShopCost, on: boolean): string {
-  return (
-    `<label class="only"><input type="checkbox" data-toggle="bags-only" ${ref(shop)}${on ? " checked" : ""} aria-label="tylko za liczbę worków"> tylko za liczbę worków</label>`
-  );
 }
 
 function tripBox(shop: ShopCost): string {

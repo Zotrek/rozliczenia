@@ -417,8 +417,7 @@
             <li>Na zgłoszenie włączone, Harmonogram widać i nie da się go zaznaczyć.</li>
             <li>Podwykonawcę znajduje się jak na mapie: fragment Nazwa albo Dane do Worda. Adres jest w Dane do Worda. Wybór jest z listy, do rozliczenia wchodzi Nazwa. Data początkowa ma opcję „bez daty początkowej”. Data końcowa jest wymagana. Obie daty są włącznie. Data początkowa późniejsza niż końcowa nie startuje Szukaj.</li>
             <li>Wiersz sklepu i wiersz trasy, rozwinięcie sklepów, jedna Suma trasy.</li>
-            <li>Liczba worków zmienia się od razu. Stawka podjazdu i worka tylko na ekranie. Stawka za trasę zapisuje się od razu do Stawka za trasę. Koszt odbioru i Koszt odbioru per worek, kolumny 16 i 17, dopiero przy Zatwierdź.</li>
-            <li>Tylko za liczbę worków jest przy odbiorze zwykłym: w Podjazd/Trasa jest „—”. Na trasie tej opcji nie ma.</li>
+            <li>Liczba worków zmienia się od razu. Stawka podjazdu i worka tylko na ekranie. Stawka za trasę zapisuje się od razu do Stawka za trasę. Koszt odbioru i Koszt odbioru per worek, kolumny 16 i 17, dopiero przy Zatwierdź. Podjazd 0 zł wpisuje się w kwotę podjazdu. Opcji „tylko za liczbę worków” nie ma.</li>
             <li>Transport się nie odbył przekreśla wiersz i wyjmuje go z kosztu. Przy Zatwierdź dostaje samo „nie”: bez Rozliczony, bez faktury, bez kolumn 16 i 17 i bez stawki trasy. W następnym wyszukaniu go nie ma.</li>
             <li>Odepnij od trasy zabiera sklep z trasy od razu. Zostaje odbiorem za podjazd. Nowa nazwa i stawka robią osobną trasę. Stawka jest wymagana, pusta nie zapisuje trasy. Kwota 0 jest wpisana. Starej nazwy nie da się wpisać. Ta sama nowa nazwa łączy sklepy w jedną trasę.</li>
             <li>Suma zestawienia liczy też niezaznaczone. Suma zaznaczonych reaguje od razu.</li>
@@ -430,7 +429,7 @@
           <ul>
             <li>Ekran 1 ustala tryb, podwykonawcę i daty. Tabeli tam nie ma.</li>
             <li>Ekran 2 pokazuje pozycje, sumy i zatwierdzenie. Zakres widać w nagłówku, zmiana wraca do ekranu 1.</li>
-            <li>Bez wykresu <strong>na Zestawieniu</strong>. „Tylko za liczbę worków” stoi pod nazwą sklepu, nie na trasie. Statystyki (osobna makieta) mają słupki CSS.</li>
+            <li>Bez wykresu <strong>na Zestawieniu</strong>. Opcji „tylko za liczbę worków” nie ma. Statystyki (osobna makieta) mają słupki CSS.</li>
             <li>Baza stawek jest oknem. Sklep to lista adresów z rejestru, podwykonawca to nazwa krótka z Listy podwykonawców. Nie pinezki mapy.</li>
             <li>Na ekranie Zakres jest przycisk <strong>Statystyki</strong> (obok Bazy stawek) — makieta: <a href="makiety-statystyki.html">makiety-statystyki.html</a>. Trzy widoki aplikacji: Zakres, Zestawienie, Statystyki.</li>
             <li>Remis stawek jest na wierszu z błędem w zestawieniu, nie w tym oknie. Makieta tego nie rysuje.</li>
@@ -475,11 +474,11 @@
       { name: 'IWO SORTOWNIA ODPADÓW SEGREGOWANYCH', dane: 'IWO ul. Bielska 41, 17-120 Brańsk' }
     ];
     const SEED = [
-      { id: 's1', type: 'shop', contractor: 'GPW', name: 'Biedronka', address: 'ul. Głogowska 12, Poznań', date: '12.09.2026', protocol: '10421', drive: 20, bags: 4, bagRate: 2.5, bagsOnly: false, noTrip: false, checked: false },
-      { id: 's2', type: 'shop', contractor: 'GPW', name: 'Lidl', address: 'ul. Hetmańska 90, Poznań', date: '14.09.2026', protocol: '10488', drive: 35, bags: 8, bagRate: 2.5, bagsOnly: false, noTrip: false, checked: false },
-      { id: 's3', type: 'shop', contractor: 'GPW', name: 'Żabka', address: 'ul. Półwiejska 3, Poznań', date: '15.09.2026', protocol: '10502', drive: 20, bags: 4, bagRate: 2.5, bagsOnly: true, noTrip: false, checked: true },
-      { id: 's4', type: 'shop', contractor: 'GPW', name: 'Lewiatan', address: 'ul. Święty Marcin 40, Poznań', date: '16.09.2026', protocol: '10540', drive: 22, bags: 3, bagRate: null, bagsOnly: false, noTrip: false, checked: false },
-      { id: 's5', type: 'shop', contractor: 'GPW', name: 'Rossmann', address: 'ul. Półwiejska 42, Poznań', date: '16.09.2026', protocol: '10555', drive: 15, bags: 2, bagRate: 2.5, bagsOnly: false, noTrip: true, checked: false },
+      { id: 's1', type: 'shop', contractor: 'GPW', name: 'Biedronka', address: 'ul. Głogowska 12, Poznań', date: '12.09.2026', protocol: '10421', drive: 20, bags: 4, bagRate: 2.5, noTrip: false, checked: false },
+      { id: 's2', type: 'shop', contractor: 'GPW', name: 'Lidl', address: 'ul. Hetmańska 90, Poznań', date: '14.09.2026', protocol: '10488', drive: 35, bags: 8, bagRate: 2.5, noTrip: false, checked: false },
+      { id: 's3', type: 'shop', contractor: 'GPW', name: 'Żabka', address: 'ul. Półwiejska 3, Poznań', date: '15.09.2026', protocol: '10502', drive: 0, bags: 4, bagRate: 2.5, noTrip: false, checked: true },
+      { id: 's4', type: 'shop', contractor: 'GPW', name: 'Lewiatan', address: 'ul. Święty Marcin 40, Poznań', date: '16.09.2026', protocol: '10540', drive: 22, bags: 3, bagRate: null, noTrip: false, checked: false },
+      { id: 's5', type: 'shop', contractor: 'GPW', name: 'Rossmann', address: 'ul. Półwiejska 42, Poznań', date: '16.09.2026', protocol: '10555', drive: 15, bags: 2, bagRate: 2.5, noTrip: true, checked: false },
       {
         id: 't1', type: 'route', contractor: 'GPW', name: 'gpw-18.09.26-01', date: '18.09.2026', routeRate: 150, bagRate: 2, checked: true, open: true,
         shops: [
@@ -554,7 +553,7 @@
     }
     function shopEconomics(row) {
       const bagsSum = row.noTrip ? 0 : bagMoney(row.bags, row.bagRate);
-      const drivePart = row.noTrip || row.bagsOnly ? 0 : (Number(row.drive) || 0);
+      const drivePart = row.noTrip ? 0 : (Number(row.drive) || 0);
       return { bagsSum, cost: row.noTrip ? 0 : drivePart + bagsSum };
     }
     function shopBagRate(route, shop) {
@@ -630,7 +629,7 @@
       visibleRows().forEach((row) => {
         if (row.type === 'shop') {
           if (row.noTrip) return;
-          if (!row.bagsOnly) podjazd += Number(row.drive) || 0;
+          podjazd += Number(row.drive) || 0;
           worki += bagMoney(row.bags, row.bagRate);
         } else {
           const eco = routeEconomics(row);
@@ -663,7 +662,6 @@
         drive: 0,
         bags: shop.bags,
         bagRate: shopBagRate(route, shop),
-        bagsOnly: false,
         noTrip: false,
         checked: false,
         detached: true,
@@ -814,20 +812,11 @@
         + '<button type="button" class="btn-mini" data-action="make-route" data-id="' + row.id + '" title="Zapis od razu. Ta sama nazwa u tego podwykonawcy to jedna trasa.">Osobna trasa</button>'
         + err + '</div>';
     }
-    function bagsBox(id, on, labeled) {
-      const input = '<input type="checkbox" data-toggle="bags" data-id="' + id + '"' + (on ? ' checked' : '') + ' aria-label="tylko za liczbę worków">';
-      if (labeled === 'under') return '<label class="only">' + input + ' tylko za liczbę worków</label>';
-      if (labeled === 'chip') return '<label class="chip">' + input + ' tylko za liczbę worków</label>';
-      return input;
-    }
     function numInput(id, field, value, shopIndex, title) {
       const shop = shopIndex == null ? '' : ' data-shop="' + shopIndex + '"';
       const shown = field === 'bags' ? (value == null ? '' : String(value)) : formatInput(value);
       const ph = field === 'bagRate' ? ' placeholder="brak"' : '';
       return '<input type="text" inputmode="decimal" spellcheck="false" data-edit="' + field + '" data-id="' + id + '"' + shop + ' value="' + esc(shown) + '"' + ph + ' title="' + esc(title) + '">';
-    }
-    function onlyPlace() {
-      return 'under';
     }
     function plDate(iso) {
       if (!iso) return '';
@@ -900,8 +889,7 @@
     }
 
     function headRow() {
-      const extra = state.layout === 'b' ? '<th class="c wrap">tylko za liczbę worków</th>' : '';
-      return '<tr><th class="c">Rozliczone</th>' + extra + '<th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th><th>Podjazd/Trasa</th><th class="num">Liczba worków</th><th class="num">Kwota za worek</th><th class="num">Suma za worki</th><th class="num">Koszt odbioru</th><th class="num" title="Tylko na ekranie. Nie zapisuje się jako jedna kwota.">Suma trasy</th><th>transport się odbył</th></tr>';
+      return '<tr><th class="c">Rozliczone</th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th><th>Podjazd/Trasa</th><th class="num">Liczba worków</th><th class="num">Kwota za worek</th><th class="num">Suma za worki</th><th class="num">Koszt odbioru</th><th class="num" title="Tylko na ekranie. Nie zapisuje się jako jedna kwota.">Suma trasy</th><th>transport się odbył</th></tr>';
     }
 
     function rowClass(dead, checked, kind) {
@@ -910,16 +898,11 @@
 
     function shopCells(row, dead) {
       const eco = shopEconomics(row);
-      const place = onlyPlace();
-      const under = place === 'under' ? bagsBox(row.id, row.bagsOnly, 'under') : '';
-      const col = place === 'col' ? '<td class="c">' + bagsBox(row.id, row.bagsOnly, 'col') + '</td>' : '';
-      const drive = row.bagsOnly
-        ? dash()
-        : '<span class="tag">podjazd</span>' + numInput(row.id, 'drive', row.drive, null, 'Zmiana kwoty za podjazd tylko na tym ekranie, nie w Bazie stawek');
-      return '<td class="c">' + checkBox(row.id, row.checked) + '</td>' + col
+      const drive = '<span class="tag">podjazd</span>' + numInput(row.id, 'drive', row.drive, null, 'Zmiana kwoty za podjazd tylko na tym ekranie, nie w Bazie stawek');
+      return '<td class="c">' + checkBox(row.id, row.checked) + '</td>'
         + '<td>' + tx(row.protocol, dead) + '</td>'
         + '<td class="adres">' + tx(row.address, dead) + '</td>'
-        + '<td class="sklep"><div>' + tx(row.name, dead) + under + newRouteBox(row) + '</div></td>'
+        + '<td class="sklep"><div>' + tx(row.name, dead) + newRouteBox(row) + '</div></td>'
         + '<td>' + tx(row.date, dead) + '</td>'
         + '<td>' + drive + '</td>'
         + '<td class="num">' + numInput(row.id, 'bags', row.bags, null, 'Zapis od razu do Ilość worków') + '</td>'
@@ -952,8 +935,7 @@
 
     function childCells(row, shop, index) {
       const dead = !!shop.noTrip;
-      const col = state.layout === 'b' ? '<td></td>' : '';
-      return '<td></td>' + col
+      return '<td></td>'
         + '<td>' + tx(shop.protocol, dead) + '</td>'
         + '<td class="adres">' + tx(shop.address, dead) + '</td>'
         + '<td class="sklep">' + tx(shop.name, dead) + '</td>'
@@ -1016,14 +998,11 @@
         const dead = !!row.noTrip;
         const bagsSum = dead ? 0 : bagMoney(row.bags, row.bagRate);
         const cost = shopEconomics(row).cost;
-        const drive = row.bagsOnly
-          ? dash()
-          : '<span class="tag">podjazd</span>' + numInput(row.id, 'drive', row.drive, null, 'Tylko ten ekran');
+        const drive = '<span class="tag">podjazd</span>' + numInput(row.id, 'drive', row.drive, null, 'Tylko ten ekran');
         return '<article class="card' + (dead ? ' is-dead' : '') + (row.checked ? ' is-checked' : '') + '"><div class="card-top">'
           + checkBox(row.id, row.checked)
           + '<div class="card-id"><div class="who">' + tx(row.name, dead) + '</div><span class="sub">' + tx(row.address, dead) + '</span></div>'
           + '<div>' + tx(row.date, dead) + ' · ' + tx(row.protocol, dead) + '</div>'
-          + bagsBox(row.id, row.bagsOnly, 'chip')
           + tripBox(row.id, row.noTrip)
           + '</div><div class="card-money">'
           + cardMoney('Podjazd/Trasa', drive)
@@ -1356,11 +1335,6 @@
         else row.noTrip = el.checked;
         paint();
         return;
-      }
-      if (el.dataset.toggle === 'bags') {
-        if (row.type === 'route') return;
-        row.bagsOnly = el.checked;
-        paint();
       }
     });
 

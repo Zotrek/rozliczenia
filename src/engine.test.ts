@@ -108,13 +108,12 @@ describe("settle", () => {
     expect(line.routeCostApplies).toBe(true);
   });
 
-  it("test_settle_bagsOnly_10_leg_dash", () => {
-    const row = reception({ sheetRow: 2 });
-    const shop = onlyPlain(go([row], screen(row, { bagsOnly: true })));
-    expect(shop.legAmount).toBeNull();
+  it("test_settle_pickup0_cost_is_bags_leg_stays_zero", () => {
+    const row = reception({ sheetRow: 2, pickupRate: 0 });
+    const shop = onlyPlain(go([row]));
+    expect(shop.legAmount).toBe(0);
     expect(shop.bagSum).toBe(1_000);
     expect(shop.receptionCost).toBe(1_000);
-    expect(shop.bagsOnly).toBe(true);
   });
 
   it("test_settle_route150_threeShops_oneAbsent_divisor2_share75_excluded0", () => {

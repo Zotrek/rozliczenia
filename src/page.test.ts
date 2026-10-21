@@ -77,7 +77,7 @@ describe("page wiring", () => {
     );
     const one = change.slice(
       change.indexOf('el.dataset.toggle === "checked"'),
-      change.indexOf('el.dataset.toggle === "bags-only"'),
+      change.indexOf('el.dataset.toggle === "notrip"'),
     );
     for (const branch of [all, one]) {
       expect(branch).toContain("syncCheckedRows()");
@@ -112,13 +112,13 @@ describe("page wiring", () => {
 
   it("test_page_onChange_toggles_and_commits_edits", () => {
     const change = functionBody("onChange");
-    expect(change).toContain('el.dataset.toggle === "bags-only"');
+    expect(change).not.toContain('el.dataset.toggle === "bags-only"');
+    expect(change).not.toContain("setBagsOnly(");
     expect(change).toContain('el.dataset.toggle === "notrip"');
     expect(change).toContain('el.dataset.toggle === "checked"');
     expect(change).toContain('el.dataset.toggle === "checked-all"');
     expect(change).toContain("setAllSelected(");
     expect(change).toContain('el.dataset.toggle === "nofrom"');
-    expect(change).toContain("setBagsOnly(");
     expect(change).toContain("setDidNotHappen(");
     expect(change).toContain("toggleSelected(");
     expect(change).toContain("applyNoStartDate(");

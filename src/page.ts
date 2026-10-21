@@ -47,7 +47,6 @@ import {
   selectedLineCount,
   setAllSelected,
   setBagRate,
-  setBagsOnly,
   setDidNotHappen,
   setPickup,
   setRouteBagRate,
@@ -724,15 +723,18 @@ function onChange(event: Event): void {
     syncCheckedRows();
     return;
   }
-  if (el.dataset.toggle === "bags-only" || el.dataset.toggle === "notrip") {
+  if (el.dataset.toggle === "notrip") {
     const ref = sheetRef(el);
     if (!ref) {
       return;
     }
-    VIEW.statement =
-      el.dataset.toggle === "bags-only"
-        ? setBagsOnly(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked, ref.sheetName)
-        : setDidNotHappen(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked, ref.sheetName);
+    VIEW.statement = setDidNotHappen(
+      VIEW.statement,
+      ref.sheetRow,
+      ref.transportNumber,
+      el.checked,
+      ref.sheetName,
+    );
     VIEW.status = "";
     paint();
     return;

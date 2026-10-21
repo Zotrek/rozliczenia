@@ -109,7 +109,6 @@ export interface ApproveShop {
   transportNumber: string;
   nieOdbył?: true;
   koszt?: number;
-  tylkoWorki?: true;
 }
 
 export type ApproveBuild =
@@ -336,16 +335,6 @@ export function toggleOpen(screen: StatementScreen, routeName: string): Statemen
     openRoutes[routeName] = true;
   }
   return { ...screen, openRoutes };
-}
-
-export function setBagsOnly(
-  screen: StatementScreen,
-  sheetRow: number,
-  transportNumber: string,
-  on: boolean,
-  sheetName = "",
-): StatementScreen {
-  return patchScreen(screen, rowKey(sheetRow, transportNumber, sheetName), { bagsOnly: on });
 }
 
 export function setDidNotHappen(
@@ -726,9 +715,6 @@ function shopItem(shop: ShopCost): ApproveShop | null {
     transportNumber: shop.transportNumber,
     koszt: shop.receptionCost,
   };
-  if (shop.bagsOnly) {
-    item.tylkoWorki = true;
-  }
   return item;
 }
 

@@ -71,7 +71,7 @@ flowchart LR
 
 Podział odpowiedzialności:
 
-- **Przeglądarka** liczy koszt, grupuje trasy, trzyma stan ekranu, który nie ma kolumny: „tylko za liczbę worków”, przekreślenie „transport się nie odbył” przed zatwierdzeniem, podgląd stawki podjazdu i worka innej niż w bazie. Na Statystykach agreguje KPI i rankingi (czyste funkcje TS + Vitest).
+- **Przeglądarka** liczy koszt, grupuje trasy, trzyma stan ekranu, który nie ma kolumny: przekreślenie „transport się nie odbył” przed zatwierdzeniem, podgląd stawki podjazdu i worka innej niż w bazie. Podjazd 0 zł wpisuje się w kwotę podjazdu. Osobnej opcji „tylko za liczbę worków” nie ma. Na Statystykach agreguje KPI i rankingi (czyste funkcje TS + Vitest).
 - **Apps Script** jest jedynym miejscem zapisu. Nie liczy kosztu na nowo z bazy, bo część kwot żyje tylko na ekranie do Zatwierdź. Zapisuje to, co ekran już policzył, po sprawdzeniu, że wiersz wolno ruszyć. Odczyt Statystyk nic nie zapisuje.
 - **Arkusz** jest stanem trwałym. Po Zatwierdź kolumny 16 i 17 się nie przeliczają.
 
@@ -129,7 +129,6 @@ Stawki trasy w tej zakładce nie ma.
 
 Te rzeczy są tylko na ekranie, aż do Zatwierdź. Payload zatwierdzenia musi je nieść, bo z samego arkusza nie da się ich odtworzyć:
 
-- opcja „tylko za liczbę worków”,
 - znacznik „transport się nie odbył” ustawiony na zestawieniu, zanim w kolumnie 18 stoi `nie`,
 - kwota za podjazd i kwota za worek zmienione na wierszu, inne niż w Bazie stawek.
 

@@ -104,7 +104,7 @@ Testy biorą przykłady ze specyfikacji:
 - podjazd 20 zł + worki 10 zł = koszt 30 zł,
 - trasa 150 zł i dwa sklepy: udział 75 zł, suma trasy to stawka raz plus worki,
 - 100 / 3 = 33,33 zł, suma udziałów 99,99 zł,
-- tylko worki: 10 zł, w Podjazd/Trasa jest „—”,
+- podjazd 0 zł + worki 10 zł = koszt 10 zł, w Podjazd/Trasa jest znacznik podjazd i kwota 0 zł,
 - stawka 150 zł, trzy sklepy, jeden „nie odbył się”: dzielnik 2, udział 75 zł, wyłączony 0 zł,
 - żaden sklep się nie odbył: kosztu trasy nie ma, nie dzielimy przez 1,
 - brak pary, pusta stawka worka albo 0: 0 zł, bez błędu,
@@ -129,7 +129,7 @@ Każdy zapis rejestru niesie numer wiersza i numer z kolumny 1. Pod lockiem odpa
 
 Osobno od R3, bo dopiero tu powstają kolumny 14–17.
 
-Payload niesie numer faktury, zaznaczone wiersze (para klucza) i stan ekranu, którego arkusz nie pamięta: tylko worki, transport się nie odbył, kwoty podjazdu i worka zmienione na zestawieniu, koszt już policzony.
+Payload niesie numer faktury, zaznaczone wiersze (para klucza) i stan ekranu, którego arkusz nie pamięta: transport się nie odbył, kwoty podjazdu i worka zmienione na zestawieniu, koszt już policzony. Osobnej flagi „tylko worki” nie ma. Podjazd 0 zł jest kwotą podjazdu.
 
 Skrypt odmawia bez numeru faktury i bez zaznaczenia. Wiersz z remisem pomija, pozostałe zaznaczone może zapisać. Sklep z „nie odbył się” dostaje samo `nie` w kolumnie 18. Odbyty dostaje `tak`, fakturę, kolumny 16 i 17. Wiersz trasy rozpisuje na sklepy. Niezaznaczone zostają. Wiersz, który w międzyczasie ma `tak`, jest pomijany. Para klucza, która się nie zgadza, jest pomijana.
 
@@ -149,7 +149,7 @@ Kwoty na ekranie są wynikiem R1, nie drugim liczeniem w HTML.
 
 - Wiersz zwykły i wiersz trasy. Jedna nazwa u tego podwykonawcy w zakresie to jeden wiersz, także gdy dni się różnią. Gdy dzień nie jest jeden, w dacie jest „—”.
 - Rozwinięcie pokazuje sklepy. Liczbę worków zmienia się przy adresie, od razu, akcją z R3, do kolumny 9 tego wiersza.
-- „Tylko za liczbę worków” stoi pod nazwą sklepu przy odbiorze zwykłym. Na trasie i w rozwinięciu jej nie ma. Włączona: w Podjazd/Trasa jest „—”. Zapis tej opcji dopiero przy Zatwierdź.
+- Opcji „tylko za liczbę worków” nie ma. Podjazd, który nie ma wejść w koszt, wpisuje się jako 0 zł w Kwota podjazdu/trasy. Znacznik zostaje „podjazd”.
 - Kwota za podjazd i kwota za worek zmienione na wierszu zostają na ekranie. Do Bazy stawek nie idą.
 - Stawka trasy na zsumowanym wierszu zapisuje się od razu, akcją z R3.
 - Odepnij czyści kolumny 12 i 13 tego sklepu od razu. Sklep zostaje odbiorem zwykłym. Nowa trasa: pusta stawka nie zapisuje, kwota 0 zapisuje, nazwa nie jest tą, z której sklep właśnie zszedł.

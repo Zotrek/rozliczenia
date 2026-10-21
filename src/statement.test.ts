@@ -33,7 +33,6 @@ import {
   selectedKeys,
   selectedLineCount,
   setBagRate,
-  setBagsOnly,
   setDidNotHappen,
   setPickup,
   setAllSelected,
@@ -128,19 +127,18 @@ describe("screen edits", () => {
     expect(JSON.stringify(next)).not.toContain("saveRate");
   });
 
-  it("test_setBagsOnly_drops_pickup_from_cost", () => {
-    const next = setBagsOnly(
+  it("test_setPickup_zero_keeps_leg_and_cost_is_bags", () => {
+    const next = setPickup(
       screen([row({ sheetRow: 2, bagCount: 1, bagRate: 1_000 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]),
       2,
       "2",
-      true,
+      0,
     );
     const statement = currentStatement(next);
     const shop = statement.lines[0];
     expect(shop.kind).toBe("plain");
     if (shop.kind === "plain") {
-      expect(shop.shop.bagsOnly).toBe(true);
-      expect(shop.shop.legAmount).toBeNull();
+      expect(shop.shop.legAmount).toBe(0);
       expect(shop.shop.receptionCost).toBe(1_000);
     }
   });
@@ -294,18 +292,18 @@ describe("buildApprove", () => {
 
 describe("adoptRows", () => {
   it("test_adoptRows_drops_missing_and_keeps_screen_of_remaining", () => {
-    const prev = setBagsOnly(
+    const prev = setPickup(
       screen([
         row({ sheetRow: 2, address: "Zostaje" }),
         row({ sheetRow: 3, address: "Znika" }),
       ]),
       2,
       "2",
-      true,
+      0,
     );
     const next = adoptRows(prev, [row({ sheetRow: 2, address: "Zostaje" })], []);
     expect(next.rows.map((item) => item.sheetRow)).toEqual([2]);
-    expect(next.screenByRow["\t2\t2"]?.bagsOnly).toBe(true);
+    expect(next.screenByRow["\t2\t2"]?.pickupAmount).toBe(0);
     expect(next.screenByRow["\t3\t3"]).toBeUndefined();
   });
 });
@@ -547,20 +545,21 @@ describe("route edits and commits", () => {
     expect(readSettlementStats({ ok: true }).ok).toBe(false);
   });
 
-  it("test_buildApprove_tie_blocks_and_bagsOnly_flag", () => {
-    const base = setBagsOnly(
-      screen([row({ sheetRow: 2, bagCount: 1, bagRate: 1_000 })], [
-        rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 }),
-      ]),
-      2,
-      "2",
-      true,
-    );
+  it("test_buildApprove_tie_blocks_plain_row", () => {
+    const base = screen([row({ sheetRow: 2, bagCount: 1, bagRate: 1_000 })], [
+      rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 }),
+    ]);
     const statement = currentStatement(base);
     const built = buildApprove("FV/1", statement, { "\t2\t2": true });
     expect(built.ok).toBe(true);
     if (built.ok) {
-      expect(built.body.wiersze[0]).toMatchObject({ tylkoWorki: true, koszt: 1_000 });
+      expect(built.body.wiersze[0]).toEqual({
+        sheetName: "",
+        sheetRow: 2,
+        transportNumber: "2",
+        koszt: 3_000,
+      });
+      expect(built.body.wiersze[0]).not.toHaveProperty("tylkoWorki");
     }
     const tied = {
       ...statement,

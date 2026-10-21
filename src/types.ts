@@ -48,10 +48,10 @@ export interface RateRow {
 
 /**
  * Stan, którego arkusz nie pamięta poza snapshotem.
- * Brak klucza = odbiór odbyty, ze stawką z rejestru, z podjazdem.
+ * Brak klucza = odbiór odbyty, ze stawką z rejestru.
+ * Osobnej opcji „tylko za liczbę worków” nie ma: podjazd 0 zł wpisuje się w `pickupAmount`.
  */
 export interface ScreenState {
-  bagsOnly?: boolean;
   didNotHappen?: boolean;
   /** undefined = stawka z rejestru. null = puste pole na ekranie. */
   pickupAmount?: Grosze | null;
@@ -91,10 +91,10 @@ export interface ShopCost {
   pickupDate: string;
   bagCount: number | null;
   happened: boolean;
-  bagsOnly: boolean;
   /**
    * Kwota w kolumnie Kwota podjazdu/trasy.
-   * null = „—” (tylko worki, albo remis przy odbiorze zwykłym).
+   * Przy odbiorze zwykłym to kwota podjazdu, także 0 zł.
+   * null nie występuje: remis pokazuje „—” w widoku, nie przez tę wartość.
    */
   legAmount: Grosze | null;
   /** null = pusta stawka albo remis. Zero jest zerem. */

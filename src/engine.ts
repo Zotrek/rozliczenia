@@ -117,7 +117,6 @@ function buildRoute(rows: readonly RegisterRow[], input: EngineInput): RouteLine
 function buildShop(row: RegisterRow, input: EngineInput, mode: ShopMode): ShopCost {
   const screen = screenOf(input, row);
   const happened = !screen.didNotHappen;
-  const bagsOnly = mode.kind === "plain" && screen.bagsOnly === true;
   const priced = price(row, screen);
 
   let legAmount: Grosze | null;
@@ -135,11 +134,6 @@ function buildShop(row: RegisterRow, input: EngineInput, mode: ShopMode): ShopCo
     bagSum = priced.bagSum;
     receptionCost = mode.share + priced.bagSum;
     perBag = costPerBag(receptionCost, row.bagCount);
-  } else if (bagsOnly) {
-    legAmount = null;
-    bagSum = priced.bagSum;
-    receptionCost = priced.bagSum;
-    perBag = costPerBag(receptionCost, row.bagCount);
   } else {
     legAmount = priced.pickup;
     bagSum = priced.bagSum;
@@ -156,7 +150,6 @@ function buildShop(row: RegisterRow, input: EngineInput, mode: ShopMode): ShopCo
     pickupDate: row.pickupDate,
     bagCount: row.bagCount,
     happened,
-    bagsOnly,
     legAmount,
     bagRate: priced.bagRate,
     bagSum,

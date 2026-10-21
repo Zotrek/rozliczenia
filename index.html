@@ -340,7 +340,7 @@ tr.is-dead { color: #94a3b8; }
 td.adres { font-weight: 700; }
 td.sklep { font-weight: 450; white-space: normal; }
 .sub { color: var(--muted); font-weight: 550; font-size: 12px; }
-.only, .trip { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: #334155; font-size: 12px; font-weight: 550; }
+.trip { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: #334155; font-size: 12px; font-weight: 550; }
 .trip-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .btn-detach, .btn-mini {
   border: 1px solid var(--line);
@@ -1745,7 +1745,6 @@ function buildRoute(rows, input) {
 function buildShop(row, input, mode) {
     const screen = screenOf(input, row);
     const happened = !screen.didNotHappen;
-    const bagsOnly = mode.kind === "plain" && screen.bagsOnly === true;
     const priced = price(row, screen);
     let legAmount;
     let bagSum;
@@ -1763,12 +1762,6 @@ function buildShop(row, input, mode) {
         receptionCost = mode.share + priced.bagSum;
         perBag = costPerBag(receptionCost, row.bagCount);
     }
-    else if (bagsOnly) {
-        legAmount = null;
-        bagSum = priced.bagSum;
-        receptionCost = priced.bagSum;
-        perBag = costPerBag(receptionCost, row.bagCount);
-    }
     else {
         legAmount = priced.pickup;
         bagSum = priced.bagSum;
@@ -1784,7 +1777,6 @@ function buildShop(row, input, mode) {
         pickupDate: row.pickupDate,
         bagCount: row.bagCount,
         happened,
-        bagsOnly,
         legAmount,
         bagRate: priced.bagRate,
         bagSum,
@@ -2103,9 +2095,6 @@ function toggleOpen(screen, routeName) {
     }
     return { ...screen, openRoutes };
 }
-function setBagsOnly(screen, sheetRow, transportNumber, on, sheetName = "") {
-    return patchScreen(screen, rowKey(sheetRow, transportNumber, sheetName), { bagsOnly: on });
-}
 function setDidNotHappen(screen, sheetRow, transportNumber, on, sheetName = "") {
     return patchScreen(screen, rowKey(sheetRow, transportNumber, sheetName), { didNotHappen: on });
 }
@@ -2387,9 +2376,6 @@ function shopItem(shop) {
         transportNumber: shop.transportNumber,
         koszt: shop.receptionCost,
     };
-    if (shop.bagsOnly) {
-        item.tylkoWorki = true;
-    }
     return item;
 }
 function patchScreen(screen, key, patch) {
@@ -2625,8 +2611,8 @@ function plainRow(screen, shop) {
     const dead = !shop.happened;
     const checked = screen.selected[key] === true;
     const state = screen.screenByRow[key] ?? {};
-    const legKind = shop.bagsOnly || shop.tie || dead ? DASH : `<span class="tag">podjazd</span>`;
-    const legAmount = shop.bagsOnly || shop.tie
+    const legKind = shop.tie || dead ? DASH : `<span class="tag">podjazd</span>`;
+    const legAmount = shop.tie
         ? DASH
         : dead
             ? money(shop.legAmount, true)
@@ -2638,7 +2624,7 @@ function plainRow(screen, shop) {
         `<td class="c">${lineBox(line, checked)}</td>` +
         `<td>${text(shop.transportNumber, dead)}</td>` +
         `<td class="adres">${text(addressWithCommaAfterLocality(shop.address), dead)}</td>` +
-        `<td class="sklep"><div>${text(shop.shopName, dead)}${bagsOnlyBox(shop, shop.bagsOnly)}${tieBox(shop.tie, screen.rates)}${newRouteBox(screen, shop)}</div></td>` +
+        `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}${newRouteBox(screen, shop)}</div></td>` +
         `<td>${text(shop.pickupDate, dead)}</td>` +
         `<td>${legKind}</td>` +
         `<td class="num">${legAmount}</td>` +
@@ -2736,9 +2722,6 @@ function selectAllBox(lines, selected) {
 }
 function lineBox(line, checked) {
     return `<input type="checkbox" data-toggle="checked" data-line="${escapeHtml(line)}"${checked ? " checked" : ""} aria-label="Rozliczone">`;
-}
-function bagsOnlyBox(shop, on) {
-    return (`<label class="only"><input type="checkbox" data-toggle="bags-only" ${ref(shop)}${on ? " checked" : ""} aria-label="tylko za liczbę worków"> tylko za liczbę worków</label>`);
 }
 function tripBox(shop) {
     const on = !shop.happened;
@@ -4942,15 +4925,12 @@ function onChange(event) {
         syncCheckedRows();
         return;
     }
-    if (el.dataset.toggle === "bags-only" || el.dataset.toggle === "notrip") {
+    if (el.dataset.toggle === "notrip") {
         const ref = sheetRef(el);
         if (!ref) {
             return;
         }
-        VIEW.statement =
-            el.dataset.toggle === "bags-only"
-                ? setBagsOnly(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked, ref.sheetName)
-                : setDidNotHappen(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked, ref.sheetName);
+        VIEW.statement = setDidNotHappen(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked, ref.sheetName);
         VIEW.status = "";
         paint();
         return;

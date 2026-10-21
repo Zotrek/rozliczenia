@@ -7,8 +7,8 @@ import {
   formatPln,
   freshStatement,
   routeSelectionKey,
-  setBagsOnly,
   setDidNotHappen,
+  setPickup,
   type StatementScreen,
 } from "./statement.js";
 import { renderStatement } from "./statementView.js";
@@ -72,36 +72,34 @@ describe("renderStatement", () => {
     expect(cells.at(-1)).not.toContain(">—<");
   });
 
-  it("test_renderStatement_bagsOnly_sumaTrasy_showsBagCostAsFinal", () => {
+  it("test_renderStatement_zeroPickup_sumaTrasy_showsBagCostAsFinal", () => {
     const html = renderStatement(
-      setBagsOnly(
+      setPickup(
         screen(
           [row({ sheetRow: 2, bagCount: 4, bagRate: 250 })],
           [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 250 })],
         ),
         2,
         "2",
-        true,
+        0,
       ),
     );
     const rowHtml = html.slice(html.indexOf('data-kind="plain"'), html.indexOf("</tr>", html.indexOf('data-kind="plain"')));
     const cells = rowHtml.split('<td class="num">');
     expect(cells.at(-1)).toContain(formatPln(1_000));
     expect(cells.at(-1)).not.toContain(">—<");
+    expect(html).toContain('data-edit="pickup"');
+    expect(html).not.toContain("tylko za liczbę worków");
   });
 
-  it("test_renderStatement_bagsOnly_under_shop_name_dash_in_leg", () => {
+  it("test_renderStatement_plain_has_no_bags_only_control", () => {
     const html = renderStatement(
-      setBagsOnly(
-        screen([row({ sheetRow: 2, bagCount: 1, bagRate: 1_000 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]),
-        2,
-        "2",
-        true,
-      ),
+      screen([row({ sheetRow: 2, bagCount: 1, bagRate: 1_000 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", bagAmount: 1_000 })]),
     );
-    expect(html).toContain("tylko za liczbę worków");
-    expect(html).not.toContain('data-edit="pickup"');
-    expect(html).toContain('<span class="muted">—</span>');
+    expect(html).not.toContain("tylko za liczbę worków");
+    expect(html).not.toContain('data-toggle="bags-only"');
+    expect(html).toContain('data-edit="pickup"');
+    expect(html).toContain("podjazd");
   });
 
   it("test_renderStatement_route_has_no_bags_only_and_date_dash_when_days_differ", () => {
@@ -191,7 +189,7 @@ describe("renderStatement", () => {
   it("test_renderStatement_detached_shop_can_start_a_new_route", () => {
     const detached = commitDetach(screen([row({ sheetRow: 2, routeName: "stara", routeRate: 1_000 })]), 2, "2");
     const html = renderStatement(detached ?? screen([]));
-    expect(html).toContain("tylko za liczbę worków");
+    expect(html).not.toContain("tylko za liczbę worków");
     expect(html).toContain("odpięty od stara");
     expect(html).toContain('data-action="attach"');
     expect(html).not.toContain('data-kind="route"');

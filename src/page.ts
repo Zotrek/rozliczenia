@@ -118,6 +118,29 @@ const VIEW: RangeViewModel = {
 
 let heldFrom = "";
 let webapp = "";
+let tableScrollEpoch = 0;
+
+type TableScroll = { top: number; left: number };
+
+function readTableScroll(root: ParentNode): TableScroll[] {
+  return [...root.querySelectorAll(".table-wrap")].map((el) => ({
+    top: el.scrollTop,
+    left: el.scrollLeft,
+  }));
+}
+
+function writeTableScroll(root: ParentNode, spots: readonly TableScroll[]): void {
+  const boxes = root.querySelectorAll(".table-wrap");
+  for (let index = 0; index < spots.length; index += 1) {
+    const box = boxes[index];
+    const spot = spots[index];
+    if (!(box instanceof HTMLElement) || !spot) {
+      continue;
+    }
+    box.scrollTop = spot.top;
+    box.scrollLeft = spot.left;
+  }
+}
 
 function faultText(value: unknown): string {
   if (value instanceof Error && value.message !== "") {
@@ -179,18 +202,39 @@ function paint(keep?: string): void {
   const current = keep ? fieldByKeep(document, keep) : null;
   const start = current?.selectionStart ?? null;
   const end = current?.selectionEnd ?? null;
-  root.innerHTML = renderApp(VIEW);
+  const spots = readTableScroll(root);
+  const pageLeft = window.scrollX;
+  const pageTop = window.scrollY;
+  const epoch = ++tableScrollEpoch;
   if (!keep) {
-    return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && root.contains(active)) {
+      active.blur();
+    }
   }
-  const next = fieldByKeep(root, keep);
-  if (!next) {
-    return;
+  root.innerHTML = renderApp(VIEW);
+  writeTableScroll(root, spots);
+  window.scrollTo(pageLeft, pageTop);
+  if (keep) {
+    const next = fieldByKeep(root, keep);
+    if (next) {
+      next.focus();
+      if (start != null && end != null) {
+        next.setSelectionRange(start, end);
+      }
+    }
   }
-  next.focus();
-  if (start != null && end != null) {
-    next.setSelectionRange(start, end);
-  }
+  requestAnimationFrame(() => {
+    if (epoch !== tableScrollEpoch) {
+      return;
+    }
+    const live = document.getElementById("app");
+    if (!live) {
+      return;
+    }
+    writeTableScroll(live, spots);
+    window.scrollTo(pageLeft, pageTop);
+  });
 }
 
 function builtWebAppUrl(): string {

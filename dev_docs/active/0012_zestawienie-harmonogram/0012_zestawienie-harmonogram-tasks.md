@@ -1,7 +1,7 @@
 # Tasks: Zestawienie z harmonogramu
 
 > **Task:** 0012_zestawienie-harmonogram  
-> **Updated:** 2026-10-01
+> **Updated:** 2026-10-21
 
 ## Implementation
 
@@ -16,6 +16,9 @@
 - [x] `saveRateHarmonogram` → od razu stawki na nierozliczonych wierszach zestawienia (+ reload UI Harmonogram)
 - [x] Przy 0 workach uzupełniać Nazwa kontrahenta / Nazwa punktu z odebrane (ten sam adres)
 - [x] **CHECKPOINT:** `npm test` arkusz-mapa (syncZestawienieHarmonogram + settlementRead) — all pass ✅
+- [x] Worki spoza dnia odbioru doliczają się do najbliższego dnia z Bazy cen
+- [x] Sync zdejmuje nierozliczone wiersze spoza tych dni (worki przechodzą na dzień odbioru)
+- [x] **CHECKPOINT:** vitest syncZestawienieHarmonogram + settlementRead — planOffScheduleCleanup ✅
 
 ## Documentation Updates
 

@@ -1,7 +1,7 @@
 # Context: Zestawienie z harmonogramu
 
 > **Task:** 0012_zestawienie-harmonogram  
-> **Last Updated:** 2026-10-01 (lag +1 dzień do zestawienia)  
+> **Last Updated:** 2026-10-21 (sync zdejmuje nierozliczone wiersze spoza dni odbioru)  
 > **Status:** implemented
 
 ## Decyzje
@@ -24,6 +24,8 @@
 | 14 | Ilość worków vs usunięcie z odebrane | Sync przy update bierze **max(istniejąca, z odebrane)** — usunięcie pojedynczych worków z „odebrane” **nie cofa** sumy w zestawieniu |
 | 15 | Nazwy przy 0 workach | `Nazwa kontrahenta` i `Nazwa punktu` z worków dnia; gdy 0 worków — z dowolnego wiersza `odebrane` tego adresu |
 | 16 | Lag sync +1 dzień | Wiersz do zestawienia dopiero **dzień po** dacie odbioru (teoretycznej z Bazy / zamknięcia worka): 01.10 → dopisanie gdy sync z `dataDo` ≥ 02.10; kolumna Data odbioru = 01.10 |
+| 17 | Worki poza dniem odbioru | Sklep z dniami w Bazie cen: wiersz tylko w te dni. Worek zamknięty w inny dzień dolicza się do najbliższego takiego odbioru (data zamknięcia, jeśli wpada w dni; inaczej kolejny). Osobnego wiersza na ten dzień nie ma. Sklep bez dni w Bazie zostaje na dacie zamknięcia. |
+| 18 | Stare wiersze spoza dni | Sync nie czyści całej zakładki. Nierozliczony wiersz spoza dni Bazy oddaje worki na najbliższy dzień odbioru i jest usuwany. Zostaje, gdy sam jest rozliczony, ma numer faktury, albo dzień docelowy jest rozliczony. „transport się odbył = nie” jest usuwany bez doliczania worków. Liczba na dniu odbioru to max(zapis z odebrane, suma już w arkuszu + worki z błędnych dni), żeby nie podwoić worków nadal obecnych w odebrane. |
 
 ## Pliki
 

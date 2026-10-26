@@ -55,6 +55,12 @@ describe("page wiring", () => {
       "pickup-clear-all",
       "pickup-ok",
       "pickup-cancel",
+      "invoice-menu",
+      "invoice-sort",
+      "invoice-clear",
+      "invoice-clear-all",
+      "invoice-ok",
+      "invoice-cancel",
       "rates",
       "rates-tab",
       "close-rates",
@@ -125,6 +131,22 @@ describe("page wiring", () => {
     expect(write).toContain("requestAnimationFrame");
     expect(functionBody("readMenuScroll")).toContain(".xl-values");
     expect(functionBody("writeMenuScroll")).toContain("scrollTop");
+  });
+
+  it("test_page_paint_keeps_stats_report_scroll", () => {
+    const paint = functionBody("paint");
+    const htmlAt = paint.indexOf("root.innerHTML");
+    expect(paint).toContain("readStatsScroll()");
+    expect(paint).toContain("writeStatsScroll(statsScroll)");
+    expect(paint.indexOf("readStatsScroll()")).toBeLessThan(htmlAt);
+    expect(paint.lastIndexOf("writeStatsScroll(statsScroll)")).toBeGreaterThan(htmlAt);
+    const read = functionBody("readStatsScroll");
+    const write = functionBody("writeStatsScroll");
+    expect(read).toContain(".stats .body");
+    expect(read).toContain("scrollTop");
+    expect(write).toContain(".stats .body");
+    expect(write).toContain("scrollTop");
+    expect(write).toContain("requestAnimationFrame");
   });
 
   it("test_page_onChange_toggles_and_commits_edits", () => {
@@ -240,6 +262,11 @@ describe("page wiring", () => {
     expect(functionBody("commitInvoiceComment")).toContain("commentSaveFace(");
     expect(functionBody("applyPickupFilter")).toContain("pickupFiltersAfterApply(");
     expect(functionBody("setPickupDraftVisible")).toContain("pickupDraftAfterVisible(");
+    expect(functionBody("applyInvoiceFilter")).toContain("invoiceFiltersAfterApply(");
+    expect(functionBody("setInvoiceDraftVisible")).toContain("pickupDraftAfterVisible(");
+    expect(functionBody("onInput")).toContain('el.dataset.keep === "invoice-query"');
+    expect(functionBody("onChange")).toContain("el.dataset.invoiceValue");
+    expect(functionBody("onKeyDown")).toContain("applyInvoiceFilter(");
     expect(functionBody("applyInvoiceComment")).toContain("writeNow(");
     expect(functionBody("applyInvoiceComment")).toContain("rememberInvoiceComment(");
     expect(functionBody("commitInvoiceComment")).toContain("invoiceCommentBody(");

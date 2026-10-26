@@ -14,8 +14,12 @@ import {
 } from "./stats.js";
 import {
   defaultStatsView,
+  emptyInvoiceTable,
   emptyPickupTable,
+  filterPeriodInvoices,
   filterPeriodPickups,
+  invoiceCellText,
+  invoiceColumnChoices,
   loadSectionsCollapsed,
   loadTablesCollapsed,
   pickupCellText,
@@ -25,13 +29,16 @@ import {
   pickupQueryHits,
   readStatsFold,
   renderStatsScreen,
+  sortPeriodInvoices,
   sortPeriodPickups,
   STATS_FOLD_LS_PREFIX,
+  visiblePeriodInvoices,
   visiblePeriodPickups,
   writeStatsFold,
+  type InvoiceTableState,
   type PickupTableState,
 } from "./statsView.js";
-import type { PeriodPickup } from "./stats.js";
+import type { PeriodInvoice, PeriodPickup } from "./stats.js";
 import { readSettlementStats } from "./statement.js";
 import { statsParams } from "./range.js";
 
@@ -374,11 +381,20 @@ describe("renderStatsScreen", () => {
     expect(invoicesAt).toBeGreaterThan(pickupsAt);
     expect(bagsAt).toBeGreaterThan(invoicesAt);
     const block = html.slice(invoicesAt, bagsAt);
-    expect(block).toContain(">Nazwa</th>");
-    expect(block).toContain(">Worki</th>");
-    expect(block).toContain(">Kwota</th>");
+    expect(block).toContain(">Nazwa</span>");
+    expect(block).toContain(">Podwykonawca</span>");
+    expect(block).toContain(">Sposób odbioru</span>");
+    expect(block).toContain(">Data</span>");
+    expect(block).toContain(">Worki</span>");
+    expect(block).toContain(">Kwota</span>");
+    expect(block).toContain('data-action="invoice-menu"');
+    expect(block).toContain('data-col="name"');
+    expect(block).toContain('data-col="amount"');
     expect(block).toContain("FV/9");
-    expect(block).toContain("gpw · Na zgłoszenie · 11.09.2026");
+    expect(block).toContain(">gpw</td>");
+    expect(block).toContain(">Na zgłoszenie</td>");
+    expect(block).toContain(">11.09.2026</td>");
+    expect(block).not.toContain("gpw · Na zgłoszenie · 11.09.2026");
     expect(block).toContain(">4</td>");
     expect(block).toContain("75,00");
     expect(block).toContain('data-action="invoice-preview"');
@@ -646,6 +662,165 @@ describe("period pickup filter and sort", () => {
   it("test_pickupDraftAfterVisible_changes_only_values_matching_the_search", () => {
     expect(pickupDraftAfterVisible(["gpw"], ["blue", "GPW"], true)).toEqual(["gpw", "blue", "GPW"]);
     expect(pickupDraftAfterVisible(["gpw", "blue"], ["blue"], false)).toEqual(["gpw"]);
+  });
+});
+
+function invoice(over: Partial<PeriodInvoice> = {}): PeriodInvoice {
+  return {
+    invoice: over.invoice ?? "FV/1",
+    contractor: over.contractor ?? "gpw",
+    mode: over.mode ?? "report",
+    bagCount: over.bagCount === undefined ? 2 : over.bagCount,
+    amount: over.amount === undefined ? 4_000 : over.amount,
+    pickupDate: over.pickupDate ?? "10.09.2026",
+  };
+}
+
+describe("period invoice filter and sort", () => {
+  const rows = [
+    invoice({ invoice: "FV/10", contractor: "blue", mode: "schedule", pickupDate: "12.09.2026", bagCount: 10, amount: null }),
+    invoice({ invoice: "FV/2", contractor: "gpw", pickupDate: "02.09.2026", bagCount: 2, amount: 4_000 }),
+    invoice({ invoice: "FV/1", contractor: "gpw", pickupDate: "11.09.2026", bagCount: null, amount: 1_500 }),
+  ];
+
+  it("test_filterPeriodInvoices_keeps_rows_matching_every_column", () => {
+    const filtered = filterPeriodInvoices(rows, {
+      contractor: ["gpw"],
+      mode: ["Na zgłoszenie"],
+    });
+    expect(filtered.map((row) => row.invoice)).toEqual(["FV/2", "FV/1"]);
+  });
+
+  it("test_filterPeriodInvoices_empty_selection_shows_nothing", () => {
+    expect(filterPeriodInvoices(rows, { contractor: [] })).toEqual([]);
+  });
+
+  it("test_sortPeriodInvoices_orders_dates_names_and_keeps_blank_amounts_last", () => {
+    expect(sortPeriodInvoices(rows, "date", "desc").map((row) => row.pickupDate)).toEqual([
+      "12.09.2026",
+      "11.09.2026",
+      "02.09.2026",
+    ]);
+    expect(sortPeriodInvoices(rows, "name", "asc").map((row) => row.invoice)).toEqual(["FV/1", "FV/2", "FV/10"]);
+    expect(sortPeriodInvoices(rows, "amount", "asc").map((row) => row.amount)).toEqual([1_500, 4_000, null]);
+    expect(sortPeriodInvoices(rows, "amount", "desc").map((row) => row.amount)).toEqual([4_000, 1_500, null]);
+    expect(sortPeriodInvoices(rows, "bags", "asc").map((row) => row.bagCount)).toEqual([2, 10, null]);
+  });
+
+  it("test_invoiceColumnChoices_ignores_the_open_column_and_uses_other_filters", () => {
+    expect(invoiceColumnChoices(rows, { contractor: ["gpw"] }, "name")).toEqual(["FV/1", "FV/2"]);
+    expect(invoiceCellText(rows[0], "amount")).toBe("—");
+    expect(invoiceCellText(rows[2], "bags")).toBe("—");
+    expect(invoiceCellText(rows[0], "mode")).toBe("Harmonogram");
+  });
+
+  it("test_visiblePeriodInvoices_filters_before_sort_and_keeps_newest_first_without_sort", () => {
+    const state: InvoiceTableState = {
+      ...emptyInvoiceTable(),
+      sortKey: "date",
+      sortDir: "asc",
+      filters: { contractor: ["gpw"] },
+    };
+    expect(visiblePeriodInvoices(rows, state).map((row) => row.pickupDate)).toEqual([
+      "02.09.2026",
+      "11.09.2026",
+    ]);
+    expect(visiblePeriodInvoices(rows, emptyInvoiceTable()).map((row) => row.invoice)).toEqual([
+      "FV/10",
+      "FV/2",
+      "FV/1",
+    ]);
+  });
+
+  it("test_renderStats_invoice_menu_lists_values_and_marks_active_filter", () => {
+    const report = buildStatsReport(
+      [
+        row({
+          sheetRow: 2,
+          settled: true,
+          invoice: "FV/9",
+          contractor: "gpw",
+          address: "A 2",
+          shopName: "Alfa",
+          pickupDate: "02.09.2026",
+          bagCount: 2,
+          receptionCost: 4_000,
+        }),
+        row({
+          sheetRow: 3,
+          settled: true,
+          invoice: "FV/1",
+          contractor: "blue",
+          address: "B 2",
+          shopName: "Beta",
+          pickupDate: "12.09.2026",
+          bagCount: 4,
+          receptionCost: 8_000,
+          mode: "schedule",
+        }),
+      ],
+      [],
+      { range: { from: "01.09.2026", to: "23.09.2026" } },
+    );
+    const html = renderStatsScreen(
+      defaultStatsView(TODAY, {
+        report,
+        appliedFrom: "01.09.2026",
+        appliedTo: "23.09.2026",
+        invoices: {
+          ...emptyInvoiceTable(),
+          sortKey: "date",
+          sortDir: "desc",
+          filters: { contractor: ["gpw"] },
+          menu: { column: "contractor", draft: ["gpw"], query: "" },
+        },
+      }),
+    );
+    const invoices = html.slice(html.indexOf("Ostatnie faktury"), html.indexOf("Ile worków zabrano"));
+    expect(invoices).toContain('data-action="invoice-menu"');
+    expect(invoices).toContain("Sortuj od A do Z");
+    expect(invoices).toContain("Sortuj od Z do A");
+    expect(invoices).toContain('aria-label="Sortuj i filtruj kolumnę Data, sortowanie malejąco">▼');
+    expect(invoices).toContain("(Zaznacz wszystko)");
+    expect(invoices).toContain('data-invoice-value="gpw"');
+    expect(invoices).toContain('data-invoice-value="blue"');
+    expect(invoices).toContain("Filtr: Podwykonawca");
+    expect(invoices).toContain("Sortowanie: Data, od najnowszych");
+    expect(invoices).toContain('class="xl-btn is-on"');
+    expect(invoices).toContain("FV/9");
+    expect(invoices).not.toContain("FV/1");
+    expect(invoices).toContain('data-mixed="1"');
+    expect(invoices).toContain('data-action="invoice-preview"');
+  });
+
+  it("test_renderStats_invoice_menu_says_when_the_search_matches_nothing", () => {
+    const report = buildStatsReport(
+      [
+        row({
+          sheetRow: 2,
+          settled: true,
+          invoice: "FV/9",
+          contractor: "gpw",
+          receptionCost: 4_000,
+        }),
+      ],
+      [],
+      { range: { from: "01.09.2026", to: "23.09.2026" } },
+    );
+    const html = renderStatsScreen(
+      defaultStatsView(TODAY, {
+        report,
+        appliedFrom: "01.09.2026",
+        appliedTo: "23.09.2026",
+        invoices: {
+          ...emptyInvoiceTable(),
+          menu: { column: "contractor", draft: ["gpw"], query: "nie-ma" },
+        },
+      }),
+    );
+    const invoices = html.slice(html.indexOf("Ostatnie faktury"), html.indexOf("Ile worków zabrano"));
+    expect(invoices).toContain("Brak pasujących wartości");
+    expect(invoices).not.toContain('data-invoice-value="gpw"');
   });
 });
 

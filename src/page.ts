@@ -97,7 +97,11 @@ import {
   type StatsPeriodKind,
 } from "./stats.js";
 import {
+  emptyInvoiceTable,
   emptyPickupTable,
+  invoiceColumnChoices,
+  invoiceFiltersAfterApply,
+  isInvoiceColumnKey,
   isPickupColumnKey,
   loadSectionsCollapsed,
   loadTablesCollapsed,
@@ -106,6 +110,7 @@ import {
   pickupFiltersAfterApply,
   pickupQueryHits,
   writeStatsFold,
+  type InvoiceColumnKey,
   type PickupColumnKey,
 } from "./statsView.js";
 import type { CalendarDate } from "./sheetDate.js";
@@ -230,6 +235,38 @@ function readListScroll(): { top: number; left: number } | null {
 
 let listScrollGen = 0;
 
+/** Przewinięcie raportu statystyk. Przebudowa HTML tworzy nowy kontener i bez tego wraca na górę. */
+function readStatsScroll(): number | null {
+  const body = document.querySelector(".stats .body");
+  if (!(body instanceof HTMLElement)) {
+    return null;
+  }
+  return body.scrollTop;
+}
+
+let statsScrollGen = 0;
+
+function writeStatsScroll(top: number | null): void {
+  if (top == null) {
+    return;
+  }
+  const apply = (): void => {
+    const body = document.querySelector(".stats .body");
+    if (!(body instanceof HTMLElement)) {
+      return;
+    }
+    body.scrollTop = top;
+  };
+  apply();
+  const gen = ++statsScrollGen;
+  requestAnimationFrame(() => {
+    if (gen !== statsScrollGen) {
+      return;
+    }
+    apply();
+  });
+}
+
 function writeListScroll(scroll: { top: number; left: number } | null): void {
   if (!scroll) {
     return;
@@ -280,6 +317,7 @@ function paint(keep?: string): void {
   painting = true;
   try {
   const scroll = readListScroll();
+  const statsScroll = readStatsScroll();
   const menuScroll = readMenuScroll();
   const current = keep ? fieldByKeep(document, keep) : null;
   const start = current?.selectionStart ?? null;
@@ -295,6 +333,7 @@ function paint(keep?: string): void {
     }
   }
   writeListScroll(scroll);
+  writeStatsScroll(statsScroll);
   placePickupMenu();
   writeMenuScroll(menuScroll);
   const focused = root.querySelector(".invoice-card.is-focus");
@@ -786,6 +825,29 @@ function onClick(event: MouseEvent): void {
   } else if (action === "pickup-cancel") {
     closePickupMenu();
     paint();
+  } else if (action === "invoice-menu") {
+    const column = el.dataset.col ?? "";
+    if (isInvoiceColumnKey(column)) {
+      openInvoiceMenu(column);
+    }
+  } else if (action === "invoice-sort") {
+    const column = el.dataset.col ?? "";
+    const dir = el.dataset.dir === "desc" ? "desc" : "asc";
+    if (isInvoiceColumnKey(column)) {
+      applyInvoiceSort(column, dir);
+    }
+  } else if (action === "invoice-clear") {
+    const column = el.dataset.col ?? "";
+    if (isInvoiceColumnKey(column)) {
+      clearInvoiceColumn(column);
+    }
+  } else if (action === "invoice-clear-all") {
+    clearInvoiceTable();
+  } else if (action === "invoice-ok") {
+    applyInvoiceFilter();
+  } else if (action === "invoice-cancel") {
+    closeInvoiceMenu();
+    paint();
   } else if (action === "rates") {
     void openRates();
   } else if (action === "rates-tab") {
@@ -942,6 +1004,10 @@ function onInput(event: Event): void {
     setPickupQuery(el.value);
     return;
   }
+  if (el.dataset.keep === "invoice-query") {
+    setInvoiceQuery(el.value);
+    return;
+  }
   if (
     el.dataset.edit === "invoice-bags" ||
     el.dataset.edit === "invoice-pickup" ||
@@ -1044,6 +1110,14 @@ function onChange(event: Event): void {
   }
   if (el.dataset.pickupValue !== undefined) {
     setPickupDraftValue(el.dataset.pickupValue, el.checked);
+    return;
+  }
+  if (el.dataset.invoiceAll === "1") {
+    setInvoiceDraftVisible(el.checked);
+    return;
+  }
+  if (el.dataset.invoiceValue !== undefined) {
+    setInvoiceDraftValue(el.dataset.invoiceValue, el.checked);
     return;
   }
   if (el.dataset.stats === "from" || el.dataset.stats === "to") {
@@ -1687,21 +1761,23 @@ function syncInvoiceComment(): void {
 }
 
 function onKeyDown(event: KeyboardEvent): void {
-  if (VIEW.stats.pickups.menu) {
+  if (VIEW.stats.pickups.menu || VIEW.stats.invoices.menu) {
     if (event.key === "Escape") {
       event.preventDefault();
       closePickupMenu();
+      closeInvoiceMenu();
       paint();
       return;
     }
     const field = event.target;
-    if (
-      event.key === "Enter" &&
-      field instanceof HTMLInputElement &&
-      field.dataset.keep === "pickup-query"
-    ) {
+    if (event.key === "Enter" && field instanceof HTMLInputElement && field.dataset.keep === "pickup-query") {
       event.preventDefault();
       applyPickupFilter();
+      return;
+    }
+    if (event.key === "Enter" && field instanceof HTMLInputElement && field.dataset.keep === "invoice-query") {
+      event.preventDefault();
+      applyInvoiceFilter();
       return;
     }
   }
@@ -2542,7 +2618,7 @@ function toggleStatsTable(id: string): void {
 }
 
 function onCaptureScroll(event: Event): void {
-  if (painting || !VIEW.stats.pickups.menu) {
+  if (painting || (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu)) {
     return;
   }
   const target = event.target;
@@ -2550,6 +2626,7 @@ function onCaptureScroll(event: Event): void {
     return;
   }
   closePickupMenu();
+  closeInvoiceMenu();
   paint();
 }
 
@@ -2558,7 +2635,9 @@ function placePickupMenu(): void {
   if (!(menu instanceof HTMLElement)) {
     return;
   }
-  const btn = document.querySelector('[data-action="pickup-menu"][aria-expanded="true"]');
+  const btn = document.querySelector(
+    '[data-action="pickup-menu"][aria-expanded="true"], [data-action="invoice-menu"][aria-expanded="true"]',
+  );
   if (!(btn instanceof HTMLElement)) {
     return;
   }
@@ -2581,20 +2660,25 @@ function placePickupMenu(): void {
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
   menu.style.visibility = "visible";
-  const all = menu.querySelector("[data-pickup-all]");
+  const all = menu.querySelector("[data-pickup-all], [data-invoice-all]");
   if (all instanceof HTMLInputElement && all.dataset.mixed === "1") {
     all.indeterminate = true;
   }
 }
 
 function dismissPickupMenuOnOutside(target: Element): void {
-  if (!VIEW.stats.pickups.menu) {
+  if (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu) {
     return;
   }
-  if (target.closest("[data-xl-menu]") || target.closest("[data-action='pickup-menu']")) {
+  if (
+    target.closest("[data-xl-menu]") ||
+    target.closest("[data-action='pickup-menu']") ||
+    target.closest("[data-action='invoice-menu']")
+  ) {
     return;
   }
   closePickupMenu();
+  closeInvoiceMenu();
   paint();
 }
 
@@ -2620,6 +2704,7 @@ function openPickupMenu(column: PickupColumnKey): void {
   const saved = current.filters[column];
   VIEW.stats = {
     ...VIEW.stats,
+    invoices: { ...VIEW.stats.invoices, menu: null },
     pickups: {
       ...current,
       menu: { column, draft: saved ? [...saved] : [...choices], query: "" },
@@ -2729,6 +2814,138 @@ function setPickupDraftVisible(on: boolean): void {
     pickups: { ...VIEW.stats.pickups, menu: { ...menu, draft: pickupDraftAfterVisible(menu.draft, visible, on) } },
   };
   paint(pickupDraftKeep());
+}
+
+function openInvoiceMenu(column: InvoiceColumnKey): void {
+  const report = VIEW.stats.report;
+  if (!report) {
+    return;
+  }
+  const current = VIEW.stats.invoices;
+  if (current.menu?.column === column) {
+    closeInvoiceMenu();
+    paint();
+    return;
+  }
+  const choices = invoiceColumnChoices(report.periodInvoices, current.filters, column);
+  const saved = current.filters[column];
+  VIEW.stats = {
+    ...VIEW.stats,
+    pickups: { ...VIEW.stats.pickups, menu: null },
+    invoices: {
+      ...current,
+      menu: { column, draft: saved ? [...saved] : [...choices], query: "" },
+    },
+  };
+  paint();
+}
+
+function applyInvoiceSort(column: InvoiceColumnKey, dir: "asc" | "desc"): void {
+  VIEW.stats = {
+    ...VIEW.stats,
+    invoicesPage: 1,
+    invoices: { ...VIEW.stats.invoices, sortKey: column, sortDir: dir, menu: null },
+  };
+  paint();
+}
+
+function clearInvoiceColumn(column: InvoiceColumnKey): void {
+  const filters = { ...VIEW.stats.invoices.filters };
+  delete filters[column];
+  VIEW.stats = {
+    ...VIEW.stats,
+    invoicesPage: 1,
+    invoices: { ...VIEW.stats.invoices, filters, menu: null },
+  };
+  paint();
+}
+
+function clearInvoiceTable(): void {
+  VIEW.stats = {
+    ...VIEW.stats,
+    invoicesPage: 1,
+    invoices: emptyInvoiceTable(),
+  };
+  paint();
+}
+
+function applyInvoiceFilter(): void {
+  const menu = VIEW.stats.invoices.menu;
+  const report = VIEW.stats.report;
+  if (!menu || !report) {
+    return;
+  }
+  const choices = invoiceColumnChoices(report.periodInvoices, VIEW.stats.invoices.filters, menu.column);
+  const filters = invoiceFiltersAfterApply(VIEW.stats.invoices.filters, menu.column, choices, menu.draft);
+  VIEW.stats = {
+    ...VIEW.stats,
+    invoicesPage: 1,
+    invoices: { ...VIEW.stats.invoices, filters, menu: null },
+  };
+  paint();
+}
+
+function closeInvoiceMenu(): void {
+  if (!VIEW.stats.invoices.menu) {
+    return;
+  }
+  VIEW.stats = { ...VIEW.stats, invoices: { ...VIEW.stats.invoices, menu: null } };
+}
+
+function setInvoiceQuery(value: string): void {
+  const menu = VIEW.stats.invoices.menu;
+  if (!menu || menu.query === value) {
+    return;
+  }
+  VIEW.stats = {
+    ...VIEW.stats,
+    invoices: { ...VIEW.stats.invoices, menu: { ...menu, query: value } },
+  };
+  paint("invoice-query");
+}
+
+function invoiceDraftKeep(): string | undefined {
+  const active = document.activeElement;
+  if (active instanceof HTMLInputElement && active.dataset.keep === "invoice-query") {
+    return "invoice-query";
+  }
+  return undefined;
+}
+
+function setInvoiceDraftValue(value: string, on: boolean): void {
+  const menu = VIEW.stats.invoices.menu;
+  if (!menu) {
+    return;
+  }
+  const draft = on
+    ? menu.draft.includes(value)
+      ? menu.draft
+      : [...menu.draft, value]
+    : menu.draft.filter((item) => item !== value);
+  VIEW.stats = {
+    ...VIEW.stats,
+    invoices: { ...VIEW.stats.invoices, menu: { ...menu, draft } },
+  };
+  paint(invoiceDraftKeep());
+}
+
+function setInvoiceDraftVisible(on: boolean): void {
+  const menu = VIEW.stats.invoices.menu;
+  const report = VIEW.stats.report;
+  if (!menu || !report) {
+    return;
+  }
+  const visible = invoiceColumnChoices(report.periodInvoices, VIEW.stats.invoices.filters, menu.column).filter(
+    (text) => pickupQueryHits(text, menu.query),
+  );
+  VIEW.stats = {
+    ...VIEW.stats,
+    invoices: {
+      ...VIEW.stats.invoices,
+      menu: { ...menu, draft: pickupDraftAfterVisible(menu.draft, visible, on) },
+    },
+  };
+  paint(invoiceDraftKeep());
 }
 
 function shiftStatsPage(pager: string, dir: string): void {
@@ -2850,6 +3067,7 @@ async function runStats(): Promise<void> {
       pickupsPage: 1,
       invoicesPage: 1,
       pickups: emptyPickupTable(),
+      invoices: emptyInvoiceTable(),
       tablesCollapsed: loadTablesCollapsed(storage, ["bags", "costs"], stacked),
     };
   } catch (err) {

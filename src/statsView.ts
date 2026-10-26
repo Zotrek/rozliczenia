@@ -10,6 +10,7 @@ import {
   statsPeriodKindLabel,
   STATS_PAGE_SIZE,
   type MonthOption,
+  type PeriodInvoice,
   type PeriodPickup,
   type QuarterOption,
   type StatsPeriodKind,
@@ -49,6 +50,27 @@ const PICKUP_COLUMNS: readonly { key: PickupColumnKey; label: string; numeric: b
   { key: "invoice", label: "Wartość faktury", numeric: true },
 ];
 
+const INVOICE_COLUMN_KEYS = ["name", "contractor", "mode", "date", "bags", "amount"] as const;
+
+export type InvoiceColumnKey = (typeof INVOICE_COLUMN_KEYS)[number];
+
+export type InvoiceTableState = {
+  sortKey: InvoiceColumnKey | null;
+  sortDir: "asc" | "desc";
+  /** Brak klucza = kolumna bez filtra. Pusta lista = nic nie przechodzi. */
+  filters: Partial<Record<InvoiceColumnKey, readonly string[]>>;
+  menu: { column: InvoiceColumnKey; draft: readonly string[]; query: string } | null;
+};
+
+const INVOICE_COLUMNS: readonly { key: InvoiceColumnKey; label: string; numeric: boolean }[] = [
+  { key: "name", label: "Nazwa", numeric: false },
+  { key: "contractor", label: "Podwykonawca", numeric: false },
+  { key: "mode", label: "Sposób odbioru", numeric: false },
+  { key: "date", label: "Data", numeric: false },
+  { key: "bags", label: "Worki", numeric: true },
+  { key: "amount", label: "Kwota", numeric: true },
+];
+
 const FUNNEL_ICON =
   '<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M1.5 2.5h13l-5 6.1V13l-3 1.1V8.6z"/></svg>';
 
@@ -56,8 +78,16 @@ export function emptyPickupTable(): PickupTableState {
   return { sortKey: null, sortDir: "asc", filters: {}, menu: null };
 }
 
+export function emptyInvoiceTable(): InvoiceTableState {
+  return { sortKey: null, sortDir: "asc", filters: {}, menu: null };
+}
+
 export function isPickupColumnKey(value: string): value is PickupColumnKey {
   return (PICKUP_COLUMN_KEYS as readonly string[]).includes(value);
+}
+
+export function isInvoiceColumnKey(value: string): value is InvoiceColumnKey {
+  return (INVOICE_COLUMN_KEYS as readonly string[]).includes(value);
 }
 
 /** Tekst komórki, ten sam w tabeli i na liście filtra. */
@@ -102,12 +132,7 @@ export function filterPeriodPickups(
   rows: readonly PeriodPickup[],
   filters: PickupTableState["filters"],
 ): PeriodPickup[] {
-  const active = (Object.keys(filters) as PickupColumnKey[]).filter((key) => filters[key] != null);
-  if (active.length === 0) {
-    return [...rows];
-  }
-  const sets = active.map((key) => [key, new Set(filters[key])] as const);
-  return rows.filter((row) => sets.every(([key, set]) => set.has(pickupCellText(row, key))));
+  return rowsMatchingFilters(rows, filters, pickupCellText);
 }
 
 /** Wartości kolumny po filtrach pozostałych kolumn, w kolejności sortowania rosnącego. */
@@ -116,25 +141,7 @@ export function pickupColumnChoices(
   filters: PickupTableState["filters"],
   column: PickupColumnKey,
 ): string[] {
-  const rest: PickupTableState["filters"] = { ...filters };
-  delete rest[column];
-  const first = new Map<string, PeriodPickup>();
-  for (const row of filterPeriodPickups(rows, rest)) {
-    const text = pickupCellText(row, column);
-    if (!first.has(text)) {
-      first.set(text, row);
-    }
-  }
-  return [...first.entries()]
-    .sort((a, b) => {
-      const aBlank = isBlankNumber(a[1], column);
-      const bBlank = isBlankNumber(b[1], column);
-      if (aBlank !== bBlank) {
-        return aBlank ? 1 : -1;
-      }
-      return comparePickups(a[1], b[1], column) || a[0].localeCompare(b[0], "pl");
-    })
-    .map(([text]) => text);
+  return choicesFromRows(rows, filters, column, pickupCellText, isBlankNumber, comparePickups);
 }
 
 export function sortPeriodPickups(
@@ -142,25 +149,7 @@ export function sortPeriodPickups(
   sortKey: PickupColumnKey | null,
   sortDir: "asc" | "desc",
 ): PeriodPickup[] {
-  if (sortKey === null) {
-    return [...rows];
-  }
-  const key = sortKey;
-  return rows
-    .map((row, index) => ({ row, index }))
-    .sort((a, b) => {
-      const aBlank = isBlankNumber(a.row, key);
-      const bBlank = isBlankNumber(b.row, key);
-      if (aBlank !== bBlank) {
-        return aBlank ? 1 : -1;
-      }
-      const cmp = comparePickups(a.row, b.row, key);
-      if (cmp === 0) {
-        return a.index - b.index;
-      }
-      return sortDir === "asc" ? cmp : -cmp;
-    })
-    .map((item) => item.row);
+  return sortRowsByColumn(rows, sortKey, sortDir, isBlankNumber, comparePickups);
 }
 
 export function visiblePeriodPickups(
@@ -170,22 +159,153 @@ export function visiblePeriodPickups(
   return sortPeriodPickups(filterPeriodPickups(rows, state.filters), state.sortKey, state.sortDir);
 }
 
+/** Tekst komórki faktury, ten sam w tabeli i na liście filtra. */
+export function invoiceCellText(row: PeriodInvoice, key: InvoiceColumnKey): string {
+  if (key === "name") {
+    return invoiceNumberText(row.invoice);
+  }
+  if (key === "contractor") {
+    return row.contractor;
+  }
+  if (key === "mode") {
+    return modeLabel(row.mode);
+  }
+  if (key === "date") {
+    return row.pickupDate;
+  }
+  if (key === "bags") {
+    return row.bagCount === null ? "—" : String(row.bagCount);
+  }
+  return row.amount === null ? "—" : formatPln(row.amount);
+}
+
+export function filterPeriodInvoices(
+  rows: readonly PeriodInvoice[],
+  filters: InvoiceTableState["filters"],
+): PeriodInvoice[] {
+  return rowsMatchingFilters(rows, filters, invoiceCellText);
+}
+
+/** Wartości kolumny po filtrach pozostałych kolumn, w kolejności sortowania rosnącego. */
+export function invoiceColumnChoices(
+  rows: readonly PeriodInvoice[],
+  filters: InvoiceTableState["filters"],
+  column: InvoiceColumnKey,
+): string[] {
+  return choicesFromRows(rows, filters, column, invoiceCellText, isBlankInvoice, compareInvoices);
+}
+
+export function sortPeriodInvoices(
+  rows: readonly PeriodInvoice[],
+  sortKey: InvoiceColumnKey | null,
+  sortDir: "asc" | "desc",
+): PeriodInvoice[] {
+  return sortRowsByColumn(rows, sortKey, sortDir, isBlankInvoice, compareInvoices);
+}
+
+export function visiblePeriodInvoices(
+  rows: readonly PeriodInvoice[],
+  state: InvoiceTableState,
+): PeriodInvoice[] {
+  return sortPeriodInvoices(filterPeriodInvoices(rows, state.filters), state.sortKey, state.sortDir);
+}
+
+function rowsMatchingFilters<Row, Key extends string>(
+  rows: readonly Row[],
+  filters: Partial<Record<Key, readonly string[]>>,
+  text: (row: Row, key: Key) => string,
+): Row[] {
+  const active = (Object.keys(filters) as Key[]).filter((key) => filters[key] != null);
+  if (active.length === 0) {
+    return [...rows];
+  }
+  const sets = active.map((key) => [key, new Set(filters[key])] as const);
+  return rows.filter((row) => sets.every(([key, set]) => set.has(text(row, key))));
+}
+
+function choicesFromRows<Row, Key extends string>(
+  rows: readonly Row[],
+  filters: Partial<Record<Key, readonly string[]>>,
+  column: Key,
+  text: (row: Row, key: Key) => string,
+  blank: (row: Row, key: Key) => boolean,
+  compare: (a: Row, b: Row, key: Key) => number,
+): string[] {
+  const rest: Partial<Record<Key, readonly string[]>> = { ...filters };
+  delete rest[column];
+  const first = new Map<string, Row>();
+  for (const row of rowsMatchingFilters(rows, rest, text)) {
+    const label = text(row, column);
+    if (!first.has(label)) {
+      first.set(label, row);
+    }
+  }
+  return [...first.entries()]
+    .sort((a, b) => {
+      const aBlank = blank(a[1], column);
+      const bBlank = blank(b[1], column);
+      if (aBlank !== bBlank) {
+        return aBlank ? 1 : -1;
+      }
+      return compare(a[1], b[1], column) || a[0].localeCompare(b[0], "pl");
+    })
+    .map(([label]) => label);
+}
+
+function sortRowsByColumn<Row, Key extends string>(
+  rows: readonly Row[],
+  sortKey: Key | null,
+  sortDir: "asc" | "desc",
+  blank: (row: Row, key: Key) => boolean,
+  compare: (a: Row, b: Row, key: Key) => number,
+): Row[] {
+  if (sortKey === null) {
+    return [...rows];
+  }
+  const key = sortKey;
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => {
+      const aBlank = blank(a.row, key);
+      const bBlank = blank(b.row, key);
+      if (aBlank !== bBlank) {
+        return aBlank ? 1 : -1;
+      }
+      const cmp = compare(a.row, b.row, key);
+      if (cmp === 0) {
+        return a.index - b.index;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    })
+    .map((item) => item.row);
+}
+
 /** OK w menu kolumny. Zaznaczenie każdej wartości zdejmuje filtr. */
-export function pickupFiltersAfterApply(
-  filters: PickupTableState["filters"],
-  column: PickupColumnKey,
+export function pickupFiltersAfterApply<Key extends string>(
+  filters: Partial<Record<Key, readonly string[]>>,
+  column: Key,
   choices: readonly string[],
   draft: readonly string[],
-): PickupTableState["filters"] {
+): Partial<Record<Key, readonly string[]>> {
   const selected = new Set(draft);
   const allOn = choices.length > 0 && choices.every((text) => selected.has(text));
-  const next: PickupTableState["filters"] = { ...filters };
+  const next: Partial<Record<Key, readonly string[]>> = { ...filters };
   if (choices.length === 0 || allOn) {
     delete next[column];
   } else {
     next[column] = [...draft];
   }
   return next;
+}
+
+/** Ta sama reguła OK co w odbiorach: pełne zaznaczenie zdejmuje filtr. */
+export function invoiceFiltersAfterApply(
+  filters: InvoiceTableState["filters"],
+  column: InvoiceColumnKey,
+  choices: readonly string[],
+  draft: readonly string[],
+): InvoiceTableState["filters"] {
+  return pickupFiltersAfterApply(filters, column, choices, draft);
 }
 
 /** „Zaznacz wszystko” przy wpisanym szukaniu rusza tylko widoczne wartości. */
@@ -218,6 +338,23 @@ function isBlankNumber(row: PeriodPickup, key: PickupColumnKey): boolean {
   return false;
 }
 
+function isBlankInvoice(row: PeriodInvoice, key: InvoiceColumnKey): boolean {
+  if (key === "bags") {
+    return row.bagCount === null;
+  }
+  if (key === "amount") {
+    return row.amount === null;
+  }
+  if (key === "name") {
+    return row.invoice.trim() === "";
+  }
+  return false;
+}
+
+function comparePlText(a: string, b: string): number {
+  return a.localeCompare(b, "pl", { numeric: true, sensitivity: "base" });
+}
+
 function comparePickups(a: PeriodPickup, b: PeriodPickup, key: PickupColumnKey): number {
   if (key === "date") {
     return compareSheetDate(a.pickupDate, b.pickupDate);
@@ -228,20 +365,50 @@ function comparePickups(a: PeriodPickup, b: PeriodPickup, key: PickupColumnKey):
   if (key === "invoice") {
     return (a.invoiceValue ?? 0) - (b.invoiceValue ?? 0);
   }
-  return pickupCellText(a, key).localeCompare(pickupCellText(b, key), "pl", {
-    numeric: true,
-    sensitivity: "base",
-  });
+  return comparePlText(pickupCellText(a, key), pickupCellText(b, key));
+}
+
+function compareInvoices(a: PeriodInvoice, b: PeriodInvoice, key: InvoiceColumnKey): number {
+  if (key === "date") {
+    return compareSheetDate(a.pickupDate, b.pickupDate);
+  }
+  if (key === "bags") {
+    return (a.bagCount ?? 0) - (b.bagCount ?? 0);
+  }
+  if (key === "amount") {
+    return (a.amount ?? 0) - (b.amount ?? 0);
+  }
+  return comparePlText(invoiceCellText(a, key), invoiceCellText(b, key));
+}
+
+function sortPhraseKind(kind: "date" | "number" | "text", dir: "asc" | "desc"): string {
+  if (kind === "date") {
+    return dir === "asc" ? "Sortuj od najstarszych" : "Sortuj od najnowszych";
+  }
+  if (kind === "number") {
+    return dir === "asc" ? "Sortuj od najmniejszych" : "Sortuj od największych";
+  }
+  return dir === "asc" ? "Sortuj od A do Z" : "Sortuj od Z do A";
 }
 
 function sortPhrase(key: PickupColumnKey, dir: "asc" | "desc"): string {
   if (key === "date") {
-    return dir === "asc" ? "Sortuj od najstarszych" : "Sortuj od najnowszych";
+    return sortPhraseKind("date", dir);
   }
   if (key === "bags" || key === "invoice") {
-    return dir === "asc" ? "Sortuj od najmniejszych" : "Sortuj od największych";
+    return sortPhraseKind("number", dir);
   }
-  return dir === "asc" ? "Sortuj od A do Z" : "Sortuj od Z do A";
+  return sortPhraseKind("text", dir);
+}
+
+function invoiceSortPhrase(key: InvoiceColumnKey, dir: "asc" | "desc"): string {
+  if (key === "date") {
+    return sortPhraseKind("date", dir);
+  }
+  if (key === "bags" || key === "amount") {
+    return sortPhraseKind("number", dir);
+  }
+  return sortPhraseKind("text", dir);
 }
 
 function filterButtonLabel(label: string, filtered: boolean, sort: "asc" | "desc" | null): string {
@@ -286,6 +453,8 @@ export interface StatsViewModel {
   invoicesPage: number;
   /** Sortowanie i filtr kolumn w tabeli odbiorów. */
   pickups: PickupTableState;
+  /** Sortowanie i filtr kolumn w tabeli ostatnich faktur. */
+  invoices: InvoiceTableState;
   /** Sekcje zwinięte (id → true). */
   sectionsCollapsed: Readonly<Record<string, boolean>>;
   /** Tabele pod wykresem zwinięte (id → true). */
@@ -324,6 +493,7 @@ export function defaultStatsView(
     pickupsPage: 1,
     invoicesPage: 1,
     pickups: emptyPickupTable(),
+    invoices: emptyInvoiceTable(),
     sectionsCollapsed: {},
     tablesCollapsed: {},
     ...over,
@@ -564,7 +734,10 @@ function section(
   flush = false,
 ): string {
   const collapsed = model.sectionsCollapsed[id] === true;
-  const menuOpen = id === "pickups" && model.pickups.menu !== null && !collapsed;
+  const menuOpen =
+    !collapsed &&
+    ((id === "pickups" && model.pickups.menu !== null) ||
+      (id === "invoices" && model.invoices.menu !== null));
   const chev = collapsed ? "▸" : "▾";
   const aria = collapsed ? "Rozwiń sekcję" : "Zwiń sekcję";
   return (
@@ -857,25 +1030,33 @@ function periodInvoicesBlock(model: StatsViewModel): string {
   if (!report) {
     return "";
   }
-  const paged = pageSlice(report.periodInvoices, model.invoicesPage);
+  const shown = visiblePeriodInvoices(report.periodInvoices, model.invoices);
+  const paged = pageSlice(shown, model.invoicesPage);
   const body = paged.slice
     .map((row) => {
       const bags = row.bagCount === null ? "—" : String(row.bagCount);
       const amount = row.amount === null ? "—" : formatPln(row.amount);
-      const sub = `${row.contractor} · ${modeLabel(row.mode)} · ${row.pickupDate}`;
       return (
-        `<tr><td class="shop">${escapeHtml(row.invoice)}` +
-        `<span class="sub">${escapeHtml(sub)}</span></td>` +
+        `<tr><td class="shop">${escapeHtml(row.invoice)}</td>` +
+        `<td>${escapeHtml(row.contractor)}</td>` +
+        `<td>${escapeHtml(modeLabel(row.mode))}</td>` +
+        `<td>${escapeHtml(row.pickupDate)}</td>` +
         `<td class="num">${escapeHtml(bags)}</td>` +
         `<td class="num">${escapeHtml(amount)}</td>` +
         `<td>${invoiceActionLinks({ ...row, settled: true, invoiceKnown: true })}</td></tr>`
       );
     })
     .join("");
+  const empty =
+    report.periodInvoices.length === 0
+      ? "Brak faktur w tym okresie."
+      : "Brak pozycji dla tego filtra.";
   return (
+    columnBar(INVOICE_COLUMNS, model.invoices, "invoice", invoiceSortPhrase) +
     "<table><thead><tr>" +
-    '<th>Nazwa</th><th class="num">Worki</th><th class="num">Kwota</th><th></th>' +
-    `</tr></thead><tbody>${body || emptyRow(4, "Brak faktur w tym okresie.")}</tbody></table>` +
+    invoiceHead(model) +
+    "<th></th>" +
+    `</tr></thead><tbody>${body || emptyRow(INVOICE_COLUMNS.length + 1, empty)}</tbody></table>` +
     pager("invoices", paged) +
     '<p class="note" style="margin: 10px 12px 12px;">' +
     "Każdy wiersz to jeden numer faktury u jednego podwykonawcy. " +
@@ -986,23 +1167,55 @@ function pager(
 }
 
 function pickupHead(model: StatsViewModel): string {
-  const state = model.pickups;
-  return PICKUP_COLUMNS.map((col) => {
-    const open = state.menu?.column === col.key && model.sectionsCollapsed.pickups !== true;
-    const filtered = state.filters[col.key] != null;
-    const sort = state.sortKey === col.key ? state.sortDir : null;
-    const mark = sort === "asc" ? "▲" : sort === "desc" ? "▼" : FUNNEL_ICON;
-    return (
-      `<th class="${col.numeric ? "num " : ""}xl-th${open ? " is-open" : ""}">` +
-      '<div class="xl-head">' +
-      `<span>${escapeHtml(col.label)}</span>` +
-      `<button type="button" class="xl-btn${filtered ? " is-on" : ""}" data-action="pickup-menu" data-col="${col.key}"` +
-      ` aria-expanded="${open ? "true" : "false"}" aria-label="${escapeHtml(filterButtonLabel(col.label, filtered, sort))}">${mark}</button>` +
-      "</div>" +
-      (open ? pickupMenu(model, col.key) : "") +
-      "</th>"
-    );
-  }).join("");
+  return columnHead(
+    PICKUP_COLUMNS,
+    model.pickups,
+    model.sectionsCollapsed.pickups !== true,
+    "pickup",
+    (key) => pickupMenu(model, key),
+  );
+}
+
+function invoiceHead(model: StatsViewModel): string {
+  return columnHead(
+    INVOICE_COLUMNS,
+    model.invoices,
+    model.sectionsCollapsed.invoices !== true,
+    "invoice",
+    (key) => invoiceMenu(model, key),
+  );
+}
+
+function columnHead<Key extends string>(
+  columns: readonly { key: Key; label: string; numeric: boolean }[],
+  state: {
+    sortKey: Key | null;
+    sortDir: "asc" | "desc";
+    filters: Partial<Record<Key, readonly string[]>>;
+    menu: { column: Key } | null;
+  },
+  sectionOpen: boolean,
+  action: "pickup" | "invoice",
+  menuFor: (key: Key) => string,
+): string {
+  return columns
+    .map((col) => {
+      const open = state.menu?.column === col.key && sectionOpen;
+      const filtered = state.filters[col.key] != null;
+      const sort = state.sortKey === col.key ? state.sortDir : null;
+      const mark = sort === "asc" ? "▲" : sort === "desc" ? "▼" : FUNNEL_ICON;
+      return (
+        `<th class="${col.numeric ? "num " : ""}xl-th${open ? " is-open" : ""}">` +
+        '<div class="xl-head">' +
+        `<span>${escapeHtml(col.label)}</span>` +
+        `<button type="button" class="xl-btn${filtered ? " is-on" : ""}" data-action="${action}-menu" data-col="${col.key}"` +
+        ` aria-expanded="${open ? "true" : "false"}" aria-label="${escapeHtml(filterButtonLabel(col.label, filtered, sort))}">${mark}</button>` +
+        "</div>" +
+        (open ? menuFor(col.key) : "") +
+        "</th>"
+      );
+    })
+    .join("");
 }
 
 function pickupMenu(model: StatsViewModel, column: PickupColumnKey): string {
@@ -1013,57 +1226,117 @@ function pickupMenu(model: StatsViewModel, column: PickupColumnKey): string {
   }
   const choices = pickupColumnChoices(report.periodPickups, model.pickups.filters, column);
   const visible = choices.filter((text) => pickupQueryHits(text, menu.query));
-  const picked = new Set(menu.draft);
-  const visibleOn = visible.filter((text) => picked.has(text)).length;
-  const allChecked = visible.length > 0 && visibleOn === visible.length;
-  const mixed = visibleOn > 0 && visibleOn < visible.length;
   const label = PICKUP_COLUMNS.find((item) => item.key === column)?.label ?? column;
-  const hasFilter = model.pickups.filters[column] != null;
+  return xlColumnMenu({
+    action: "pickup",
+    column,
+    label,
+    sortAscLabel: sortPhrase(column, "asc"),
+    sortDescLabel: sortPhrase(column, "desc"),
+    sortDir: model.pickups.sortKey === column ? model.pickups.sortDir : null,
+    hasFilter: model.pickups.filters[column] != null,
+    query: menu.query,
+    visible,
+    picked: new Set(menu.draft),
+  });
+}
+
+function invoiceMenu(model: StatsViewModel, column: InvoiceColumnKey): string {
+  const report = model.report;
+  const menu = model.invoices.menu;
+  if (!report || !menu || menu.column !== column) {
+    return "";
+  }
+  const choices = invoiceColumnChoices(report.periodInvoices, model.invoices.filters, column);
+  const visible = choices.filter((text) => pickupQueryHits(text, menu.query));
+  const label = INVOICE_COLUMNS.find((item) => item.key === column)?.label ?? column;
+  return xlColumnMenu({
+    action: "invoice",
+    column,
+    label,
+    sortAscLabel: invoiceSortPhrase(column, "asc"),
+    sortDescLabel: invoiceSortPhrase(column, "desc"),
+    sortDir: model.invoices.sortKey === column ? model.invoices.sortDir : null,
+    hasFilter: model.invoices.filters[column] != null,
+    query: menu.query,
+    visible,
+    picked: new Set(menu.draft),
+  });
+}
+
+function xlColumnMenu(args: {
+  action: "pickup" | "invoice";
+  column: string;
+  label: string;
+  sortAscLabel: string;
+  sortDescLabel: string;
+  sortDir: "asc" | "desc" | null;
+  hasFilter: boolean;
+  query: string;
+  visible: readonly string[];
+  picked: ReadonlySet<string>;
+}): string {
+  const visibleOn = args.visible.filter((text) => args.picked.has(text)).length;
+  const allChecked = args.visible.length > 0 && visibleOn === args.visible.length;
+  const mixed = visibleOn > 0 && visibleOn < args.visible.length;
   const options =
-    visible.length === 0
+    args.visible.length === 0
       ? '<p class="xl-empty">Brak pasujących wartości</p>'
-      : visible
+      : args.visible
           .map(
             (text) =>
-              `<label class="xl-opt"><input type="checkbox" data-pickup-value="${escapeHtml(text)}"${picked.has(text) ? " checked" : ""}>` +
+              `<label class="xl-opt"><input type="checkbox" data-${args.action}-value="${escapeHtml(text)}"${args.picked.has(text) ? " checked" : ""}>` +
               `<span>${escapeHtml(text)}</span></label>`,
           )
           .join("");
-  const sortBtn = (dir: "asc" | "desc"): string => {
-    const on = model.pickups.sortKey === column && model.pickups.sortDir === dir;
+  const sortBtn = (dir: "asc" | "desc", phrase: string): string => {
+    const on = args.sortDir === dir;
     return (
-      `<button type="button" class="xl-sort${on ? " is-on" : ""}" data-action="pickup-sort" data-col="${column}" data-dir="${dir}" aria-pressed="${on ? "true" : "false"}">` +
-      `${escapeHtml(sortPhrase(column, dir))}</button>`
+      `<button type="button" class="xl-sort${on ? " is-on" : ""}" data-action="${args.action}-sort" data-col="${args.column}" data-dir="${dir}" aria-pressed="${on ? "true" : "false"}">` +
+      `${escapeHtml(phrase)}</button>`
     );
   };
   return (
-    `<div class="xl-menu" data-xl-menu role="dialog" aria-label="${escapeHtml(`Sortuj i filtruj: ${label}`)}">` +
-    sortBtn("asc") +
-    sortBtn("desc") +
-    (hasFilter
-      ? `<button type="button" class="xl-clear" data-action="pickup-clear" data-col="${column}">${escapeHtml(`Wyczyść filtr z „${label}”`)}</button>`
+    `<div class="xl-menu" data-xl-menu role="dialog" aria-label="${escapeHtml(`Sortuj i filtruj: ${args.label}`)}">` +
+    sortBtn("asc", args.sortAscLabel) +
+    sortBtn("desc", args.sortDescLabel) +
+    (args.hasFilter
+      ? `<button type="button" class="xl-clear" data-action="${args.action}-clear" data-col="${args.column}">${escapeHtml(`Wyczyść filtr z „${args.label}”`)}</button>`
       : "") +
-    `<input class="xl-search" type="text" data-keep="pickup-query" placeholder="Szukaj" value="${escapeHtml(menu.query)}" autocomplete="off">` +
-    `<label class="xl-opt xl-all"><input type="checkbox" data-pickup-all="1"${visible.length === 0 ? " disabled" : ""}${allChecked ? " checked" : ""}${mixed ? ' data-mixed="1"' : ""}>` +
+    `<input class="xl-search" type="text" data-keep="${args.action}-query" placeholder="Szukaj" value="${escapeHtml(args.query)}" autocomplete="off">` +
+    `<label class="xl-opt xl-all"><input type="checkbox" data-${args.action}-all="1"${args.visible.length === 0 ? " disabled" : ""}${allChecked ? " checked" : ""}${mixed ? ' data-mixed="1"' : ""}>` +
     "<span>(Zaznacz wszystko)</span></label>" +
     `<div class="xl-values">${options}</div>` +
     '<div class="xl-actions">' +
-    '<button type="button" class="btn-ghost" data-action="pickup-cancel">Anuluj</button>' +
-    '<button type="button" class="btn-teal" data-action="pickup-ok">OK</button>' +
+    `<button type="button" class="btn-ghost" data-action="${args.action}-cancel">Anuluj</button>` +
+    `<button type="button" class="btn-teal" data-action="${args.action}-ok">OK</button>` +
     "</div></div>"
   );
 }
 
 function pickupBar(state: PickupTableState): string {
-  const filtered = PICKUP_COLUMNS.filter((col) => state.filters[col.key] != null).map((col) => col.label);
+  return columnBar(PICKUP_COLUMNS, state, "pickup", sortPhrase);
+}
+
+function columnBar<Key extends string>(
+  columns: readonly { key: Key; label: string }[],
+  state: {
+    sortKey: Key | null;
+    sortDir: "asc" | "desc";
+    filters: Partial<Record<Key, readonly string[]>>;
+  },
+  action: "pickup" | "invoice",
+  phrase: (key: Key, dir: "asc" | "desc") => string,
+): string {
+  const filtered = columns.filter((col) => state.filters[col.key] != null).map((col) => col.label);
   if (state.sortKey === null && filtered.length === 0) {
     return "";
   }
   const bits: string[] = [];
   if (state.sortKey) {
-    const label = PICKUP_COLUMNS.find((item) => item.key === state.sortKey)?.label ?? state.sortKey;
-    const phrase = sortPhrase(state.sortKey, state.sortDir).replace(/^Sortuj /, "");
-    bits.push(`Sortowanie: ${label}, ${phrase}`);
+    const key = state.sortKey;
+    const label = columns.find((item) => item.key === key)?.label ?? key;
+    bits.push(`Sortowanie: ${label}, ${phrase(key, state.sortDir).replace(/^Sortuj /, "")}`);
   }
   if (filtered.length > 0) {
     bits.push(`Filtr: ${filtered.join(", ")}`);
@@ -1071,7 +1344,7 @@ function pickupBar(state: PickupTableState): string {
   return (
     '<div class="xl-bar">' +
     `<span>${escapeHtml(bits.join(" · "))}</span>` +
-    '<button type="button" data-action="pickup-clear-all">Wyczyść</button></div>'
+    `<button type="button" data-action="${action}-clear-all">Wyczyść</button></div>`
   );
 }
 

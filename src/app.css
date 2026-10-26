@@ -17,7 +17,53 @@ body {
   color: var(--ink);
   background: var(--bg);
 }
-#app { position: relative; }
+#app {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.menu {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+}
+.menu-nav { display: flex; gap: 4px; }
+.menu-nav button {
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  padding: 8px 8px 6px;
+  font-size: 14px;
+  font-weight: 750;
+  color: #475569;
+}
+.menu-nav button:hover:not(:disabled) { color: var(--ink); }
+.menu-nav button.is-on { color: var(--teal-deep); border-bottom-color: var(--teal); }
+.menu-nav button:disabled { opacity: 0.4; }
+.menu-side { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.menu .btn-ghost { width: auto; }
+.app-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-body > .setup,
+.app-body > .statement,
+.app-body > .stats {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+@media (max-width: 800px) {
+  .menu-side { margin-left: 0; }
+}
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
@@ -123,7 +169,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   padding: 22px 22px 16px;
   box-shadow: var(--shadow);
 }
-.setup-card h2 { margin: 16px 0 6px; font-size: 20px; letter-spacing: -0.02em; }
+.setup-card h2 { margin: 0 0 6px; font-size: 20px; letter-spacing: -0.02em; }
 .setup-lead { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); font-weight: 550; }
 .dates {
   display: grid;
@@ -132,16 +178,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   align-items: start;
 }
 .dates .checkline { grid-column: 1 / -1; }
-.setup-foot {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-}
-.setup-foot .btn-ghost { flex: 1 1 auto; min-width: 7.5rem; }
 @media (max-width: 520px) {
   .dates { grid-template-columns: 1fr; }
 }
@@ -531,11 +567,9 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
 .stats {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  min-height: 0;
   background: #fff;
 }
-.stats .top { flex-wrap: wrap; gap: 12px; }
-.stats .top .brand { margin-right: auto; }
 .stats .filters {
   flex-direction: row;
   flex-wrap: wrap;

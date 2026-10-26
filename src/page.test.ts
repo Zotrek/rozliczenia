@@ -43,8 +43,7 @@ describe("page wiring", () => {
       "invoice-preview",
       "invoice-edit",
       "back",
-      "stats",
-      "stats-back",
+      "nav",
       "stats-period",
       "stats-show",
       "stats-fold",
@@ -70,7 +69,8 @@ describe("page wiring", () => {
     }
     expect(click).toContain("runSearch()");
     expect(click).toContain("runInvoices()");
-    expect(click).toContain("openStats()");
+    expect(click).toContain("goMenu(");
+    expect(click).not.toContain('action === "stats-back"');
     expect(click).toContain("runStats()");
     expect(click).toContain("runApprove()");
     expect(click).toContain("commitDetach(");
@@ -165,6 +165,27 @@ describe("page wiring", () => {
     expect(search).toContain("invoice: VIEW.invoiceFocus");
     expect(search).toContain("loadInvoiceRows(");
     expect(search).toContain("rowsOfInvoice(");
+  });
+
+  it("test_page_menu_keeps_statement_and_loaded_stats", () => {
+    const menu = functionBody("goMenu");
+    expect(menu).toContain("VIEW.searched");
+    expect(menu).toContain('place === "statement"');
+    expect(menu).toContain("openStats()");
+    expect(menu).not.toContain("runSearch(");
+    expect(menu).not.toContain("runStats(");
+    expect(menu).not.toContain("VIEW.statement");
+    expect(menu).not.toContain("VIEW.invoiceFocus");
+    const open = functionBody("openStats");
+    expect(open.indexOf("VIEW.stats.report !== null")).toBeLessThan(open.indexOf("emptyStats("));
+    expect(open).toContain("contractor: VIEW.contractor");
+    expect(open).toContain("void runStats()");
+    expect(functionBody("runSearch")).toContain("VIEW.searched = true");
+    expect(functionBody("runInvoices")).not.toContain("VIEW.searched");
+    const mode = functionBody("onChange");
+    const modeNa = mode.slice(mode.indexOf('el.id === "mode-na"'), mode.indexOf('el.id === "mode-h"'));
+    expect(modeNa).not.toContain("runSearch(");
+    expect(modeNa).not.toContain("runStats(");
   });
 
   it("test_page_stats_helpers_persist_fold_and_reload_report", () => {

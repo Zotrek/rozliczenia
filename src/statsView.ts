@@ -351,19 +351,8 @@ export function loadTablesCollapsed(
 export function renderStatsScreen(model: StatsViewModel): string {
   return (
     '<div class="stats" data-screen="stats">' +
-    statsTop() +
     statsFilters(model) +
     statsBody(model) +
-    "</div>"
-  );
-}
-
-function statsTop(): string {
-  return (
-    '<div class="top">' +
-    '<div class="brand"><img src="logo.png" alt="" width="36" height="36">' +
-    "<div><strong>Rozliczenia</strong><em>Statystyki</em></div></div>" +
-    '<button type="button" class="btn-ghost" data-action="stats-back">← Powrót</button>' +
     "</div>"
   );
 }

@@ -295,17 +295,19 @@ Gdy cokolwiek się ładuje — wyszukanie, zapis stawek, zatwierdzenie poniżej 
 
 ### Układ ekranu
 
-Układ Zakresu i Zestawienia jest w makiecie `rozliczenia/docs/makiety-tabeli.html`. Układ Statystyk — w `rozliczenia/docs/makiety-statystyki.html`. Pasek przełączników na górze stron makiet nie wchodzi do aplikacji. Kolory, odstępy i typografia biorą się z makiet. Teksty na Statystykach mają być zrozumiałe bez znajomości kolumn arkusza (język zarządu).
+Pasek miejsc jest w makiecie `rozliczenia/docs/makiety-menu.html`, wariant Propozycja, tryb przy zakresie. Układ tabeli Zakresu i Zestawienia — w `rozliczenia/docs/makiety-tabeli.html`. Układ Statystyk — w `rozliczenia/docs/makiety-statystyki.html`. Pasek przełączników na górze stron makiet (Wariant, Ekran, Szukaj) nie wchodzi do aplikacji. Przełącznika „W pasku” nie ma. Kolory, odstępy i typografia biorą się z makiet. Teksty na Statystykach mają być zrozumiałe bez znajomości kolumn arkusza (język zarządu).
 
 Cztery widoki aplikacji + okno Bazy stawek. Tabeli na Zakresie nie ma. Na Zestawieniu wykresu składu kosztów nie ma.
 
-**Zakres.** Na środku karta. Ikona, nazwa Rozliczenia i tryb Na zgłoszenie. Pod spodem dwa tryby: Na zgłoszenie zaznaczony, Harmonogram da się zaznaczyć. Potem podwykonawca, data początkowa, data końcowa i Szukaj. Na dole karty: **Statystyki** (wejście bez Szukaj) oraz **Baza stawek**. Baza stawek otwiera okno (zakładki: Baza stawek / Baza cen harmonogram), nie osobny ekran. Sklep i podwykonawca są listami, bez wpisu ręcznego: adres z kolumny Adres sklepu rejestru, nazwa krótka z Listy podwykonawców. To nie są pinezki mapy.
+**Pasek.** Na każdym widoku: Zakres, Zestawienie, Statystyki i podgląd faktury. Po lewej ikona i nazwa Rozliczenia. Podpis przy logo to bieżący tryb (Na zgłoszenie albo Harmonogram) na Zakresie, na Zestawieniu i na podglądzie faktury. Na Statystykach podpis to Statystyki. W środku trzy miejsca: Zakres, Zestawienie, Statystyki. Aktywne miejsce jest podkreślone. Podgląd faktury nie ma własnego miejsca: świeci się Statystyki. Po prawej **Baza stawek**, ten sam przycisk-widmo. Otwiera okno (zakładki: Baza stawek / Baza cen harmonogram) i nie zmienia widoku. Okno da się otworzyć z każdego widoku, także ze Statystyk i z podglądu. Zamknięcie wraca do widoku, z którego je otwarto. Zestawienie w pasku jest nieaktywne, dopóki nie było udanego Szukaj. Klik wtedy nic nie robi. Po Szukaj prowadzi do ostatniego zestawienia, bez ponownego odczytu. Wejście w Zakres albo w Statystyki tego zestawienia nie kasuje.
 
-**Zestawienie.** Po Szukaj. W nagłówku ikona, zakres (podwykonawca i daty) oraz przycisk Zmień zakres, który wraca do ekranu Zakres. Obok jest Baza stawek. Przycisku Statystyki na Zestawieniu nie ma. Pod nagłówkiem liczba pozycji w zestawieniu, bez sklepów z rozwinięcia trasy. Potem tabela. Na dole Suma zestawienia, Suma zaznaczonych, numer faktury i Zatwierdź.
+**Zakres.** Na środku karta. Przełącznik trybu zostaje na karcie, w tym samym miejscu, z tymi samymi napisami. Na starcie Na zgłoszenie. Jeden tryb naraz. Zmiana trybu nie przeładowuje zestawienia ani raportu. Potem podwykonawca, data początkowa, data końcowa i Szukaj. Dolnych przycisków Statystyki i Baza stawek nie ma. Sklep i podwykonawca są listami, bez wpisu ręcznego: adres z kolumny Adres sklepu rejestru, nazwa krótka z Listy podwykonawców. To nie są pinezki mapy.
 
-**Podgląd rozliczonych.** Ze Statystyk, z wiersza odbioru w tabeli **Odbiory w okresie**. Ten podwykonawca, ten tryb wiersza i okres raportu. Gdy wiersz ma numer faktury, na ekranie jest tylko ta faktura. Kwoty z arkusza. ← Statystyki wraca do raportu. Szczegóły: [Podgląd rozliczonych faktur](#podgląd-rozliczonych-faktur).
+**Zestawienie.** Po Szukaj. Zostaje opis zakresu (podwykonawca i daty). Przycisku Zmień zakres nie ma: Zakres jest w pasku. Bazy stawek w nagłówku nie ma: jest w pasku. Gdy zestawienie otwarto Edycją z tabeli odbiorów, zostaje **← Statystyki** i wraca do tego samego raportu. Numer faktury i pozycje tej faktury zostają, dopóki użytkownik nie zrobi nowego Szukaj z Zakresu. Pod opisem liczba pozycji w zestawieniu, bez sklepów z rozwinięcia trasy. Potem tabela. Na dole Suma zestawienia, Suma zaznaczonych, numer faktury i Zatwierdź. Po Zatwierdź wraca na Zakres.
 
-**Statystyki.** Z Zakresu. W nagłówku ikona, nazwa Rozliczenia / Statystyki oraz **← Powrót** (wraca do Zakresu). Filtry okresu i podwykonawcy, potem KPI i sekcje raportów. Szczegóły: [Statystyki](#statystyki).
+**Podgląd rozliczonych.** Ze Statystyk, z wiersza odbioru w tabeli **Odbiory w okresie**. Ten podwykonawca, ten tryb wiersza i okres raportu. Gdy wiersz ma numer faktury, na ekranie jest tylko ta faktura. Kwoty z arkusza. W pasku świeci się Statystyki. **← Statystyki** zostaje i wraca do tego samego raportu. Szczegóły: [Podgląd rozliczonych faktur](#podgląd-rozliczonych-faktur).
+
+**Statystyki.** Z paska, także ze Zestawienia i z podglądu, bez wracania na Zakres. Wejście nie kasuje zestawienia. Pierwsze wejście ładuje raport (podwykonawca z formularza, od razu odczyt). Kolejne, gdy raport już jest, tylko przełącza widok: raport, filtry i zwinięte sekcje zostają. Przycisku **← Powrót** nie ma. Filtry okresu i podwykonawcy, potem KPI i sekcje raportów. Szczegóły: [Statystyki](#statystyki).
 
 Opcji **tylko za liczbę worków** nie ma. Nie stoi pod nazwą sklepu, nie ma jej w kolumnie i nie ma jej na trasie. Gdy podjazd nie jest naliczany, w Kwota podjazdu/trasy wpisuje się 0 zł.
 
@@ -491,7 +493,7 @@ W rejestrze Na zgłoszenie edycja **Ilość worków** na rozliczonym wierszu kos
 
 ## Statystyki
 
-Widok tylko do odczytu. Bez zatwierdzania, bez edycji kosztów i bez okna Bazy stawek. Makieta: `rozliczenia/docs/makiety-statystyki.html`. Wejście: przycisk **Statystyki** na Zakresie (bez Szukaj). Wyjście: **← Powrót** → Zakres.
+Widok tylko do odczytu. Bez zatwierdzania i bez edycji kosztów. Baza stawek jest w pasku i otwiera to samo okno, bez zmiany widoku. Makieta: `rozliczenia/docs/makiety-statystyki.html`. Wejście: miejsce **Statystyki** w pasku (bez Szukaj). Pierwsze wejście czyta raport. Kolejne, gdy raport już jest, wraca do niego bez nowego odczytu. Przycisku **← Powrót** nie ma.
 
 Teksty na ekranie mają być jasne dla osoby nietechnicznej (np. zarząd): bez liter kolumn arkusza i bez angielskiego żargonu.
 

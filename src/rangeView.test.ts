@@ -32,6 +32,7 @@ function model(over: Partial<RangeViewModel> = {}): RangeViewModel {
     invoiceFocus: null,
     invoiceNotice: "",
     workReturn: "range",
+    searched: false,
     addresses: [],
     ratesShop: "",
     ratesShopQuery: "",
@@ -111,32 +112,56 @@ describe("renderApp", () => {
     expect(html).not.toContain("Zatwierdzenie faktury w tej wersji niedostępne");
   });
 
-  it("test_renderApp_change_range_is_on_the_statement_screen", () => {
+  it("test_renderApp_statement_keeps_the_range_and_opens_rates_without_changing_screen", () => {
     const html = renderApp(
-      model({ screen: "statement", applied: APPLIED, ratesOpen: true }),
+      model({ screen: "statement", applied: APPLIED, searched: true, ratesOpen: true }),
     );
     expect(html).toContain('data-screen="statement"');
-    expect(html).toContain("Zmień zakres");
+    expect(html).not.toContain("Zmień zakres");
     expect(html).not.toContain("Rozliczone faktury");
     expect(html).toContain("GPW, od 01.09.2026 do 18.09.2026");
     expect(html).toContain('data-window="rates"');
     expect(html).not.toContain('data-screen="range"');
     expect(html).not.toContain('data-screen="rates"');
+    const sheet = html.slice(html.indexOf('data-screen="statement"'), html.indexOf('data-window="rates"'));
+    expect(sheet).not.toContain('data-action="rates"');
+    expect(sheet).not.toContain("← Statystyki");
+    expect(html).toContain('class="is-on" data-action="nav" data-place="statement"');
   });
 
-  it("test_renderApp_stats_button_on_range_and_back_on_stats", () => {
+  it("test_renderApp_menu_places_and_rates_are_on_every_screen", () => {
     const range = renderApp(model({ screen: "range" }));
-    expect(range).toContain('data-action="stats"');
+    expect(range).toContain('aria-label="Miejsca"');
+    expect(range).toContain('class="is-on" data-action="nav" data-place="range"');
+    expect(range).toContain('data-place="statement" disabled');
+    expect(range).toContain('title="Najpierw Szukaj na Zakresie"');
+    expect(range).not.toContain("setup-foot");
     expect(range).not.toContain('data-action="invoices"');
     expect(range).not.toContain("Rozliczone faktury");
-    expect(range).toContain("Statystyki");
-    expect(range).toContain("Baza stawek");
-    const stats = renderApp(model({ screen: "stats" }));
+    expect(range).toContain("<em>Na zgłoszenie</em>");
+    expect(range.match(/src="logo.png"/g)).toHaveLength(1);
+    const card = range.slice(range.indexOf('data-screen="range"'));
+    expect(card).toContain('data-action="search"');
+    expect(card).toContain('id="mode-na"');
+    expect(card).not.toContain('data-action="rates"');
+    expect(card).not.toContain('data-action="nav"');
+    const ready = renderApp(model({ screen: "range", searched: true, applied: APPLIED }));
+    expect(ready).not.toMatch(/data-place="statement"[^>]*disabled/);
+    const stats = renderApp(model({ screen: "stats", mode: "schedule", searched: true }));
     expect(stats).toContain('data-screen="stats"');
-    expect(stats).toContain('data-action="stats-back"');
-    expect(stats).toContain("← Powrót");
+    expect(stats).toContain('class="is-on" data-action="nav" data-place="stats"');
+    expect(stats).toContain("<em>Statystyki</em>");
+    expect(stats).not.toContain("<em>Harmonogram</em>");
+    expect(stats).not.toContain("← Powrót");
+    expect(stats).not.toContain('data-action="stats-back"');
     expect(stats).toContain("Pokaż raport");
+    expect(stats).toContain('data-action="rates"');
     expect(stats).not.toContain('data-screen="range"');
+    const preview = renderApp(model({ screen: "invoices", mode: "schedule", applied: APPLIED }));
+    expect(preview).toContain('class="is-on" data-action="nav" data-place="stats"');
+    expect(preview).toContain("<em>Harmonogram</em>");
+    expect(preview).toContain("← Statystyki");
+    expect(preview).toContain('data-action="rates"');
   });
 
   it("test_renderApp_invoices_screen_lists_saved_invoice_without_approve", () => {
@@ -166,7 +191,8 @@ describe("renderApp", () => {
     expect(html).toContain("Podgląd rozliczonych");
     expect(html).toContain("FV/1");
     expect(html).toContain("150,00");
-    expect(html).toContain("Zmień zakres");
+    expect(html).toContain("← Statystyki");
+    expect(html).not.toContain("Zmień zakres");
     expect(html).toContain('data-invoice="FV/1"');
     expect(html).not.toContain("is-focus");
     const fromStats = renderApp(
@@ -252,12 +278,15 @@ describe("renderApp", () => {
       model({
         screen: "statement",
         applied: APPLIED,
+        searched: true,
         workReturn: "stats",
         invoiceFocus: "FV/1",
         invoices,
       }),
     );
     expect(html).toContain('data-screen="statement"');
+    expect(html).toContain("← Statystyki");
+    expect(html).toContain('class="is-on" data-action="nav" data-place="statement"');
     expect(html).toContain("Pozycje tej faktury");
     expect(html).toContain("Sklep A");
     expect(html).not.toContain("Sklep Obcy");

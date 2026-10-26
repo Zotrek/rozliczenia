@@ -11,7 +11,6 @@ import {
   screenAfterInvoices,
   screenAfterOpenStats,
   screenAfterSearch,
-  screenAfterStatsBack,
   searchParams,
   sheetToIsoDate,
   statsParams,
@@ -141,6 +140,7 @@ const VIEW: RangeViewModel = {
   invoiceFocus: null,
   invoiceNotice: "",
   workReturn: "range",
+  searched: false,
   loadKind: "logo",
   addresses: [],
   ratesShop: "",
@@ -539,6 +539,7 @@ async function runSearch(): Promise<void> {
       return;
     }
     VIEW.applied = started;
+    VIEW.searched = true;
     VIEW.screen = screenAfterSearch();
     VIEW.statement = freshStatement(read.rows, read.rates);
     VIEW.invoiceNotice = "";
@@ -738,14 +739,8 @@ function onClick(event: MouseEvent): void {
     VIEW.loading = false;
     VIEW.ratesOpen = false;
     paint();
-  } else if (action === "stats") {
-    openStats();
-  } else if (action === "stats-back") {
-    VIEW.screen = screenAfterStatsBack();
-    VIEW.loading = false;
-    VIEW.ratesOpen = false;
-    VIEW.stats = { ...VIEW.stats, status: "" };
-    paint();
+  } else if (action === "nav") {
+    goMenu(el.dataset.place ?? "");
   } else if (action === "stats-period") {
     const period = el.dataset.period as StatsPeriodKind | undefined;
     if (!period) {
@@ -2256,7 +2251,33 @@ async function runApprove(): Promise<void> {
   }
 }
 
+/** Zakres, Zestawienie albo Statystyki. Nie czyta arkusza i nie kasuje zestawienia. */
+function goMenu(place: string): void {
+  if (place === "stats") {
+    openStats();
+    return;
+  }
+  if (place === "statement") {
+    if (!VIEW.searched) {
+      return;
+    }
+    VIEW.screen = "statement";
+  } else {
+    VIEW.screen = "range";
+  }
+  VIEW.loading = false;
+  VIEW.ratesOpen = false;
+  paint();
+}
+
 function openStats(): void {
+  VIEW.ratesOpen = false;
+  VIEW.status = "";
+  if (VIEW.stats.report !== null) {
+    VIEW.screen = screenAfterOpenStats();
+    paint();
+    return;
+  }
   const today = todayCalendar();
   const storage = typeof localStorage !== "undefined" ? localStorage : null;
   VIEW.stats = {
@@ -2266,8 +2287,6 @@ function openStats(): void {
     sectionsCollapsed: loadSectionsCollapsed(storage, STATS_SECTION_IDS),
   };
   VIEW.screen = screenAfterOpenStats();
-  VIEW.ratesOpen = false;
-  VIEW.status = "";
   paint();
   void runStats();
 }

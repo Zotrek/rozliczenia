@@ -272,7 +272,7 @@ export function screenAfterWorkBack(workReturn: "range" | "stats"): ScreenId {
   return workReturn === "stats" ? "stats" : screenAfterChangeRange();
 }
 
-/** Po udanym Zatwierdź wraca do karty zakresu, jak Zmień zakres. */
+/** Po udanym Zatwierdź wraca na Zakres. Zestawienie w pamięci zostaje. */
 export function screenAfterApprove(): ScreenId {
   return "range";
 }

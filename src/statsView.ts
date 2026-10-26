@@ -251,7 +251,7 @@ function statsBody(model: StatsViewModel): string {
       "pickups",
       model,
       "Odbiory w okresie",
-      "Każdy transport osobno · tryb zlecenia i liczba worków · po 5 na stronę",
+      "Każdy transport osobno · przy rozliczonym podgląd i edycja faktury · po 5 na stronę",
       periodPickupsBlock(model),
       true,
     ) +
@@ -551,6 +551,7 @@ function periodPickupsBlock(model: StatsViewModel): string {
   const body = paged.slice
     .map((row) => {
       const bags = row.bagCount === null ? "—" : String(row.bagCount);
+      const value = row.invoiceValue == null ? "—" : formatPln(row.invoiceValue);
       return (
         `<tr><td>${escapeHtml(row.pickupDate)}</td>` +
         `<td class="shop">${escapeHtml(row.address)}` +
@@ -558,18 +559,42 @@ function periodPickupsBlock(model: StatsViewModel): string {
         `<td>${escapeHtml(row.contractor)}</td>` +
         `<td>${escapeHtml(modeLabel(row.mode))}</td>` +
         `<td class="num">${escapeHtml(bags)}</td>` +
-        `<td>${row.settled ? "Tak" : "Nie"}</td></tr>`
+        `<td>${row.settled ? "Tak" : "Nie"}${invoiceLinks(row)}</td>` +
+        `<td class="num">${escapeHtml(value)}</td></tr>`
       );
     })
     .join("");
   return (
     "<table><thead><tr>" +
     "<th>Data</th><th>Sklep</th><th>Podwykonawca</th><th>Tryb</th><th class=\"num\">Worki</th><th>Rozliczone</th>" +
-    `</tr></thead><tbody>${body || emptyRow(6)}</tbody></table>` +
+    "<th class=\"num\">Wartość faktury</th>" +
+    `</tr></thead><tbody>${body || emptyRow(7)}</tbody></table>` +
     pager("pickups", paged) +
     '<p class="note" style="margin: 10px 12px 12px;">' +
+    "Wartość faktury to suma kosztów odbioru z arkusza dla tego numeru, u tego podwykonawcy i w tym okresie. " +
+    "Podgląd nic nie zapisuje. Edycja otwiera zestawienie nierozliczonych i wpisuje ten numer faktury. " +
+    "W Harmonogramie link jest też przy nierozliczonym wierszu. " +
     "Harmonogram: liczba worków = liczba wierszy w „odebrane z harmonogramu” dla sklepu i dnia. " +
     `Lista pokazuje po ${STATS_PAGE_SIZE} pozycji na stronę.</p>`
+  );
+}
+
+function invoiceLinks(row: StatsReport["periodPickups"][number]): string {
+  // Harmonogram w tej tabeli to worki z „odebrane”, bez numeru faktury.
+  // Link i tak otwiera rejestr harmonogramu dla tej firmy i okresu.
+  if (!row.settled && row.mode !== "schedule") {
+    return "";
+  }
+  const attrs =
+    ` data-contractor="${escapeHtml(row.contractor)}"` +
+    ` data-mode="${row.mode}"` +
+    ` data-invoice="${escapeHtml(row.invoice)}"` +
+    (row.settled && row.invoiceKnown ? ' data-invoice-known="1"' : "");
+  return (
+    '<div class="row-links">' +
+    `<button type="button" data-action="invoice-preview"${attrs}>Podgląd</button>` +
+    `<button type="button" data-action="invoice-edit"${attrs}>Edycja</button>` +
+    "</div>"
   );
 }
 

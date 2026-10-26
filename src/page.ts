@@ -3,13 +3,17 @@ import {
   applyNoStartDate,
   fieldsForSearch,
   foldPl,
+  RANGE_ERROR,
   readWebAppUrl,
   screenAfterApprove,
-  screenAfterChangeRange,
+  screenAfterWorkBack,
+  invoiceParams,
+  screenAfterInvoices,
   screenAfterOpenStats,
   screenAfterSearch,
   screenAfterStatsBack,
   searchParams,
+  sheetToIsoDate,
   statsParams,
   selectedContractor,
   resolveContractorText,
@@ -19,6 +23,7 @@ import {
   defaultRangeDates,
   type ContractorListItem,
 } from "./range.js";
+import { readSettledInvoices } from "./invoices.js";
 import { lineKey, rowKey, sumSelected } from "./engine.js";
 import {
   STATEMENT_ERROR,
@@ -103,6 +108,9 @@ const VIEW: RangeViewModel = {
   status: "",
   webappMissing: false,
   statement: emptyStatement(),
+  invoices: [],
+  invoiceFocus: null,
+  workReturn: "range",
   loadKind: "logo",
   addresses: [],
   ratesShop: "",
@@ -166,7 +174,7 @@ function reportMissingWebApp(place: string): void {
     "ROZ-E-WEBAPP",
     place,
     "Brak adresu Web App.",
-    "Bez adresu lista, wyszukanie, stawki i statystyki nie dojdą. Dopisz ?webapp= do adresu tej strony albo ustaw adres przy buildzie.",
+    "Bez adresu lista, wyszukanie, podgląd faktur, stawki i statystyki nie dojdą. Dopisz ?webapp= do adresu tej strony albo ustaw adres przy buildzie.",
     { technical: "webapp empty" },
   );
 }
@@ -229,6 +237,10 @@ function paint(keep?: string): void {
     }
   }
   writeListScroll(scroll);
+  const focused = root.querySelector(".invoice-card.is-focus");
+  if (focused instanceof HTMLElement) {
+    focused.scrollIntoView({ block: "nearest" });
+  }
 }
 
 /** Zaznaczenie nie przebudowuje listy: zostaje przewinięcie i fokus na checkboxie. */
@@ -397,9 +409,7 @@ async function runSearch(): Promise<void> {
     VIEW.mode,
   );
   if (!started.ok) {
-    VIEW.error = started.error;
-    VIEW.contractorOpen = false;
-    paint();
+    failRangeStart(started.error);
     return;
   }
   if (webapp === "") {
@@ -418,7 +428,7 @@ async function runSearch(): Promise<void> {
     const parsed = await readRozJson(response);
     if (!parsed.ok) {
       if (!parsed.silent) {
-        VIEW.status = "Wyszukanie nie doszło.";
+        failOpen("Wyszukanie nie doszło.");
         reportFailure(
           "ROZ-E-SEARCH",
           "page.ts runSearch",
@@ -431,7 +441,7 @@ async function runSearch(): Promise<void> {
     }
     const read = readSettlement(parsed.body);
     if (!read.ok) {
-      VIEW.status = read.error;
+      failOpen(read.error);
       reportFailure(
         "ROZ-E-SEARCH",
         "page.ts runSearch",
@@ -444,15 +454,137 @@ async function runSearch(): Promise<void> {
     VIEW.applied = started;
     VIEW.screen = screenAfterSearch();
     VIEW.statement = freshStatement(read.rows, read.rates);
+    if (VIEW.workReturn === "stats" && VIEW.invoiceFocus) {
+      VIEW.statement = { ...VIEW.statement, invoice: VIEW.invoiceFocus };
+    }
     VIEW.status = "";
+    VIEW.stats = { ...VIEW.stats, status: "" };
     VIEW.ratesOpen = false;
   } catch (err) {
-    VIEW.status = "Wyszukanie nie doszło.";
+    failOpen("Wyszukanie nie doszło.");
     reportFailure(
       "ROZ-E-SEARCH",
       "page.ts runSearch",
       "Wyszukanie nie doszło.",
       "Zestawienie się nie zmieniło. Możesz poprawić zakres i szukać jeszcze raz.",
+      { technical: err },
+    );
+  } finally {
+    VIEW.loading = false;
+    paint();
+  }
+}
+
+function failOpen(message: string): void {
+  if (VIEW.workReturn === "stats") {
+    VIEW.stats = { ...VIEW.stats, status: message };
+    VIEW.screen = "stats";
+    VIEW.status = "";
+    return;
+  }
+  VIEW.status = message;
+}
+
+function failRangeStart(error: keyof typeof RANGE_ERROR): void {
+  if (VIEW.workReturn === "stats") {
+    failOpen(RANGE_ERROR[error]);
+  } else {
+    VIEW.error = error;
+    VIEW.screen = "range";
+  }
+  VIEW.contractorOpen = false;
+  paint();
+}
+
+/** Podgląd i edycja z tabeli odbiorów: ten podwykonawca, tryb wiersza, okres raportu. */
+function armPickupWork(el: HTMLElement): boolean {
+  const from = sheetToIsoDate(VIEW.stats.appliedFrom);
+  const to = sheetToIsoDate(VIEW.stats.appliedTo);
+  if (!from || !to) {
+    VIEW.stats = { ...VIEW.stats, status: "Najpierw pokaż raport." };
+    paint();
+    return false;
+  }
+  VIEW.mode = el.dataset.mode === "schedule" ? "schedule" : "report";
+  VIEW.contractor = el.dataset.contractor ?? "";
+  VIEW.contractorQuery = VIEW.contractor;
+  VIEW.contractorOpen = false;
+  VIEW.from = from;
+  VIEW.to = to;
+  VIEW.noFrom = false;
+  VIEW.workReturn = "stats";
+  VIEW.error = "";
+  VIEW.invoiceFocus = el.dataset.invoiceKnown === "1" ? (el.dataset.invoice ?? "") : null;
+  return true;
+}
+
+async function runInvoices(): Promise<void> {
+  const started = startSearch(
+    fieldsForSearch({
+      contractor: VIEW.contractor,
+      from: VIEW.from,
+      to: VIEW.to,
+      noFrom: VIEW.noFrom,
+    }),
+    VIEW.contractors,
+    VIEW.mode,
+  );
+  if (!started.ok) {
+    failRangeStart(started.error);
+    return;
+  }
+  if (webapp === "") {
+    VIEW.webappMissing = true;
+    reportMissingWebApp("page.ts runInvoices");
+    paint();
+    return;
+  }
+  VIEW.error = "";
+  VIEW.loading = true;
+  VIEW.loadKind = "logo";
+  VIEW.loadMessage = "Szukam rozliczonych faktur…";
+  paint();
+  try {
+    const response = await fetch(webAppUrl(webapp, invoiceParams(started)));
+    const parsed = await readRozJson(response);
+    if (!parsed.ok) {
+      if (!parsed.silent) {
+        failOpen("Odczyt faktur nie doszedł.");
+        reportFailure(
+          "ROZ-E-INVOICES",
+          "page.ts runInvoices",
+          "Odczyt faktur nie doszedł.",
+          "Podgląd się nie zmienił. Możesz poprawić zakres i otworzyć go jeszcze raz.",
+          parsed,
+        );
+      }
+      return;
+    }
+    const read = readSettledInvoices(parsed.body);
+    if (!read.ok) {
+      failOpen(read.error);
+      reportFailure(
+        "ROZ-E-INVOICES",
+        "page.ts runInvoices",
+        "Odczyt faktur nie doszedł.",
+        "Podgląd się nie zmienił. Możesz poprawić zakres i otworzyć go jeszcze raz.",
+        { technical: read.error },
+      );
+      return;
+    }
+    VIEW.applied = started;
+    VIEW.screen = screenAfterInvoices();
+    VIEW.invoices = read.rows;
+    VIEW.status = "";
+    VIEW.stats = { ...VIEW.stats, status: "" };
+    VIEW.ratesOpen = false;
+  } catch (err) {
+    failOpen("Odczyt faktur nie doszedł.");
+    reportFailure(
+      "ROZ-E-INVOICES",
+      "page.ts runInvoices",
+      "Odczyt faktur nie doszedł.",
+      "Podgląd się nie zmienił. Możesz poprawić zakres i otworzyć go jeszcze raz.",
       { technical: err },
     );
   } finally {
@@ -481,9 +613,19 @@ function onClick(event: MouseEvent): void {
   if (action === "pick-contractor") {
     pickContractor(el.dataset.nazwa ?? "");
   } else if (action === "search") {
+    VIEW.workReturn = "range";
+    VIEW.invoiceFocus = null;
     void runSearch();
+  } else if (action === "invoice-preview") {
+    if (armPickupWork(el)) {
+      void runInvoices();
+    }
+  } else if (action === "invoice-edit") {
+    if (armPickupWork(el)) {
+      void runSearch();
+    }
   } else if (action === "back") {
-    VIEW.screen = screenAfterChangeRange();
+    VIEW.screen = screenAfterWorkBack(VIEW.workReturn);
     VIEW.loading = false;
     VIEW.ratesOpen = false;
     paint();

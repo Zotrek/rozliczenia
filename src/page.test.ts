@@ -40,6 +40,8 @@ describe("page wiring", () => {
     for (const action of [
       "pick-contractor",
       "search",
+      "invoice-preview",
+      "invoice-edit",
       "back",
       "stats",
       "stats-back",
@@ -61,6 +63,7 @@ describe("page wiring", () => {
       expect(click).toContain(`action === "${action}"`);
     }
     expect(click).toContain("runSearch()");
+    expect(click).toContain("runInvoices()");
     expect(click).toContain("openStats()");
     expect(click).toContain("runStats()");
     expect(click).toContain("runApprove()");
@@ -135,6 +138,23 @@ describe("page wiring", () => {
     expect(input).toContain("typeRateField(");
   });
 
+  it("test_page_invoices_open_from_the_same_range_without_a_write", () => {
+    const click = functionBody("onClick");
+    expect(click).toContain('action === "invoice-preview"');
+    expect(click).toContain('action === "invoice-edit"');
+    expect(click).toContain("armPickupWork(");
+    expect(click).toContain("screenAfterWorkBack(");
+    expect(click).not.toContain('action === "invoices"');
+    const run = functionBody("runInvoices");
+    expect(run).toContain("invoiceParams(");
+    expect(run).toContain("readSettledInvoices(");
+    expect(run).toContain("screenAfterInvoices()");
+    expect(run).not.toContain("postSheet(");
+    expect(run).not.toContain("buildApprove(");
+    expect(functionBody("armPickupWork")).toContain("sheetToIsoDate(");
+    expect(functionBody("runSearch")).toContain("invoice: VIEW.invoiceFocus");
+  });
+
   it("test_page_stats_helpers_persist_fold_and_reload_report", () => {
     expect(functionBody("openStats")).toContain("screenAfterOpenStats()");
     expect(functionBody("toggleStatsSection")).toContain("writeStatsFold(");
@@ -170,12 +190,15 @@ describe("buildPage bundle", () => {
     expect(html).toContain("function escapeHtml");
     expect(html).toContain("function renderStatsScreen");
     expect(html).toContain("function renderStatement");
+    expect(html).toContain("function renderInvoiceList");
     expect(html).toContain("function renderApp");
     expect(html).toContain('id="roz-error-stack"');
     expect(html).toContain("function showRozErrorCard");
     expect(html).toContain("ROZ-E-AUTH-MISMATCH");
     expect(html).not.toMatch(/\bimport\s/);
     expect(html).not.toMatch(/\bexport\s/);
+    const script = html.slice(html.lastIndexOf("<script>") + "<script>".length, html.lastIndexOf("</script>"));
+    expect(() => new Function(script)).not.toThrow();
   });
 });
 
@@ -191,6 +214,7 @@ describe("error cards", () => {
       "ROZ-E-APPROVE-PARTIAL",
       "ROZ-E-REFRESH",
       "ROZ-E-STATS",
+      "ROZ-E-INVOICES",
       "ROZ-E-WEBAPP",
       "ROZ-E-STORAGE",
     ]) {

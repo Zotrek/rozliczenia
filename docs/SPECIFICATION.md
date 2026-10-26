@@ -11,7 +11,7 @@
 
 **Co chcemy osiągnąć?**
 
-Osobna aplikacja do rozliczania kosztów odbiorów realizowanych przez podwykonawców i do przypisania tych kosztów do faktury. To nowa aplikacja, nie widok mapy: główna praca odbywa się na tabeli. Są **trzy widoki**: Zakres, Zestawienie (po Szukaj) oraz **Statystyki** (raport odczytowy). Baza stawek to okno, nie osobny ekran. Na Zestawieniu wykresów nie ma. Na Statystykach są proste słupki CSS (bez bibliotek wykresów).
+Osobna aplikacja do rozliczania kosztów odbiorów realizowanych przez podwykonawców i do przypisania tych kosztów do faktury. To nowa aplikacja, nie widok mapy: główna praca odbywa się na tabeli. Są **cztery widoki**: Zakres, Zestawienie (po Szukaj), **podgląd rozliczonych faktur** oraz **Statystyki** (raport odczytowy). Baza stawek to okno, nie osobny ekran. Na Zestawieniu wykresów nie ma. Na Statystykach są proste słupki CSS (bez bibliotek wykresów).
 
 Aplikacja nie służy do wpisywania odbiorów. Dane odbioru powstają przy generowaniu protokołu w Arkusz-mapa i leżą na zakładkach miesięcznych **Na zgłoszenie {Miesiąc} {Rok}** (oraz legacy **Arkusz1** dla historii). Tutaj użytkownik wyszukuje nierozliczone pozycje, widzi składniki kosztu, może zmienić stawki i zatwierdza rozliczenie — albo otwiera Statystyki, żeby zobaczyć KPI i rankingi bez zatwierdzania.
 
@@ -43,7 +43,7 @@ Poza zakresem, świadomie:
 
 - Cofanie rozliczenia i edycja numeru faktury po zatwierdzeniu. W tej wersji tego nie ma.
 - Biblioteki wykresów (Chart.js itd.) i wykres składu kosztów na Zestawieniu. Na Statystykach dozwolone są proste słupki CSS.
-- Raport po numerze faktury; lista sklepów bez odbiorów (np. 2 tygodnie); prognoza / trend na przyszłe tygodnie.
+- Wyszukiwanie samej faktury bez podwykonawcy i zakresu dat; lista sklepów bez odbiorów (np. 2 tygodnie); prognoza / trend na przyszłe tygodnie.
 - Wybór technologii aplikacji rozliczeń. Z zachowania nie wynika Symfony, Vue ani PostgreSQL.
 
 ---
@@ -297,11 +297,13 @@ Gdy cokolwiek się ładuje — wyszukanie, zapis stawek, zatwierdzenie poniżej 
 
 Układ Zakresu i Zestawienia jest w makiecie `rozliczenia/docs/makiety-tabeli.html`. Układ Statystyk — w `rozliczenia/docs/makiety-statystyki.html`. Pasek przełączników na górze stron makiet nie wchodzi do aplikacji. Kolory, odstępy i typografia biorą się z makiet. Teksty na Statystykach mają być zrozumiałe bez znajomości kolumn arkusza (język zarządu).
 
-Trzy widoki aplikacji + okno Bazy stawek. Tabeli na Zakresie nie ma. Na Zestawieniu wykresu składu kosztów nie ma.
+Cztery widoki aplikacji + okno Bazy stawek. Tabeli na Zakresie nie ma. Na Zestawieniu wykresu składu kosztów nie ma.
 
 **Zakres.** Na środku karta. Ikona, nazwa Rozliczenia i tryb Na zgłoszenie. Pod spodem dwa tryby: Na zgłoszenie zaznaczony, Harmonogram da się zaznaczyć. Potem podwykonawca, data początkowa, data końcowa i Szukaj. Na dole karty: **Statystyki** (wejście bez Szukaj) oraz **Baza stawek**. Baza stawek otwiera okno (zakładki: Baza stawek / Baza cen harmonogram), nie osobny ekran. Sklep i podwykonawca są listami, bez wpisu ręcznego: adres z kolumny Adres sklepu rejestru, nazwa krótka z Listy podwykonawców. To nie są pinezki mapy.
 
 **Zestawienie.** Po Szukaj. W nagłówku ikona, zakres (podwykonawca i daty) oraz przycisk Zmień zakres, który wraca do ekranu Zakres. Obok jest Baza stawek. Przycisku Statystyki na Zestawieniu nie ma. Pod nagłówkiem liczba pozycji w zestawieniu, bez sklepów z rozwinięcia trasy. Potem tabela. Na dole Suma zestawienia, Suma zaznaczonych, numer faktury i Zatwierdź.
+
+**Podgląd rozliczonych.** Ze Statystyk, z wiersza odbioru w tabeli **Odbiory w okresie**. Ten podwykonawca, ten tryb wiersza i okres raportu. Grupy po numerze faktury, kwoty z arkusza, bez edycji. ← Statystyki wraca do raportu. Szczegóły: [Podgląd rozliczonych faktur](#podgląd-rozliczonych-faktur).
 
 **Statystyki.** Z Zakresu. W nagłówku ikona, nazwa Rozliczenia / Statystyki oraz **← Powrót** (wraca do Zakresu). Filtry okresu i podwykonawcy, potem KPI i sekcje raportów. Szczegóły: [Statystyki](#statystyki).
 
@@ -342,6 +344,16 @@ Porównanie jest po **dacie odbioru**. Obie granice są włącznie, także przy 
 Data początkowa późniejsza niż końcowa nie startuje wyszukania. Widać błąd: data początkowa nie może być późniejsza niż końcowa. Przy opcji bez daty początkowej tej pary nie ma.
 
 Po wyszukaniu widać tylko odbiory nierozliczone tego podwykonawcy w tym zakresie, bez wierszy z **transport się odbył** `nie`. Rozliczony odbiór nie wraca i nie wchodzi do kalkulacji. Odbiór z `nie` też nie wraca.
+
+### Podgląd rozliczonych faktur
+
+W Statystykach, w tabeli **Odbiory w okresie**, rozliczony wiersz ma **Podgląd** i **Edycja**. Podgląd bierze podwykonawcę z wiersza, tryb wiersza i okres raportu. Otwiera wiersze z **Rozliczony** `tak`. Nic nie zapisuje i nie bierze locka. Edycja otwiera zestawienie nierozliczonych odbiorów tego samego podwykonawcy, trybu i okresu i wpisuje numer tej faktury. ← Statystyki wraca do raportu.
+
+Ta sama tabela ma kolumnę **Wartość faktury**: suma kosztów odbioru z arkusza dla tego numeru, u tego podwykonawcy, w tym trybie i w tym okresie. Pusty numer jest jedną grupą. Nierozliczony wiersz nie ma linków ani kwoty.
+
+Pozycje podglądu są pogrupowane po **Numer faktury**. Pusty numer jest jedną grupą „bez numeru”, na końcu listy. W grupie widać numer protokołu, adres, sklep, datę, trasę, liczbę worków, koszt odbioru i koszt na worek. Kwoty są z arkusza, bez przeliczania. Nie ma pól edycji, checkboxów ani Zatwierdź.
+
+W Harmonogramie podgląd czyta rejestr harmonogramu. Stawek przy tym odczycie nie przepisuje.
 
 ### Tabela — odbiór zwykły
 
@@ -514,7 +526,9 @@ Sekcje da się zwijać; stan w `localStorage`. Przy długim okresie tabela pod w
 
 Do czasu kolumny trybu w rejestrze seria Harmonogram = 0 (wszystko widać jako Na zgłoszenie).
 
-Świadomie poza Statystykami: raport po fakturze, sklepy bez odbiorów, prognoza, porównanie „backlog vs rozliczone” jako osobny wykres, Chart.js.
+W tabeli **Odbiory w okresie** rozliczony wiersz linkuje podgląd faktury i edycję zestawienia. Kolumna **Wartość faktury** jest sumą kosztów odbioru z arkusza dla numeru, w okresie raportu.
+
+Świadomie poza Statystykami: sklepy bez odbiorów, prognoza, porównanie „backlog vs rozliczone” jako osobny wykres, Chart.js.
 
 ---
 

@@ -28,6 +28,11 @@ export interface SettlementStatsRow extends RegisterRow {
   happened: boolean;
   receptionCost: Grosze | null;
   costPerBag: Grosze | null;
+  /**
+   * Numer faktury z arkusza. `null`, gdy odczyt go nie przysłał.
+   * Pusty tekst = rozliczony bez numeru.
+   */
+  invoice: string | null;
   /** Brak / report = Na zgłoszenie; schedule = z „odebrane z harmonogramu”. */
   mode?: SettlementMode;
 }

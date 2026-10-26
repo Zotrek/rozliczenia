@@ -22,6 +22,11 @@ export interface StatsRow extends RegisterRow {
   /** Kol. 17 / Q. */
   costPerBag: Grosze | null;
   /**
+   * Numer faktury. `null` = odczyt go nie podał.
+   * Pusty tekst = w arkuszu nie ma numeru.
+   */
+  invoice?: string | null;
+  /**
    * Sposób zlecenia. Brak / undefined = Na zgłoszenie
    * (do czasu kolumny trybu w rejestrze).
    */
@@ -157,6 +162,16 @@ export interface PeriodPickup {
   bagCount: number | null;
   mode: SettlementMode;
   settled: boolean;
+  /** Pusty, gdy brak numeru albo odczyt go nie podał. */
+  invoice: string;
+  /** false, gdy odczyt statystyk nie przysłał numeru faktury. */
+  invoiceKnown: boolean;
+  /**
+   * Suma kosztów odbioru z arkusza dla tego numeru,
+   * u tego podwykonawcy, w tym trybie i w tym okresie.
+   * `null` przy nierozliczonym, przy braku numeru w odczycie albo gdy żaden wiersz nie ma kosztu.
+   */
+  invoiceValue: Grosze | null;
 }
 
 /** Próg inkluzywnej długości okresu: ≤ → tygodnie, inaczej miesiące. */
@@ -518,22 +533,31 @@ export function listPeriodPickups(
   rows: readonly StatsRow[],
   filters: StatsFilters,
 ): PeriodPickup[] {
-  return rows
-    .filter(
-      (row) =>
-        row.happened &&
-        matchesContractor(row, filters.contractor) &&
-        inSheetDateRange(row.pickupDate, filters.range),
-    )
-    .map((row) => ({
-      address: row.address,
-      shopName: row.shopName,
-      contractor: row.contractor,
-      pickupDate: row.pickupDate,
-      bagCount: row.bagCount,
-      mode: rowMode(row),
-      settled: row.settled,
-    }))
+  const matched = rows.filter(
+    (row) =>
+      row.happened &&
+      matchesContractor(row, filters.contractor) &&
+      inSheetDateRange(row.pickupDate, filters.range),
+  );
+  const totals = invoiceTotals(matched);
+  return matched
+    .map((row) => {
+      const known = row.invoice != null;
+      const invoice = known ? row.invoice.trim() : "";
+      const bucket = row.settled && known ? totals.get(invoiceGroupKey(row, invoice)) : undefined;
+      return {
+        address: row.address,
+        shopName: row.shopName,
+        contractor: row.contractor,
+        pickupDate: row.pickupDate,
+        bagCount: row.bagCount,
+        mode: rowMode(row),
+        settled: row.settled,
+        invoice,
+        invoiceKnown: known,
+        invoiceValue: bucket?.any ? bucket.sum : null,
+      };
+    })
     .sort((a, b) => {
       const byDate = compareSheetDate(a.pickupDate, b.pickupDate);
       if (byDate !== 0) {
@@ -544,6 +568,30 @@ export function listPeriodPickups(
       }
       return a.address.localeCompare(b.address, "pl");
     });
+}
+
+/** Suma kosztów odbioru rozliczonych wierszy o tym samym numerze, firmie i trybie. */
+function invoiceTotals(
+  rows: readonly StatsRow[],
+): Map<string, { sum: number; any: boolean }> {
+  const totals = new Map<string, { sum: number; any: boolean }>();
+  for (const row of rows) {
+    if (!row.settled || row.invoice == null) {
+      continue;
+    }
+    const key = invoiceGroupKey(row, row.invoice.trim());
+    const bucket = totals.get(key) ?? { sum: 0, any: false };
+    if (row.receptionCost != null) {
+      bucket.sum += row.receptionCost;
+      bucket.any = true;
+    }
+    totals.set(key, bucket);
+  }
+  return totals;
+}
+
+function invoiceGroupKey(row: StatsRow, invoice: string): string {
+  return `${rowMode(row)}\n${row.contractor}\n${invoice}`;
 }
 
 function aggregateTimeSeries(

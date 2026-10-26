@@ -25,7 +25,7 @@ export const RANGE_ERROR = {
 
 export type RangeError = keyof typeof RANGE_ERROR;
 
-export type ScreenId = "range" | "statement" | "stats";
+export type ScreenId = "range" | "statement" | "invoices" | "stats";
 
 export type SettlementMode = "report" | "schedule";
 
@@ -182,6 +182,15 @@ export function isoToSheetDate(iso: string): string | null {
   return sheet;
 }
 
+/** `dd.mm.yyyy` → `yyyy-mm-dd`. Zły dzień daje null. */
+export function sheetToIsoDate(sheet: string): string | null {
+  try {
+    return calendarToIsoDate(parseSheetDate(sheet));
+  } catch {
+    return null;
+  }
+}
+
 export function fieldsForSearch(draft: RangeDraft): RangeFields {
   return {
     contractor: draft.contractor,
@@ -249,8 +258,18 @@ export function screenAfterSearch(): ScreenId {
   return "statement";
 }
 
+/** Zakres albo zestawienie → podgląd rozliczonych faktur. */
+export function screenAfterInvoices(): ScreenId {
+  return "invoices";
+}
+
 export function screenAfterChangeRange(): ScreenId {
   return "range";
+}
+
+/** Powrót z podglądu albo zestawienia. Ze statystyk wraca do raportu. */
+export function screenAfterWorkBack(workReturn: "range" | "stats"): ScreenId {
+  return workReturn === "stats" ? "stats" : screenAfterChangeRange();
 }
 
 /** Po udanym Zatwierdź wraca do karty zakresu, jak Zmień zakres. */
@@ -300,6 +319,11 @@ export function searchParams(query: StartedSearch): Record<string, string> {
     params.tryb = "harmonogram";
   }
   return params;
+}
+
+/** GET `settlementInvoices`. Ten sam zakres co Szukaj, bez zapisu. */
+export function invoiceParams(query: StartedSearch): Record<string, string> {
+  return { ...searchParams(query), action: "settlementInvoices" };
 }
 
 /** GET `settlementStats`. Oba krańce dat wymagane; pusty podwykonawca = wszyscy. */

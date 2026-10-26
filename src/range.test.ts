@@ -10,6 +10,7 @@ import {
   fieldsForSearch,
   foldPl,
   isoToSheetDate,
+  sheetToIsoDate,
   matchingContractors,
   matchingTexts,
   openRatesWindow,
@@ -19,8 +20,11 @@ import {
   modeLabel,
   resolveContractorText,
   resolveListText,
+  invoiceParams,
   screenAfterApprove,
   screenAfterChangeRange,
+  screenAfterWorkBack,
+  screenAfterInvoices,
   screenAfterOpenStats,
   screenAfterSearch,
   screenAfterStatsBack,
@@ -155,9 +159,18 @@ describe("startSearch", () => {
       dataDo: "18.09.2026",
       tryb: "harmonogram",
     });
+    expect(invoiceParams(started)).toEqual({
+      action: "settlementInvoices",
+      podwykonawca: "GPW",
+      dataOd: "01.09.2026",
+      dataDo: "18.09.2026",
+      tryb: "harmonogram",
+    });
   });
 
   it("test_startSearch_iso_date_does_not_shift_calendar_day", () => {
+    expect(sheetToIsoDate("01.09.2026")).toBe("2026-09-01");
+    expect(sheetToIsoDate("31.02.2026")).toBeNull();
     expect(isoToSheetDate("2026-09-01")).toBe("01.09.2026");
     expect(isoToSheetDate("2024-02-29")).toBe("29.02.2024");
     expect(isoToSheetDate("2026-02-31")).toBeNull();
@@ -210,7 +223,10 @@ describe("applyNoStartDate", () => {
 describe("screens", () => {
   it("test_screenAfterChangeRange_returns_to_range", () => {
     expect(screenAfterSearch()).toBe("statement");
+    expect(screenAfterInvoices()).toBe("invoices");
     expect(screenAfterChangeRange()).toBe("range");
+    expect(screenAfterWorkBack("range")).toBe("range");
+    expect(screenAfterWorkBack("stats")).toBe("stats");
   });
 
   it("test_screenAfterApprove_returns_to_range", () => {

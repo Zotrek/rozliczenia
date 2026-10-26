@@ -26,6 +26,9 @@ function model(over: Partial<RangeViewModel> = {}): RangeViewModel {
     status: "",
     webappMissing: false,
     statement: emptyStatement(),
+    invoices: [],
+    invoiceFocus: null,
+    workReturn: "range",
     addresses: [],
     ratesShop: "",
     ratesShopQuery: "",
@@ -111,6 +114,7 @@ describe("renderApp", () => {
     );
     expect(html).toContain('data-screen="statement"');
     expect(html).toContain("Zmień zakres");
+    expect(html).not.toContain("Rozliczone faktury");
     expect(html).toContain("GPW, od 01.09.2026 do 18.09.2026");
     expect(html).toContain('data-window="rates"');
     expect(html).not.toContain('data-screen="range"');
@@ -120,6 +124,8 @@ describe("renderApp", () => {
   it("test_renderApp_stats_button_on_range_and_back_on_stats", () => {
     const range = renderApp(model({ screen: "range" }));
     expect(range).toContain('data-action="stats"');
+    expect(range).not.toContain('data-action="invoices"');
+    expect(range).not.toContain("Rozliczone faktury");
     expect(range).toContain("Statystyki");
     expect(range).toContain("Baza stawek");
     const stats = renderApp(model({ screen: "stats" }));
@@ -128,6 +134,66 @@ describe("renderApp", () => {
     expect(stats).toContain("← Powrót");
     expect(stats).toContain("Pokaż raport");
     expect(stats).not.toContain('data-screen="range"');
+  });
+
+  it("test_renderApp_invoices_screen_lists_saved_invoice_without_approve", () => {
+    const html = renderApp(
+      model({
+        screen: "invoices",
+        applied: APPLIED,
+        invoices: [
+          {
+            sheetName: "Arkusz1",
+            sheetRow: 2,
+            transportNumber: "10",
+            address: "Ul. Sklepowa 1",
+            shopName: "Sklep A",
+            pickupDate: "15.09.2026",
+            contractor: "GPW",
+            bagCount: 3,
+            routeName: "",
+            invoice: "FV/1",
+            receptionCost: 15000,
+            costPerBag: 5000,
+          },
+        ],
+      }),
+    );
+    expect(html).toContain('data-screen="invoices"');
+    expect(html).toContain("Podgląd rozliczonych");
+    expect(html).toContain("FV/1");
+    expect(html).toContain("150,00");
+    expect(html).toContain("Zmień zakres");
+    expect(html).toContain('data-invoice="FV/1"');
+    expect(html).not.toContain("is-focus");
+    const fromStats = renderApp(
+      model({
+        screen: "invoices",
+        applied: APPLIED,
+        workReturn: "stats",
+        invoiceFocus: "FV/1",
+        invoices: [
+          {
+            sheetName: "Arkusz1",
+            sheetRow: 2,
+            transportNumber: "10",
+            address: "Ul. Sklepowa 1",
+            shopName: "Sklep A",
+            pickupDate: "15.09.2026",
+            contractor: "GPW",
+            bagCount: 3,
+            routeName: "",
+            invoice: "FV/1",
+            receptionCost: 15000,
+            costPerBag: 5000,
+          },
+        ],
+      }),
+    );
+    expect(fromStats).toContain("← Statystyki");
+    expect(fromStats).toContain("is-focus");
+    expect(html).not.toContain("Zatwierdź");
+    expect(html).not.toContain('data-screen="range"');
   });
 
   it("test_renderApp_escapes_contractor_word_data", () => {

@@ -93,6 +93,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .btn-teal { border: none; color: #fff; background: var(--teal); width: 100%; margin-top: 8px; }
 .btn-teal:hover { background: var(--teal-deep); }
 .setup .btn-teal { margin-top: 14px; }
+.setup .btn-block { display: block; width: 100%; margin-top: 8px; }
 .btn-ghost {
   border: 1px solid var(--line);
   background: #fff;
@@ -213,6 +214,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .range span { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 .range strong { font-size: 14px; font-weight: 700; }
 .blank { padding: 48px 24px; color: var(--muted); text-align: center; }
+.muted { color: var(--muted); }
 .blank strong { display: block; color: var(--ink); margin-bottom: 6px; }
 .overlay, .modal {
   position: absolute;
@@ -421,6 +423,30 @@ td input[type="text"]:focus { border-color: var(--teal); background: #fff; outli
 .tie { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 6px; }
 .overlay-panel img.uni { width: 220px; height: auto; }
 .statement .top .btn-ghost, .statement .top .btn-teal { width: auto; margin-top: 0; }
+.invoice-body { flex: 1; min-height: 0; overflow: auto; padding-bottom: 24px; }
+.invoice-note { padding: 12px 16px 0; }
+.invoice-card {
+  margin: 12px 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.invoice-card.is-focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 2px var(--teal-soft);
+}
+.invoice-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--line);
+}
+.invoice-head strong { font-size: 14px; }
+.invoice-head span { color: var(--muted); font-size: 12px; font-weight: 650; white-space: nowrap; }
+.invoice-card .table-wrap { flex: none; overflow: auto; }
 
 
 /* —— Statystyki —— */
@@ -833,6 +859,23 @@ td input[type="text"]:focus { border-color: var(--teal); background: #fff; outli
   color: var(--ink);
 }
 .pager button:disabled { opacity: 0.45; }
+.row-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.row-links button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--teal-deep);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .pager .page-label {
   font-size: 12px;
   font-weight: 750;
@@ -1229,6 +1272,15 @@ function isoToSheetDate(iso) {
     }
     return sheet;
 }
+/** `dd.mm.yyyy` → `yyyy-mm-dd`. Zły dzień daje null. */
+function sheetToIsoDate(sheet) {
+    try {
+        return calendarToIsoDate(parseSheetDate(sheet));
+    }
+    catch {
+        return null;
+    }
+}
 function fieldsForSearch(draft) {
     return {
         contractor: draft.contractor,
@@ -1287,8 +1339,16 @@ function applyNoStartDate(state, checked) {
 function screenAfterSearch() {
     return "statement";
 }
+/** Zakres albo zestawienie → podgląd rozliczonych faktur. */
+function screenAfterInvoices() {
+    return "invoices";
+}
 function screenAfterChangeRange() {
     return "range";
+}
+/** Powrót z podglądu albo zestawienia. Ze statystyk wraca do raportu. */
+function screenAfterWorkBack(workReturn) {
+    return workReturn === "stats" ? "stats" : screenAfterChangeRange();
 }
 /** Po udanym Zatwierdź wraca do karty zakresu, jak Zmień zakres. */
 function screenAfterApprove() {
@@ -1330,6 +1390,10 @@ function searchParams(query) {
         params.tryb = "harmonogram";
     }
     return params;
+}
+/** GET `settlementInvoices`. Ten sam zakres co Szukaj, bez zapisu. */
+function invoiceParams(query) {
+    return { ...searchParams(query), action: "settlementInvoices" };
 }
 /** GET `settlementStats`. Oba krańce dat wymagane; pusty podwykonawca = wszyscy. */
 function statsParams(query) {
@@ -1606,6 +1670,172 @@ function rateContractorNames(items) {
 }
 function isRecord(value) {
     return typeof value === "object" && value !== null;
+}
+
+
+function invoiceCountLabel(count) {
+    const n = Math.abs(count);
+    const lastTwo = n % 100;
+    const last = n % 10;
+    let word = "pozycji";
+    if (n === 1) {
+        word = "pozycja";
+    }
+    else if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) {
+        word = "pozycje";
+    }
+    return `${count} ${word}`;
+}
+/** Grupy po numerze faktury. Pusty numer na końcu. W grupie: data, potem wiersz arkusza. */
+function groupSettledInvoices(rows) {
+    const buckets = new Map();
+    for (const row of rows) {
+        const key = row.invoice.trim();
+        const list = buckets.get(key);
+        if (list) {
+            list.push(row);
+        }
+        else {
+            buckets.set(key, [row]);
+        }
+    }
+    const groups = [];
+    for (const [invoice, items] of buckets) {
+        const sorted = [...items].sort(compareInvoiceRows);
+        groups.push({
+            invoice,
+            label: invoice === "" ? "bez numeru" : invoice,
+            rows: sorted,
+            total: sumCosts(sorted),
+        });
+    }
+    groups.sort((a, b) => {
+        if (a.invoice === "" && b.invoice !== "") {
+            return 1;
+        }
+        if (b.invoice === "" && a.invoice !== "") {
+            return -1;
+        }
+        return a.invoice.localeCompare(b.invoice, "pl", { numeric: true, sensitivity: "base" });
+    });
+    return groups;
+}
+function readSettledInvoices(body) {
+    if (!isRecord(body) || body.ok !== true || !Array.isArray(body.rows)) {
+        const error = isRecord(body) && typeof body.error === "string" ? body.error : "Odczyt faktur nie doszedł.";
+        return { ok: false, error };
+    }
+    const rows = [];
+    for (const item of body.rows) {
+        const row = readSettledInvoiceRow(item);
+        if (!row) {
+            return { ok: false, error: "Odczyt faktur nie doszedł." };
+        }
+        rows.push(row);
+    }
+    return { ok: true, rows };
+}
+function sumCosts(rows) {
+    let total = 0;
+    let any = false;
+    for (const row of rows) {
+        if (row.receptionCost == null) {
+            continue;
+        }
+        total += row.receptionCost;
+        any = true;
+    }
+    return any ? total : null;
+}
+function compareInvoiceRows(a, b) {
+    const byDate = compareSheetDate(a.pickupDate, b.pickupDate);
+    if (byDate !== 0) {
+        return byDate;
+    }
+    if (a.sheetRow !== b.sheetRow) {
+        return a.sheetRow - b.sheetRow;
+    }
+    return a.transportNumber.localeCompare(b.transportNumber, "pl", { numeric: true });
+}
+function readSettledInvoiceRow(value) {
+    if (!isRecord(value)) {
+        return null;
+    }
+    const sheetRow = value.sheetRow;
+    const transportNumber = readText(value.transportNumber);
+    const address = readText(value.address);
+    const shopName = readText(value.shopName);
+    const pickupDate = readText(value.pickupDate);
+    const contractor = readText(value.contractor);
+    const routeName = readText(value.routeName);
+    const invoice = readText(value.invoice);
+    const receptionCost = readGrosze(value.receptionCost);
+    const costPerBag = readGrosze(value.costPerBag);
+    if (typeof sheetRow !== "number" ||
+        !Number.isInteger(sheetRow) ||
+        sheetRow < 2 ||
+        transportNumber === null ||
+        address === null ||
+        shopName === null ||
+        pickupDate === null ||
+        contractor === null ||
+        routeName === null ||
+        invoice === null ||
+        receptionCost === undefined ||
+        costPerBag === undefined) {
+        return null;
+    }
+    let bagCount;
+    if (value.bagCount === null) {
+        bagCount = null;
+    }
+    else if (typeof value.bagCount === "number" && Number.isFinite(value.bagCount) && value.bagCount >= 0) {
+        bagCount = value.bagCount;
+    }
+    else {
+        return null;
+    }
+    try {
+        parseSheetDate(pickupDate);
+    }
+    catch {
+        return null;
+    }
+    return {
+        sheetName: readText(value.sheetName) ?? "",
+        sheetRow,
+        transportNumber,
+        address,
+        shopName,
+        pickupDate,
+        contractor,
+        bagCount,
+        routeName,
+        invoice: invoice.trim(),
+        receptionCost,
+        costPerBag,
+    };
+}
+function isRecord(value) {
+    return typeof value === "object" && value !== null;
+}
+function readText(value) {
+    if (typeof value === "string") {
+        return value;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return String(value);
+    }
+    return null;
+}
+function readGrosze(value) {
+    if (value === null) {
+        return null;
+    }
+    if (typeof value === "number" && Number.isInteger(value)) {
+        return value;
+    }
+    return undefined;
 }
 
 /**
@@ -2565,12 +2795,21 @@ function readStatsRow(value) {
     if (receptionCost === undefined || costPerBag === undefined) {
         return null;
     }
+    let invoice = null;
+    if (Object.prototype.hasOwnProperty.call(value, "invoice")) {
+        const text = readText(value.invoice);
+        if (text === null) {
+            return null;
+        }
+        invoice = text.trim();
+    }
     return {
         ...base,
         settled: value.settled,
         happened: value.happened,
         receptionCost,
         costPerBag,
+        invoice,
         mode: value.mode === "schedule" ? "schedule" : value.mode === "report" ? "report" : undefined,
     };
 }
@@ -2603,6 +2842,53 @@ function readRateRow(value) {
         }
     }
     return { sheetRow, shop, contractor, pickupAmount, bagAmount, validFrom };
+}
+
+
+
+
+
+const INVOICE_DASH = '<span class="muted">—</span>';
+function renderInvoiceList(rows, focus = null) {
+    const groups = groupSettledInvoices(rows);
+    if (groups.length === 0) {
+        return ('<div class="blank"><strong>Brak rozliczonych faktur.</strong>' +
+            "<p>Ten podwykonawca nie ma rozliczonych odbiorów w podanym zakresie.</p></div>");
+    }
+    const note = '<p class="note invoice-note">Podgląd. Kwoty są z arkusza. Tych pozycji nie da się tu zmienić ani cofnąć.</p>';
+    return `<div class="invoice-body">${note}${groups.map((group) => renderGroup(group, focus)).join("")}</div>`;
+}
+function renderGroup(group, focus) {
+    const total = group.total == null ? INVOICE_DASH : escapeHtml(formatPln(group.total));
+    const on = focus !== null && group.invoice === focus;
+    return (`<section class="invoice-card${on ? " is-focus" : ""}" data-invoice="${escapeHtml(group.invoice)}">` +
+        '<header class="invoice-head">' +
+        `<strong>${escapeHtml(group.label)}</strong>` +
+        `<span>${escapeHtml(invoiceCountLabel(group.rows.length))} · ${total}</span>` +
+        "</header>" +
+        '<div class="table-wrap"><table><thead><tr>' +
+        "<th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th><th>Trasa</th>" +
+        '<th class="num">Liczba worków</th><th class="num">Koszt odbioru</th><th class="num">Koszt na worek</th>' +
+        `</tr></thead><tbody>${group.rows.map(renderRow).join("")}</tbody></table></div></section>`);
+}
+function renderRow(row) {
+    return ("<tr>" +
+        `<td>${text(row.transportNumber)}</td>` +
+        `<td class="adres">${text(addressWithCommaAfterLocality(row.address))}</td>` +
+        `<td>${text(row.shopName)}</td>` +
+        `<td>${text(row.pickupDate)}</td>` +
+        `<td>${text(row.routeName)}</td>` +
+        `<td class="num">${row.bagCount == null ? INVOICE_DASH : escapeHtml(String(row.bagCount))}</td>` +
+        `<td class="num">${money(row.receptionCost)}</td>` +
+        `<td class="num">${money(row.costPerBag)}</td>` +
+        "</tr>");
+}
+function text(value) {
+    const trimmed = value.trim();
+    return trimmed === "" ? INVOICE_DASH : escapeHtml(trimmed);
+}
+function money(grosze) {
+    return grosze == null ? INVOICE_DASH : escapeHtml(formatPln(grosze));
 }
 
 
@@ -3188,19 +3474,28 @@ function listZeroBagPickups(rows, filters) {
  * Sort: data, tryb, adres.
  */
 function listPeriodPickups(rows, filters) {
-    return rows
-        .filter((row) => row.happened &&
+    const matched = rows.filter((row) => row.happened &&
         matchesContractor(row, filters.contractor) &&
-        inSheetDateRange(row.pickupDate, filters.range))
-        .map((row) => ({
-        address: row.address,
-        shopName: row.shopName,
-        contractor: row.contractor,
-        pickupDate: row.pickupDate,
-        bagCount: row.bagCount,
-        mode: rowMode(row),
-        settled: row.settled,
-    }))
+        inSheetDateRange(row.pickupDate, filters.range));
+    const totals = invoiceTotals(matched);
+    return matched
+        .map((row) => {
+        const known = row.invoice != null;
+        const invoice = known ? row.invoice.trim() : "";
+        const bucket = row.settled && known ? totals.get(invoiceGroupKey(row, invoice)) : undefined;
+        return {
+            address: row.address,
+            shopName: row.shopName,
+            contractor: row.contractor,
+            pickupDate: row.pickupDate,
+            bagCount: row.bagCount,
+            mode: rowMode(row),
+            settled: row.settled,
+            invoice,
+            invoiceKnown: known,
+            invoiceValue: bucket?.any ? bucket.sum : null,
+        };
+    })
         .sort((a, b) => {
         const byDate = compareSheetDate(a.pickupDate, b.pickupDate);
         if (byDate !== 0) {
@@ -3211,6 +3506,26 @@ function listPeriodPickups(rows, filters) {
         }
         return a.address.localeCompare(b.address, "pl");
     });
+}
+/** Suma kosztów odbioru rozliczonych wierszy o tym samym numerze, firmie i trybie. */
+function invoiceTotals(rows) {
+    const totals = new Map();
+    for (const row of rows) {
+        if (!row.settled || row.invoice == null) {
+            continue;
+        }
+        const key = invoiceGroupKey(row, row.invoice.trim());
+        const bucket = totals.get(key) ?? { sum: 0, any: false };
+        if (row.receptionCost != null) {
+            bucket.sum += row.receptionCost;
+            bucket.any = true;
+        }
+        totals.set(key, bucket);
+    }
+    return totals;
+}
+function invoiceGroupKey(row, invoice) {
+    return `${rowMode(row)}\n${row.contractor}\n${invoice}`;
 }
 function aggregateTimeSeries(rows, filters, rules) {
     const granularity = timeBucketGranularity(filters.range);
@@ -3747,7 +4062,7 @@ function statsBody(model) {
     return (`<div class="body">${status}` +
         `<p class="period-label">${periodLabel}</p>` +
         kpiGrid(model.report) +
-        section("pickups", model, "Odbiory w okresie", "Każdy transport osobno · tryb zlecenia i liczba worków · po 5 na stronę", periodPickupsBlock(model), true) +
+        section("pickups", model, "Odbiory w okresie", "Każdy transport osobno · przy rozliczonym podgląd i edycja faktury · po 5 na stronę", periodPickupsBlock(model), true) +
         section("bags", model, "Ile worków zabrano w czasie", bagsTimeSub(model.report.bagsOverTime), timeSeriesBlock("bags", model, model.report.bagsOverTime, false)) +
         section("costs", model, "Ile zapłacono w czasie", costsTimeSub(model.report.costsOverTime), timeSeriesBlock("costs", model, model.report.costsOverTime, true)) +
         section("q", model, "Koszt w przeliczeniu na worek", "Tylko rozliczone odbiory, w których zabrano worki · 5 najdroższych i 5 najtańszych sklepów", qRanksBlock(model.report)) +
@@ -3914,22 +4229,43 @@ function periodPickupsBlock(model) {
     const body = paged.slice
         .map((row) => {
         const bags = row.bagCount === null ? "—" : String(row.bagCount);
+        const value = row.invoiceValue == null ? "—" : formatPln(row.invoiceValue);
         return (`<tr><td>${escapeHtml(row.pickupDate)}</td>` +
             `<td class="shop">${escapeHtml(row.address)}` +
             `<span class="sub">${escapeHtml(row.shopName)}</span></td>` +
             `<td>${escapeHtml(row.contractor)}</td>` +
             `<td>${escapeHtml(modeLabel(row.mode))}</td>` +
             `<td class="num">${escapeHtml(bags)}</td>` +
-            `<td>${row.settled ? "Tak" : "Nie"}</td></tr>`);
+            `<td>${row.settled ? "Tak" : "Nie"}${invoiceLinks(row)}</td>` +
+            `<td class="num">${escapeHtml(value)}</td></tr>`);
     })
         .join("");
     return ("<table><thead><tr>" +
         "<th>Data</th><th>Sklep</th><th>Podwykonawca</th><th>Tryb</th><th class=\"num\">Worki</th><th>Rozliczone</th>" +
-        `</tr></thead><tbody>${body || emptyRow(6)}</tbody></table>` +
+        "<th class=\"num\">Wartość faktury</th>" +
+        `</tr></thead><tbody>${body || emptyRow(7)}</tbody></table>` +
         pager("pickups", paged) +
         '<p class="note" style="margin: 10px 12px 12px;">' +
+        "Wartość faktury to suma kosztów odbioru z arkusza dla tego numeru, u tego podwykonawcy i w tym okresie. " +
+        "Podgląd nic nie zapisuje. Edycja otwiera zestawienie nierozliczonych i wpisuje ten numer faktury. " +
+        "W Harmonogramie link jest też przy nierozliczonym wierszu. " +
         "Harmonogram: liczba worków = liczba wierszy w „odebrane z harmonogramu” dla sklepu i dnia. " +
         `Lista pokazuje po ${STATS_PAGE_SIZE} pozycji na stronę.</p>`);
+}
+function invoiceLinks(row) {
+    // Harmonogram w tej tabeli to worki z „odebrane”, bez numeru faktury.
+    // Link i tak otwiera rejestr harmonogramu dla tej firmy i okresu.
+    if (!row.settled && row.mode !== "schedule") {
+        return "";
+    }
+    const attrs = ` data-contractor="${escapeHtml(row.contractor)}"` +
+        ` data-mode="${row.mode}"` +
+        ` data-invoice="${escapeHtml(row.invoice)}"` +
+        (row.settled && row.invoiceKnown ? ' data-invoice-known="1"' : "");
+    return ('<div class="row-links">' +
+        `<button type="button" data-action="invoice-preview"${attrs}>Podgląd</button>` +
+        `<button type="button" data-action="invoice-edit"${attrs}>Edycja</button>` +
+        "</div>");
 }
 function zeroBagsBlock(model) {
     const report = model.report;
@@ -3997,6 +4333,7 @@ function pager(id, paged) {
 function emptyRow(cols) {
     return `<tr><td colspan="${cols}" class="note" style="border:none;background:transparent">Brak danych w tym okresie.</td></tr>`;
 }
+
 
 
 
@@ -4131,6 +4468,10 @@ function dateFields(model) {
 function ratesButton() {
     return '<button type="button" class="btn-ghost" data-action="rates">Baza stawek</button>';
 }
+function workBackButton(model) {
+    const label = model.workReturn === "stats" ? "← Statystyki" : "Zmień zakres";
+    return `<button type="button" class="btn-ghost" data-action="back">${label}</button>`;
+}
 function ratesTabs(target) {
     const stawkiOn = target === "stawki";
     const harmOn = target === "harmonogram";
@@ -4166,10 +4507,22 @@ function renderStatementScreen(model) {
     return ('<div class="statement" data-screen="statement"><div class="top">' +
         brand(model.mode) +
         `<div class="range"><span>${escapeHtml(modeLabel(model.mode))}</span><strong>${escapeHtml(label)}</strong></div>` +
-        '<button type="button" class="btn-ghost" data-action="back">Zmień zakres</button>' +
+        workBackButton(model) +
         ratesButton() +
         "</div>" +
         renderStatement(model.statement, model.status, { allowApprove: true }) +
+        "</div>");
+}
+function renderInvoicesScreen(model) {
+    const label = model.applied ? rangeLabel(model.applied) : "";
+    const status = model.status ? `<p class="err status-block">${escapeHtml(model.status)}</p>` : "";
+    return ('<div class="statement" data-screen="invoices"><div class="top">' +
+        brand(model.mode) +
+        `<div class="range"><span>Podgląd rozliczonych</span><strong>${escapeHtml(label)}</strong></div>` +
+        workBackButton(model) +
+        "</div>" +
+        status +
+        renderInvoiceList(model.invoices, model.invoiceFocus) +
         "</div>");
 }
 function renderRatesDialog(model) {
@@ -4213,9 +4566,11 @@ function renderLoading(message, unicorn) {
 function renderApp(model) {
     const main = model.screen === "statement"
         ? renderStatementScreen(model)
-        : model.screen === "stats"
-            ? renderStatsScreen(model.stats)
-            : renderRangeScreen(model);
+        : model.screen === "invoices"
+            ? renderInvoicesScreen(model)
+            : model.screen === "stats"
+                ? renderStatsScreen(model.stats)
+                : renderRangeScreen(model);
     const dialog = model.ratesOpen ? renderRatesDialog(model) : "";
     const loading = model.loading ? renderLoading(model.loadMessage, model.loadKind === "unicorn") : "";
     return main + dialog + loading;
@@ -4420,6 +4775,7 @@ host.showRozErrorCard = showRozErrorCard;
 
 
 
+
 const STATS_SECTION_IDS = ["pickups", "bags", "costs", "q", "contractors", "empty-bags", "gaps"];
 function todayCalendar() {
     const now = new Date();
@@ -4445,6 +4801,9 @@ const VIEW = {
     status: "",
     webappMissing: false,
     statement: emptyStatement(),
+    invoices: [],
+    invoiceFocus: null,
+    workReturn: "range",
     loadKind: "logo",
     addresses: [],
     ratesShop: "",
@@ -4492,7 +4851,7 @@ function reportMissingWebApp(place) {
     if (typeof document !== "undefined" && document.querySelector('[data-roz-code="ROZ-E-WEBAPP"]')) {
         return;
     }
-    reportFailure("ROZ-E-WEBAPP", place, "Brak adresu Web App.", "Bez adresu lista, wyszukanie, stawki i statystyki nie dojdą. Dopisz ?webapp= do adresu tej strony albo ustaw adres przy buildzie.", { technical: "webapp empty" });
+    reportFailure("ROZ-E-WEBAPP", place, "Brak adresu Web App.", "Bez adresu lista, wyszukanie, podgląd faktur, stawki i statystyki nie dojdą. Dopisz ?webapp= do adresu tej strony albo ustaw adres przy buildzie.", { technical: "webapp empty" });
 }
 function fieldByKeep(root, keep) {
     return (root.querySelector(`[data-keep="${keep}"]`) ??
@@ -4548,6 +4907,10 @@ function paint(keep) {
         }
     }
     writeListScroll(scroll);
+    const focused = root.querySelector(".invoice-card.is-focus");
+    if (focused instanceof HTMLElement) {
+        focused.scrollIntoView({ block: "nearest" });
+    }
 }
 /** Zaznaczenie nie przebudowuje listy: zostaje przewinięcie i fokus na checkboxie. */
 function syncCheckedRows() {
@@ -4676,9 +5039,7 @@ async function runSearch() {
         noFrom: VIEW.noFrom,
     }), VIEW.contractors, VIEW.mode);
     if (!started.ok) {
-        VIEW.error = started.error;
-        VIEW.contractorOpen = false;
-        paint();
+        failRangeStart(started.error);
         return;
     }
     if (webapp === "") {
@@ -4697,26 +5058,125 @@ async function runSearch() {
         const parsed = await readRozJson(response);
         if (!parsed.ok) {
             if (!parsed.silent) {
-                VIEW.status = "Wyszukanie nie doszło.";
+                failOpen("Wyszukanie nie doszło.");
                 reportFailure("ROZ-E-SEARCH", "page.ts runSearch", "Wyszukanie nie doszło.", "Zestawienie się nie zmieniło. Możesz poprawić zakres i szukać jeszcze raz.", parsed);
             }
             return;
         }
         const read = readSettlement(parsed.body);
         if (!read.ok) {
-            VIEW.status = read.error;
+            failOpen(read.error);
             reportFailure("ROZ-E-SEARCH", "page.ts runSearch", "Wyszukanie nie doszło.", "Zestawienie się nie zmieniło. Możesz poprawić zakres i szukać jeszcze raz.", { technical: read.error });
             return;
         }
         VIEW.applied = started;
         VIEW.screen = screenAfterSearch();
         VIEW.statement = freshStatement(read.rows, read.rates);
+        if (VIEW.workReturn === "stats" && VIEW.invoiceFocus) {
+            VIEW.statement = { ...VIEW.statement, invoice: VIEW.invoiceFocus };
+        }
         VIEW.status = "";
+        VIEW.stats = { ...VIEW.stats, status: "" };
         VIEW.ratesOpen = false;
     }
     catch (err) {
-        VIEW.status = "Wyszukanie nie doszło.";
+        failOpen("Wyszukanie nie doszło.");
         reportFailure("ROZ-E-SEARCH", "page.ts runSearch", "Wyszukanie nie doszło.", "Zestawienie się nie zmieniło. Możesz poprawić zakres i szukać jeszcze raz.", { technical: err });
+    }
+    finally {
+        VIEW.loading = false;
+        paint();
+    }
+}
+function failOpen(message) {
+    if (VIEW.workReturn === "stats") {
+        VIEW.stats = { ...VIEW.stats, status: message };
+        VIEW.screen = "stats";
+        VIEW.status = "";
+        return;
+    }
+    VIEW.status = message;
+}
+function failRangeStart(error) {
+    if (VIEW.workReturn === "stats") {
+        failOpen(RANGE_ERROR[error]);
+    }
+    else {
+        VIEW.error = error;
+        VIEW.screen = "range";
+    }
+    VIEW.contractorOpen = false;
+    paint();
+}
+/** Podgląd i edycja z tabeli odbiorów: ten podwykonawca, tryb wiersza, okres raportu. */
+function armPickupWork(el) {
+    const from = sheetToIsoDate(VIEW.stats.appliedFrom);
+    const to = sheetToIsoDate(VIEW.stats.appliedTo);
+    if (!from || !to) {
+        VIEW.stats = { ...VIEW.stats, status: "Najpierw pokaż raport." };
+        paint();
+        return false;
+    }
+    VIEW.mode = el.dataset.mode === "schedule" ? "schedule" : "report";
+    VIEW.contractor = el.dataset.contractor ?? "";
+    VIEW.contractorQuery = VIEW.contractor;
+    VIEW.contractorOpen = false;
+    VIEW.from = from;
+    VIEW.to = to;
+    VIEW.noFrom = false;
+    VIEW.workReturn = "stats";
+    VIEW.error = "";
+    VIEW.invoiceFocus = el.dataset.invoiceKnown === "1" ? (el.dataset.invoice ?? "") : null;
+    return true;
+}
+async function runInvoices() {
+    const started = startSearch(fieldsForSearch({
+        contractor: VIEW.contractor,
+        from: VIEW.from,
+        to: VIEW.to,
+        noFrom: VIEW.noFrom,
+    }), VIEW.contractors, VIEW.mode);
+    if (!started.ok) {
+        failRangeStart(started.error);
+        return;
+    }
+    if (webapp === "") {
+        VIEW.webappMissing = true;
+        reportMissingWebApp("page.ts runInvoices");
+        paint();
+        return;
+    }
+    VIEW.error = "";
+    VIEW.loading = true;
+    VIEW.loadKind = "logo";
+    VIEW.loadMessage = "Szukam rozliczonych faktur…";
+    paint();
+    try {
+        const response = await fetch(webAppUrl(webapp, invoiceParams(started)));
+        const parsed = await readRozJson(response);
+        if (!parsed.ok) {
+            if (!parsed.silent) {
+                failOpen("Odczyt faktur nie doszedł.");
+                reportFailure("ROZ-E-INVOICES", "page.ts runInvoices", "Odczyt faktur nie doszedł.", "Podgląd się nie zmienił. Możesz poprawić zakres i otworzyć go jeszcze raz.", parsed);
+            }
+            return;
+        }
+        const read = readSettledInvoices(parsed.body);
+        if (!read.ok) {
+            failOpen(read.error);
+            reportFailure("ROZ-E-INVOICES", "page.ts runInvoices", "Odczyt faktur nie doszedł.", "Podgląd się nie zmienił. Możesz poprawić zakres i otworzyć go jeszcze raz.", { technical: read.error });
+            return;
+        }
+        VIEW.applied = started;
+        VIEW.screen = screenAfterInvoices();
+        VIEW.invoices = read.rows;
+        VIEW.status = "";
+        VIEW.stats = { ...VIEW.stats, status: "" };
+        VIEW.ratesOpen = false;
+    }
+    catch (err) {
+        failOpen("Odczyt faktur nie doszedł.");
+        reportFailure("ROZ-E-INVOICES", "page.ts runInvoices", "Odczyt faktur nie doszedł.", "Podgląd się nie zmienił. Możesz poprawić zakres i otworzyć go jeszcze raz.", { technical: err });
     }
     finally {
         VIEW.loading = false;
@@ -4742,10 +5202,22 @@ function onClick(event) {
         pickContractor(el.dataset.nazwa ?? "");
     }
     else if (action === "search") {
+        VIEW.workReturn = "range";
+        VIEW.invoiceFocus = null;
         void runSearch();
     }
+    else if (action === "invoice-preview") {
+        if (armPickupWork(el)) {
+            void runInvoices();
+        }
+    }
+    else if (action === "invoice-edit") {
+        if (armPickupWork(el)) {
+            void runSearch();
+        }
+    }
     else if (action === "back") {
-        VIEW.screen = screenAfterChangeRange();
+        VIEW.screen = screenAfterWorkBack(VIEW.workReturn);
         VIEW.loading = false;
         VIEW.ratesOpen = false;
         paint();

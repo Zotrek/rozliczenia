@@ -13,6 +13,8 @@ import {
   type SettlementMode,
   type StartedSearch,
 } from "./range.js";
+import type { SettledInvoiceRow } from "./invoices.js";
+import { renderInvoiceList } from "./invoicesView.js";
 import type { StatementScreen } from "./statement.js";
 import { renderStatement } from "./statementView.js";
 import { defaultStatsView, renderStatsScreen, type StatsViewModel } from "./statsView.js";
@@ -36,6 +38,15 @@ export interface RangeViewModel {
   status: string;
   webappMissing: boolean;
   statement: StatementScreen;
+  /** Ostatni odczyt podglądu rozliczonych faktur. */
+  invoices: readonly SettledInvoiceRow[];
+  /**
+   * Numer faktury do podświetlenia na podglądzie.
+   * `null` = bez podświetlenia. Pusty tekst = grupa „bez numeru”.
+   */
+  invoiceFocus: string | null;
+  /** Dokąd wraca Zmień zakres / ← Statystyki. */
+  workReturn: "range" | "stats";
   /** Od 10 000 zł przy Zatwierdź. Inaczej pulsujące logo. */
   loadKind?: "logo" | "unicorn";
   /** Kolumna Adres sklepu i nazwa z kolumny Sklep. Zapis idzie adresem. */
@@ -248,6 +259,11 @@ function ratesButton(): string {
   return '<button type="button" class="btn-ghost" data-action="rates">Baza stawek</button>';
 }
 
+function workBackButton(model: RangeViewModel): string {
+  const label = model.workReturn === "stats" ? "← Statystyki" : "Zmień zakres";
+  return `<button type="button" class="btn-ghost" data-action="back">${label}</button>`;
+}
+
 function ratesTabs(target: "stawki" | "harmonogram"): string {
   const stawkiOn = target === "stawki";
   const harmOn = target === "harmonogram";
@@ -290,10 +306,25 @@ function renderStatementScreen(model: RangeViewModel): string {
     '<div class="statement" data-screen="statement"><div class="top">' +
     brand(model.mode) +
     `<div class="range"><span>${escapeHtml(modeLabel(model.mode))}</span><strong>${escapeHtml(label)}</strong></div>` +
-    '<button type="button" class="btn-ghost" data-action="back">Zmień zakres</button>' +
+    workBackButton(model) +
     ratesButton() +
     "</div>" +
     renderStatement(model.statement, model.status, { allowApprove: true }) +
+    "</div>"
+  );
+}
+
+function renderInvoicesScreen(model: RangeViewModel): string {
+  const label = model.applied ? rangeLabel(model.applied) : "";
+  const status = model.status ? `<p class="err status-block">${escapeHtml(model.status)}</p>` : "";
+  return (
+    '<div class="statement" data-screen="invoices"><div class="top">' +
+    brand(model.mode) +
+    `<div class="range"><span>Podgląd rozliczonych</span><strong>${escapeHtml(label)}</strong></div>` +
+    workBackButton(model) +
+    "</div>" +
+    status +
+    renderInvoiceList(model.invoices, model.invoiceFocus) +
     "</div>"
   );
 }
@@ -360,7 +391,9 @@ export function renderApp(model: RangeViewModel): string {
   const main =
     model.screen === "statement"
       ? renderStatementScreen(model)
-      : model.screen === "stats"
+      : model.screen === "invoices"
+        ? renderInvoicesScreen(model)
+        : model.screen === "stats"
         ? renderStatsScreen(model.stats)
         : renderRangeScreen(model);
   const dialog = model.ratesOpen ? renderRatesDialog(model) : "";

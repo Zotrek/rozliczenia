@@ -39,6 +39,7 @@ function row(over: Partial<StatsRow> & Pick<StatsRow, "sheetRow">): StatsRow {
     happened: over.happened ?? true,
     receptionCost: over.receptionCost ?? 4_000,
     costPerBag: over.costPerBag ?? 2_000,
+    invoice: over.invoice,
     mode: over.mode,
   };
 }
@@ -166,6 +167,7 @@ describe("readSettlementStats", () => {
           bagRate: 500,
           settled: true,
           happened: true,
+          invoice: " FV/2 ",
           receptionCost: 1500,
           costPerBag: 1500,
         },
@@ -178,6 +180,7 @@ describe("readSettlementStats", () => {
     }
     expect(result.rows[0].settled).toBe(true);
     expect(result.rows[0].receptionCost).toBe(1500);
+    expect(result.rows[0].invoice).toBe("FV/2");
   });
 });
 
@@ -244,6 +247,64 @@ describe("renderStatsScreen", () => {
     );
     expect(html).toContain("Drogi 1");
     expect(html).toMatch(/<td class="num">7<\/td>/);
+  });
+
+  it("test_renderStats_pickup_links_preview_and_edit_and_shows_invoice_value", () => {
+    const report = buildStatsReport(
+      [
+        row({
+          sheetRow: 2,
+          settled: true,
+          invoice: "FV/9",
+          receptionCost: 5_000,
+          address: "Drogi 1",
+          contractor: "gpw",
+        }),
+        row({
+          sheetRow: 3,
+          settled: true,
+          invoice: "FV/9",
+          receptionCost: 2_500,
+          address: "Drogi 2",
+          contractor: "gpw",
+          pickupDate: "11.09.2026",
+        }),
+        row({
+          sheetRow: 4,
+          settled: false,
+          address: "Otwarte 3",
+          pickupDate: "12.09.2026",
+        }),
+        row({
+          sheetRow: 5,
+          settled: false,
+          mode: "schedule",
+          address: "Harm 4",
+          pickupDate: "13.09.2026",
+          invoice: "",
+        }),
+      ],
+      [],
+      { range: { from: "01.09.2026", to: "23.09.2026" } },
+    );
+    const html = renderStatsScreen(
+      defaultStatsView(TODAY, {
+        report,
+        appliedFrom: "01.09.2026",
+        appliedTo: "23.09.2026",
+      }),
+    );
+    expect(html).toContain("Wartość faktury");
+    expect(html).toContain("75,00");
+    expect(html.match(/data-action="invoice-preview"/g)).toHaveLength(3);
+    expect(html.match(/data-action="invoice-edit"/g)).toHaveLength(3);
+    expect(html).toContain('data-mode="schedule"');
+    expect(html).toContain('data-invoice="FV/9"');
+    expect(html).toContain('data-invoice-known="1"');
+    expect(html).toContain('data-contractor="gpw"');
+    expect(html).toContain('data-mode="report"');
+    const open = html.slice(html.indexOf("Otwarte 3"), html.indexOf("Harm 4"));
+    expect(open).not.toContain("invoice-preview");
   });
 
   it("test_renderStats_marks_incomplete_week_column", () => {

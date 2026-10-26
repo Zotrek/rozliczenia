@@ -162,7 +162,8 @@ Nowe akcje obok istniejących (`modalData`, `listReferenceData`, zapis protokoł
 | Akcja | Kierunek | Co robi |
 |-------|----------|---------|
 | `settlementSearch` | GET lub POST | Podwykonawca (nazwa krótka), data od (albo brak), data do. Zwraca wiersze rejestru w zakresie, które nie mają Rozliczony `tak` i nie mają transport `nie`, plus pasujące wiersze Bazy stawek. Każdy wiersz rejestru niesie numer wiersza arkusza i numer z kolumny 1. `tryb=harmonogram`: przed odpowiedzią przepisuje **Stawka za podjazd** i **Stawka za worek** z Bazy cen harmonogram tylko na wierszach tego zestawienia. Brak pary czyści obie kolumny. Ta sama data: pierwszy wiersz, nie remis. **Trasa** i **Stawka za trasę** zostają. Rozliczonych i transport `nie` nie rusza. To jest zapis tych dwóch kolumn, nie sam odczyt |
-| `settlementStats` | GET | Odczyt pod Statystyki: rozliczone w zakresie dat + nierozliczone (backlog / problemy ze stawkami); **worki Harmonogram** z `odebrane z harmonogramu` (`mode: schedule`); pola P/Q/I, status, data, podwykonawca, adres, snapshoty; dane do remisów. **Bez zapisu**, bez locka |
+| `settlementInvoices` | GET lub POST | Ten sam zakres co `settlementSearch`. Tylko wiersze z Rozliczony `tak`, z numerem faktury i kosztem z arkusza (Na zgłoszenie: kolumny 16–18, Harmonogram: 15–17). `tryb=harmonogram` czyta rejestr harmonogramu. **Bez zapisu**, bez locka |
+| `settlementStats` | GET | Odczyt pod Statystyki: rozliczone w zakresie dat + nierozliczone (backlog / problemy ze stawkami); **worki Harmonogram** z `odebrane z harmonogramu` (`mode: schedule`); pola P/Q/I, numer faktury, status, data, podwykonawca, adres, snapshoty; dane do remisów. **Bez zapisu**, bez locka |
 | `listContractors` | GET | Lista podwykonawców: Nazwa i Dane do Worda. Można oprzeć na `listReferenceData`, jeśli pola już tam są |
 | `listStoreAddresses` | GET | Unikalne adresy z kolumny Adres sklepu rejestru. Okno stawek. Nie pinezki, nie kolumna Sklep. Nic nie zapisuje |
 | `routeNameProposal` | GET | Mapa. Czyta kolumnę 12 i zwraca zajęte nazwy. Propozycję `nazwa-dd.mm.rr-nn` liczy `routeName.ts`, nie skrypt. Gdy 01–99 są zajęte, funkcja zwraca pustą nazwę |
@@ -196,11 +197,12 @@ Odczyt nie wybiera kolumny po nagłówku. Zapis nie przesuwa kolumn 1–11. Każ
 
 Układ, kolory i typografia z `makiety-tabeli.html` (Zakres / Zestawienie) oraz `makiety-statystyki.html` (Statystyki). Pasek przełączników na górze makiet (podgląd) do aplikacji nie wchodzi. Na Zestawieniu wykresu składu kosztów nie ma. Na Statystykach: słupki CSS (worki, koszty), bez Chart.js.
 
-Trzy widoki + okno:
+Cztery widoki + okno:
 
 1. **Zakres.** Karta na środku. Na zgłoszenie zaznaczone. Harmonogram da się zaznaczyć. Podwykonawca z listy, zawężanie po Nazwa albo Dane do Worda. Tekstu spoza listy nie da się wybrać. Data początkowa, opcja bez daty początkowej, data końcowa wymagana. Szukaj nie startuje bez podwykonawcy, bez daty końcowej, ani gdy data początkowa jest późniejsza niż końcowa. Na dole: **Statystyki** (bez Szukaj) i **Baza stawek** (okno z zakładką Baza cen harmonogram).
-2. **Zestawienie.** Po Szukaj. Zmień zakres wraca do karty. Liczba pozycji bez sklepów z rozwinięcia. Tabela. Stopka: Suma zestawienia, Suma zaznaczonych, numer faktury, Zatwierdź. Baza stawek w nagłówku. Statystyk stąd nie otwiera się.
-3. **Statystyki.** Z Zakresu; ← Powrót wraca na Zakres. Filtry okresu (bieżący miesiąc domyślnie, poprzednie miesiące, bieżący kwartał, poprzednie kwartały, dokładny zakres), podwykonawca, Pokaż raport. KPI, rankingi, serie czasowe (CSS), listy ze stronicowaniem 5, zwijanie sekcji (`localStorage`). Agregacje w `src/stats.ts` (+ planowany `statsView.ts`). Copy UI: język zarządu (SPEC § Statystyki).
+2. **Zestawienie.** Po Szukaj. Zmień zakres wraca do karty. Liczba pozycji bez sklepów z rozwinięcia. Tabela. Stopka: Suma zestawienia, Suma zaznaczonych, numer faktury, Zatwierdź. W nagłówku: Baza stawek. Statystyk stąd nie otwiera się.
+3. **Podgląd rozliczonych.** Ze Statystyk, link **Podgląd** przy rozliczonym odbiorze. Ten podwykonawca, tryb wiersza i okres raportu. Grupy po numerze faktury. Koszt odbioru i koszt na worek z arkusza. Bez edycji i bez Zatwierdź. ← Statystyki wraca do raportu. **Edycja** w tej samej tabeli otwiera zestawienie nierozliczonych i wpisuje numer tej faktury. Kolumna **Wartość faktury** jest sumą kosztów tego numeru w okresie.
+4. **Statystyki.** Z Zakresu; ← Powrót wraca na Zakres. Filtry okresu (bieżący miesiąc domyślnie, poprzednie miesiące, bieżący kwartał, poprzednie kwartały, dokładny zakres), podwykonawca, Pokaż raport. KPI, rankingi, serie czasowe (CSS), listy ze stronicowaniem 5, zwijanie sekcji (`localStorage`). Agregacje w `src/stats.ts` (+ planowany `statsView.ts`). Copy UI: język zarządu (SPEC § Statystyki).
 
 Kolumny Zestawienia od lewej: Rozliczone, Numer protokołu, Adres, Sklep, Data, Podjazd/Trasa, Kwota podjazdu/trasy, Liczba worków, Kwota za worek, Suma za worki, Razem, transport się odbył. Pusta komórka pokazuje „—”. Remis stawek widać na wierszu z błędem, nie w oknie Baza stawek. Wskazanie woła `resolveRateTie`.
 

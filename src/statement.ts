@@ -915,12 +915,21 @@ function readStatsRow(value: unknown): SettlementStatsRow | null {
   if (receptionCost === undefined || costPerBag === undefined) {
     return null;
   }
+  let invoice: string | null = null;
+  if (Object.prototype.hasOwnProperty.call(value, "invoice")) {
+    const text = readText(value.invoice);
+    if (text === null) {
+      return null;
+    }
+    invoice = text.trim();
+  }
   return {
     ...base,
     settled: value.settled,
     happened: value.happened,
     receptionCost,
     costPerBag,
+    invoice,
     mode: value.mode === "schedule" ? "schedule" : value.mode === "report" ? "report" : undefined,
   };
 }

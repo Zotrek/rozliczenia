@@ -95,9 +95,14 @@ import {
   type StatsPeriodKind,
 } from "./stats.js";
 import {
+  emptyPickupTable,
+  isPickupColumnKey,
   loadSectionsCollapsed,
   loadTablesCollapsed,
+  pickupColumnChoices,
+  pickupQueryHits,
   writeStatsFold,
+  type PickupColumnKey,
 } from "./statsView.js";
 import type { CalendarDate } from "./sheetDate.js";
 import { readRozJson, showRozFailure } from "./rozErrorReport.js";
@@ -240,12 +245,35 @@ function writeListScroll(scroll: { top: number; left: number } | null): void {
   });
 }
 
+let painting = false;
+
+function readMenuScroll(): number | null {
+  const list = document.querySelector(".xl-values");
+  if (!(list instanceof HTMLElement)) {
+    return null;
+  }
+  return list.scrollTop;
+}
+
+function writeMenuScroll(top: number | null): void {
+  if (top == null) {
+    return;
+  }
+  const list = document.querySelector(".xl-values");
+  if (list instanceof HTMLElement) {
+    list.scrollTop = top;
+  }
+}
+
 function paint(keep?: string): void {
   const root = document.getElementById("app");
   if (!root) {
     return;
   }
+  painting = true;
+  try {
   const scroll = readListScroll();
+  const menuScroll = readMenuScroll();
   const current = keep ? fieldByKeep(document, keep) : null;
   const start = current?.selectionStart ?? null;
   const end = current?.selectionEnd ?? null;
@@ -260,12 +288,17 @@ function paint(keep?: string): void {
     }
   }
   writeListScroll(scroll);
+  placePickupMenu();
+  writeMenuScroll(menuScroll);
   const focused = root.querySelector(".invoice-card.is-focus");
   if (focused instanceof HTMLElement) {
     focused.scrollIntoView({ block: "nearest" });
   }
   syncCommentChrome();
   syncInvoiceComment();
+  } finally {
+    painting = false;
+  }
 }
 
 /** Zaznaczenie nie przebudowuje listy: zostaje przewinięcie i fokus na checkboxie. */
@@ -357,6 +390,7 @@ function boot(): void {
   root.addEventListener("focusout", onFocusOut);
   root.addEventListener("mousedown", onMouseDown);
   root.addEventListener("keydown", onKeyDown);
+  root.addEventListener("scroll", onCaptureScroll, true);
   paint();
   if (webapp === "") {
     reportMissingWebApp("page.ts boot");
@@ -624,6 +658,7 @@ function onClick(event: MouseEvent): void {
   if (!(target instanceof Element)) {
     return;
   }
+  dismissPickupMenuOnOutside(target);
   if (
     target.closest(".modal-panel") &&
     !target.closest("[data-action='close-rates']") &&
@@ -678,6 +713,29 @@ function onClick(event: MouseEvent): void {
     toggleStatsTable(el.dataset.tableFold ?? "");
   } else if (action === "stats-page") {
     shiftStatsPage(el.dataset.pager ?? "", el.dataset.dir ?? "");
+  } else if (action === "pickup-menu") {
+    const column = el.dataset.col ?? "";
+    if (isPickupColumnKey(column)) {
+      openPickupMenu(column);
+    }
+  } else if (action === "pickup-sort") {
+    const column = el.dataset.col ?? "";
+    const dir = el.dataset.dir === "desc" ? "desc" : "asc";
+    if (isPickupColumnKey(column)) {
+      applyPickupSort(column, dir);
+    }
+  } else if (action === "pickup-clear") {
+    const column = el.dataset.col ?? "";
+    if (isPickupColumnKey(column)) {
+      clearPickupColumn(column);
+    }
+  } else if (action === "pickup-clear-all") {
+    clearPickupTable();
+  } else if (action === "pickup-ok") {
+    applyPickupFilter();
+  } else if (action === "pickup-cancel") {
+    closePickupMenu();
+    paint();
   } else if (action === "rates") {
     void openRates();
   } else if (action === "rates-tab") {
@@ -826,6 +884,10 @@ function onInput(event: Event): void {
   if (!(el instanceof HTMLInputElement)) {
     return;
   }
+  if (el.dataset.keep === "pickup-query") {
+    setPickupQuery(el.value);
+    return;
+  }
   if (el.dataset.edit === "invoice") {
     VIEW.statement = { ...VIEW.statement, invoice: el.value };
     VIEW.status = "";
@@ -907,6 +969,14 @@ function onChange(event: Event): void {
     return;
   }
   if (!(el instanceof HTMLInputElement)) {
+    return;
+  }
+  if (el.dataset.pickupAll === "1") {
+    setPickupDraftVisible(el.checked);
+    return;
+  }
+  if (el.dataset.pickupValue !== undefined) {
+    setPickupDraftValue(el.dataset.pickupValue, el.checked);
     return;
   }
   if (el.dataset.stats === "from" || el.dataset.stats === "to") {
@@ -1456,6 +1526,24 @@ function syncInvoiceComment(): void {
 }
 
 function onKeyDown(event: KeyboardEvent): void {
+  if (VIEW.stats.pickups.menu) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closePickupMenu();
+      paint();
+      return;
+    }
+    const field = event.target;
+    if (
+      event.key === "Enter" &&
+      field instanceof HTMLInputElement &&
+      field.dataset.keep === "pickup-query"
+    ) {
+      event.preventDefault();
+      applyPickupFilter();
+      return;
+    }
+  }
   const el = event.target;
   if (el instanceof HTMLTextAreaElement) {
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
@@ -2188,6 +2276,206 @@ function toggleStatsTable(id: string): void {
   paint();
 }
 
+function onCaptureScroll(event: Event): void {
+  if (painting || !VIEW.stats.pickups.menu) {
+    return;
+  }
+  const target = event.target;
+  if (target instanceof Element && target.closest("[data-xl-menu]")) {
+    return;
+  }
+  closePickupMenu();
+  paint();
+}
+
+function placePickupMenu(): void {
+  const menu = document.querySelector("[data-xl-menu]");
+  if (!(menu instanceof HTMLElement)) {
+    return;
+  }
+  const btn = document.querySelector('[data-action="pickup-menu"][aria-expanded="true"]');
+  if (!(btn instanceof HTMLElement)) {
+    return;
+  }
+  const rect = btn.getBoundingClientRect();
+  const margin = 8;
+  const width = menu.offsetWidth || 280;
+  const height = menu.offsetHeight;
+  let left = rect.right - width;
+  if (left < margin) {
+    left = margin;
+  }
+  if (left + width > window.innerWidth - margin) {
+    left = Math.max(margin, window.innerWidth - margin - width);
+  }
+  const spaceBelow = window.innerHeight - rect.bottom - margin;
+  const top =
+    spaceBelow >= height || rect.top < height
+      ? rect.bottom + 4
+      : Math.max(margin, rect.top - height - 4);
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+  menu.style.visibility = "visible";
+  const all = menu.querySelector("[data-pickup-all]");
+  if (all instanceof HTMLInputElement && all.dataset.mixed === "1") {
+    all.indeterminate = true;
+  }
+}
+
+function dismissPickupMenuOnOutside(target: Element): void {
+  if (!VIEW.stats.pickups.menu) {
+    return;
+  }
+  if (target.closest("[data-xl-menu]") || target.closest("[data-action='pickup-menu']")) {
+    return;
+  }
+  closePickupMenu();
+  paint();
+}
+
+function closePickupMenu(): void {
+  if (!VIEW.stats.pickups.menu) {
+    return;
+  }
+  VIEW.stats = { ...VIEW.stats, pickups: { ...VIEW.stats.pickups, menu: null } };
+}
+
+function openPickupMenu(column: PickupColumnKey): void {
+  const report = VIEW.stats.report;
+  if (!report) {
+    return;
+  }
+  const current = VIEW.stats.pickups;
+  if (current.menu?.column === column) {
+    closePickupMenu();
+    paint();
+    return;
+  }
+  const choices = pickupColumnChoices(report.periodPickups, current.filters, column);
+  const saved = current.filters[column];
+  VIEW.stats = {
+    ...VIEW.stats,
+    pickups: {
+      ...current,
+      menu: { column, draft: saved ? [...saved] : [...choices], query: "" },
+    },
+  };
+  paint();
+}
+
+function applyPickupSort(column: PickupColumnKey, dir: "asc" | "desc"): void {
+  VIEW.stats = {
+    ...VIEW.stats,
+    pickupsPage: 1,
+    pickups: { ...VIEW.stats.pickups, sortKey: column, sortDir: dir, menu: null },
+  };
+  paint();
+}
+
+function clearPickupColumn(column: PickupColumnKey): void {
+  const filters = { ...VIEW.stats.pickups.filters };
+  delete filters[column];
+  VIEW.stats = {
+    ...VIEW.stats,
+    pickupsPage: 1,
+    pickups: { ...VIEW.stats.pickups, filters, menu: null },
+  };
+  paint();
+}
+
+function clearPickupTable(): void {
+  VIEW.stats = {
+    ...VIEW.stats,
+    pickupsPage: 1,
+    pickups: emptyPickupTable(),
+  };
+  paint();
+}
+
+function applyPickupFilter(): void {
+  const menu = VIEW.stats.pickups.menu;
+  const report = VIEW.stats.report;
+  if (!menu || !report) {
+    return;
+  }
+  const choices = pickupColumnChoices(report.periodPickups, VIEW.stats.pickups.filters, menu.column);
+  const selected = new Set(menu.draft);
+  const allOn = choices.length > 0 && choices.every((text) => selected.has(text));
+  const filters = { ...VIEW.stats.pickups.filters };
+  if (choices.length === 0 || allOn) {
+    delete filters[menu.column];
+  } else {
+    filters[menu.column] = [...menu.draft];
+  }
+  VIEW.stats = {
+    ...VIEW.stats,
+    pickupsPage: 1,
+    pickups: { ...VIEW.stats.pickups, filters, menu: null },
+  };
+  paint();
+}
+
+function setPickupQuery(value: string): void {
+  const menu = VIEW.stats.pickups.menu;
+  if (!menu || menu.query === value) {
+    return;
+  }
+  VIEW.stats = {
+    ...VIEW.stats,
+    pickups: { ...VIEW.stats.pickups, menu: { ...menu, query: value } },
+  };
+  paint("pickup-query");
+}
+
+function pickupDraftKeep(): string | undefined {
+  const active = document.activeElement;
+  if (active instanceof HTMLInputElement && active.dataset.keep === "pickup-query") {
+    return "pickup-query";
+  }
+  return undefined;
+}
+
+function setPickupDraftValue(value: string, on: boolean): void {
+  const menu = VIEW.stats.pickups.menu;
+  if (!menu) {
+    return;
+  }
+  const draft = on
+    ? menu.draft.includes(value)
+      ? menu.draft
+      : [...menu.draft, value]
+    : menu.draft.filter((item) => item !== value);
+  VIEW.stats = {
+    ...VIEW.stats,
+    pickups: { ...VIEW.stats.pickups, menu: { ...menu, draft } },
+  };
+  paint(pickupDraftKeep());
+}
+
+function setPickupDraftVisible(on: boolean): void {
+  const menu = VIEW.stats.pickups.menu;
+  const report = VIEW.stats.report;
+  if (!menu || !report) {
+    return;
+  }
+  const visible = pickupColumnChoices(report.periodPickups, VIEW.stats.pickups.filters, menu.column).filter(
+    (text) => pickupQueryHits(text, menu.query),
+  );
+  const next = new Set(menu.draft);
+  for (const text of visible) {
+    if (on) {
+      next.add(text);
+    } else {
+      next.delete(text);
+    }
+  }
+  VIEW.stats = {
+    ...VIEW.stats,
+    pickups: { ...VIEW.stats.pickups, menu: { ...menu, draft: [...next] } },
+  };
+  paint(pickupDraftKeep());
+}
+
 function shiftStatsPage(pager: string, dir: string): void {
   if (pager === "empty-bags") {
     const next = VIEW.stats.emptyBagsPage + (dir === "next" ? 1 : -1);
@@ -2300,6 +2588,7 @@ async function runStats(): Promise<void> {
       emptyBagsPage: 1,
       gapsPage: 1,
       pickupsPage: 1,
+      pickups: emptyPickupTable(),
       tablesCollapsed: loadTablesCollapsed(storage, ["bags", "costs"], stacked),
     };
   } catch (err) {

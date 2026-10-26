@@ -1,5 +1,5 @@
 import { escapeHtml } from "./html.js";
-import { modeLabel, type ContractorListItem } from "./range.js";
+import { foldPl, modeLabel, type ContractorListItem } from "./range.js";
 import { formatPln } from "./statement.js";
 import {
   chartShouldStack,
@@ -10,13 +10,211 @@ import {
   statsPeriodKindLabel,
   STATS_PAGE_SIZE,
   type MonthOption,
+  type PeriodPickup,
   type QuarterOption,
   type StatsPeriodKind,
   type StatsReport,
   type TimeSeriesStats,
 } from "./stats.js";
-import type { CalendarDate } from "./sheetDate.js";
+import { compareSheetDate, type CalendarDate } from "./sheetDate.js";
 import type { Grosze } from "./types.js";
+
+const PICKUP_COLUMN_KEYS = ["date", "shop", "contractor", "mode", "bags", "settled", "invoice"] as const;
+
+export type PickupColumnKey = (typeof PICKUP_COLUMN_KEYS)[number];
+
+export interface PickupColumnMenu {
+  column: PickupColumnKey;
+  /** Zaznaczone wartości zanim użytkownik naciśnie OK. */
+  draft: readonly string[];
+  query: string;
+}
+
+export interface PickupTableState {
+  sortKey: PickupColumnKey | null;
+  sortDir: "asc" | "desc";
+  /** Brak klucza = kolumna bez filtra. Pusta lista = nic nie przechodzi. */
+  filters: Partial<Record<PickupColumnKey, readonly string[]>>;
+  menu: PickupColumnMenu | null;
+}
+
+const PICKUP_COLUMNS: readonly { key: PickupColumnKey; label: string; numeric: boolean }[] = [
+  { key: "date", label: "Data", numeric: false },
+  { key: "shop", label: "Sklep", numeric: false },
+  { key: "contractor", label: "Podwykonawca", numeric: false },
+  { key: "mode", label: "Tryb", numeric: false },
+  { key: "bags", label: "Worki", numeric: true },
+  { key: "settled", label: "Rozliczone", numeric: false },
+  { key: "invoice", label: "Wartość faktury", numeric: true },
+];
+
+const FUNNEL_ICON =
+  '<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M1.5 2.5h13l-5 6.1V13l-3 1.1V8.6z"/></svg>';
+
+export function emptyPickupTable(): PickupTableState {
+  return { sortKey: null, sortDir: "asc", filters: {}, menu: null };
+}
+
+export function isPickupColumnKey(value: string): value is PickupColumnKey {
+  return (PICKUP_COLUMN_KEYS as readonly string[]).includes(value);
+}
+
+/** Tekst komórki, ten sam w tabeli i na liście filtra. */
+export function pickupCellText(row: PeriodPickup, key: PickupColumnKey): string {
+  if (key === "date") {
+    return row.pickupDate;
+  }
+  if (key === "shop") {
+    const name = row.shopName.trim();
+    if (name === "" || name === row.address) {
+      return row.address;
+    }
+    return `${row.address} · ${name}`;
+  }
+  if (key === "contractor") {
+    return row.contractor;
+  }
+  if (key === "mode") {
+    return modeLabel(row.mode);
+  }
+  if (key === "bags") {
+    return row.bagCount === null ? "—" : String(row.bagCount);
+  }
+  if (key === "settled") {
+    return row.settled ? "Tak" : "Nie";
+  }
+  return row.invoiceValue === null ? "—" : formatPln(row.invoiceValue);
+}
+
+export function pickupQueryHits(text: string, query: string): boolean {
+  const folded = foldPl(query);
+  if (folded === "") {
+    return true;
+  }
+  return foldPl(text).includes(folded);
+}
+
+export function filterPeriodPickups(
+  rows: readonly PeriodPickup[],
+  filters: PickupTableState["filters"],
+): PeriodPickup[] {
+  const active = (Object.keys(filters) as PickupColumnKey[]).filter((key) => filters[key] != null);
+  if (active.length === 0) {
+    return [...rows];
+  }
+  const sets = active.map((key) => [key, new Set(filters[key])] as const);
+  return rows.filter((row) => sets.every(([key, set]) => set.has(pickupCellText(row, key))));
+}
+
+/** Wartości kolumny po filtrach pozostałych kolumn, w kolejności sortowania rosnącego. */
+export function pickupColumnChoices(
+  rows: readonly PeriodPickup[],
+  filters: PickupTableState["filters"],
+  column: PickupColumnKey,
+): string[] {
+  const rest: PickupTableState["filters"] = { ...filters };
+  delete rest[column];
+  const first = new Map<string, PeriodPickup>();
+  for (const row of filterPeriodPickups(rows, rest)) {
+    const text = pickupCellText(row, column);
+    if (!first.has(text)) {
+      first.set(text, row);
+    }
+  }
+  return [...first.entries()]
+    .sort((a, b) => {
+      const aBlank = isBlankNumber(a[1], column);
+      const bBlank = isBlankNumber(b[1], column);
+      if (aBlank !== bBlank) {
+        return aBlank ? 1 : -1;
+      }
+      return comparePickups(a[1], b[1], column) || a[0].localeCompare(b[0], "pl");
+    })
+    .map(([text]) => text);
+}
+
+export function sortPeriodPickups(
+  rows: readonly PeriodPickup[],
+  sortKey: PickupColumnKey | null,
+  sortDir: "asc" | "desc",
+): PeriodPickup[] {
+  if (sortKey === null) {
+    return [...rows];
+  }
+  const key = sortKey;
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => {
+      const aBlank = isBlankNumber(a.row, key);
+      const bBlank = isBlankNumber(b.row, key);
+      if (aBlank !== bBlank) {
+        return aBlank ? 1 : -1;
+      }
+      const cmp = comparePickups(a.row, b.row, key);
+      if (cmp === 0) {
+        return a.index - b.index;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    })
+    .map((item) => item.row);
+}
+
+export function visiblePeriodPickups(
+  rows: readonly PeriodPickup[],
+  state: PickupTableState,
+): PeriodPickup[] {
+  return sortPeriodPickups(filterPeriodPickups(rows, state.filters), state.sortKey, state.sortDir);
+}
+
+function isBlankNumber(row: PeriodPickup, key: PickupColumnKey): boolean {
+  if (key === "bags") {
+    return row.bagCount === null;
+  }
+  if (key === "invoice") {
+    return row.invoiceValue === null;
+  }
+  return false;
+}
+
+function comparePickups(a: PeriodPickup, b: PeriodPickup, key: PickupColumnKey): number {
+  if (key === "date") {
+    return compareSheetDate(a.pickupDate, b.pickupDate);
+  }
+  if (key === "bags") {
+    return (a.bagCount ?? 0) - (b.bagCount ?? 0);
+  }
+  if (key === "invoice") {
+    return (a.invoiceValue ?? 0) - (b.invoiceValue ?? 0);
+  }
+  return pickupCellText(a, key).localeCompare(pickupCellText(b, key), "pl", {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+function sortPhrase(key: PickupColumnKey, dir: "asc" | "desc"): string {
+  if (key === "date") {
+    return dir === "asc" ? "Sortuj od najstarszych" : "Sortuj od najnowszych";
+  }
+  if (key === "bags" || key === "invoice") {
+    return dir === "asc" ? "Sortuj od najmniejszych" : "Sortuj od największych";
+  }
+  return dir === "asc" ? "Sortuj od A do Z" : "Sortuj od Z do A";
+}
+
+function filterButtonLabel(label: string, filtered: boolean, sort: "asc" | "desc" | null): string {
+  const bits = [`Sortuj i filtruj kolumnę ${label}`];
+  if (filtered) {
+    bits.push("filtr włączony");
+  }
+  if (sort === "asc") {
+    bits.push("sortowanie rosnąco");
+  }
+  if (sort === "desc") {
+    bits.push("sortowanie malejąco");
+  }
+  return bits.join(", ");
+}
 
 export const STATS_FOLD_LS_PREFIX = "rozliczenia.stats.fold.";
 
@@ -43,6 +241,8 @@ export interface StatsViewModel {
   emptyBagsPage: number;
   gapsPage: number;
   pickupsPage: number;
+  /** Sortowanie i filtr kolumn w tabeli odbiorów. */
+  pickups: PickupTableState;
   /** Sekcje zwinięte (id → true). */
   sectionsCollapsed: Readonly<Record<string, boolean>>;
   /** Tabele pod wykresem zwinięte (id → true). */
@@ -79,6 +279,7 @@ export function defaultStatsView(
     emptyBagsPage: 1,
     gapsPage: 1,
     pickupsPage: 1,
+    pickups: emptyPickupTable(),
     sectionsCollapsed: {},
     tablesCollapsed: {},
     ...over,
@@ -322,10 +523,11 @@ function section(
   flush = false,
 ): string {
   const collapsed = model.sectionsCollapsed[id] === true;
+  const menuOpen = id === "pickups" && model.pickups.menu !== null && !collapsed;
   const chev = collapsed ? "▸" : "▾";
   const aria = collapsed ? "Rozwiń sekcję" : "Zwiń sekcję";
   return (
-    `<section class="section${collapsed ? " is-collapsed" : ""}" data-fold="${id}">` +
+    `<section class="section${collapsed ? " is-collapsed" : ""}${menuOpen ? " is-menu" : ""}" data-fold="${id}">` +
     `<div class="section-h" data-action="stats-fold" data-fold="${id}">` +
     `<div class="head-text"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(sub)}</p></div>` +
     `<button type="button" class="fold-chev" aria-label="${aria}">${chev}</button></div>` +
@@ -547,7 +749,8 @@ function periodPickupsBlock(model: StatsViewModel): string {
   if (!report) {
     return "";
   }
-  const paged = pageSlice(report.periodPickups, model.pickupsPage);
+  const shown = visiblePeriodPickups(report.periodPickups, model.pickups);
+  const paged = pageSlice(shown, model.pickupsPage);
   const body = paged.slice
     .map((row) => {
       const bags = row.bagCount === null ? "—" : String(row.bagCount);
@@ -564,11 +767,15 @@ function periodPickupsBlock(model: StatsViewModel): string {
       );
     })
     .join("");
+  const empty =
+    report.periodPickups.length === 0
+      ? "Brak danych w tym okresie."
+      : "Brak pozycji dla tego filtra.";
   return (
+    pickupBar(model.pickups) +
     "<table><thead><tr>" +
-    "<th>Data</th><th>Sklep</th><th>Podwykonawca</th><th>Tryb</th><th class=\"num\">Worki</th><th>Rozliczone</th>" +
-    "<th class=\"num\">Wartość faktury</th>" +
-    `</tr></thead><tbody>${body || emptyRow(7)}</tbody></table>` +
+    pickupHead(model) +
+    `</tr></thead><tbody>${body || emptyRow(7, empty)}</tbody></table>` +
     pager("pickups", paged) +
     '<p class="note" style="margin: 10px 12px 12px;">' +
     "Wartość faktury to suma kosztów odbioru z arkusza dla tego numeru, u tego podwykonawcy i w tym okresie. " +
@@ -678,6 +885,96 @@ function pager(
   );
 }
 
-function emptyRow(cols: number): string {
-  return `<tr><td colspan="${cols}" class="note" style="border:none;background:transparent">Brak danych w tym okresie.</td></tr>`;
+function pickupHead(model: StatsViewModel): string {
+  const state = model.pickups;
+  return PICKUP_COLUMNS.map((col) => {
+    const open = state.menu?.column === col.key && model.sectionsCollapsed.pickups !== true;
+    const filtered = state.filters[col.key] != null;
+    const sort = state.sortKey === col.key ? state.sortDir : null;
+    const mark = sort === "asc" ? "▲" : sort === "desc" ? "▼" : FUNNEL_ICON;
+    return (
+      `<th class="${col.numeric ? "num " : ""}xl-th${open ? " is-open" : ""}">` +
+      '<div class="xl-head">' +
+      `<span>${escapeHtml(col.label)}</span>` +
+      `<button type="button" class="xl-btn${filtered ? " is-on" : ""}" data-action="pickup-menu" data-col="${col.key}"` +
+      ` aria-expanded="${open ? "true" : "false"}" aria-label="${escapeHtml(filterButtonLabel(col.label, filtered, sort))}">${mark}</button>` +
+      "</div>" +
+      (open ? pickupMenu(model, col.key) : "") +
+      "</th>"
+    );
+  }).join("");
+}
+
+function pickupMenu(model: StatsViewModel, column: PickupColumnKey): string {
+  const report = model.report;
+  const menu = model.pickups.menu;
+  if (!report || !menu || menu.column !== column) {
+    return "";
+  }
+  const choices = pickupColumnChoices(report.periodPickups, model.pickups.filters, column);
+  const visible = choices.filter((text) => pickupQueryHits(text, menu.query));
+  const picked = new Set(menu.draft);
+  const visibleOn = visible.filter((text) => picked.has(text)).length;
+  const allChecked = visible.length > 0 && visibleOn === visible.length;
+  const mixed = visibleOn > 0 && visibleOn < visible.length;
+  const label = PICKUP_COLUMNS.find((item) => item.key === column)?.label ?? column;
+  const hasFilter = model.pickups.filters[column] != null;
+  const options =
+    visible.length === 0
+      ? '<p class="xl-empty">Brak pasujących wartości</p>'
+      : visible
+          .map(
+            (text) =>
+              `<label class="xl-opt"><input type="checkbox" data-pickup-value="${escapeHtml(text)}"${picked.has(text) ? " checked" : ""}>` +
+              `<span>${escapeHtml(text)}</span></label>`,
+          )
+          .join("");
+  const sortBtn = (dir: "asc" | "desc"): string => {
+    const on = model.pickups.sortKey === column && model.pickups.sortDir === dir;
+    return (
+      `<button type="button" class="xl-sort${on ? " is-on" : ""}" data-action="pickup-sort" data-col="${column}" data-dir="${dir}" aria-pressed="${on ? "true" : "false"}">` +
+      `${escapeHtml(sortPhrase(column, dir))}</button>`
+    );
+  };
+  return (
+    `<div class="xl-menu" data-xl-menu role="dialog" aria-label="${escapeHtml(`Sortuj i filtruj: ${label}`)}">` +
+    sortBtn("asc") +
+    sortBtn("desc") +
+    (hasFilter
+      ? `<button type="button" class="xl-clear" data-action="pickup-clear" data-col="${column}">${escapeHtml(`Wyczyść filtr z „${label}”`)}</button>`
+      : "") +
+    `<input class="xl-search" type="text" data-keep="pickup-query" placeholder="Szukaj" value="${escapeHtml(menu.query)}" autocomplete="off">` +
+    `<label class="xl-opt xl-all"><input type="checkbox" data-pickup-all="1"${visible.length === 0 ? " disabled" : ""}${allChecked ? " checked" : ""}${mixed ? ' data-mixed="1"' : ""}>` +
+    "<span>(Zaznacz wszystko)</span></label>" +
+    `<div class="xl-values">${options}</div>` +
+    '<div class="xl-actions">' +
+    '<button type="button" class="btn-ghost" data-action="pickup-cancel">Anuluj</button>' +
+    '<button type="button" class="btn-teal" data-action="pickup-ok">OK</button>' +
+    "</div></div>"
+  );
+}
+
+function pickupBar(state: PickupTableState): string {
+  const filtered = PICKUP_COLUMNS.filter((col) => state.filters[col.key] != null).map((col) => col.label);
+  if (state.sortKey === null && filtered.length === 0) {
+    return "";
+  }
+  const bits: string[] = [];
+  if (state.sortKey) {
+    const label = PICKUP_COLUMNS.find((item) => item.key === state.sortKey)?.label ?? state.sortKey;
+    const phrase = sortPhrase(state.sortKey, state.sortDir).replace(/^Sortuj /, "");
+    bits.push(`Sortowanie: ${label}, ${phrase}`);
+  }
+  if (filtered.length > 0) {
+    bits.push(`Filtr: ${filtered.join(", ")}`);
+  }
+  return (
+    '<div class="xl-bar">' +
+    `<span>${escapeHtml(bits.join(" · "))}</span>` +
+    '<button type="button" data-action="pickup-clear-all">Wyczyść</button></div>'
+  );
+}
+
+function emptyRow(cols: number, message = "Brak danych w tym okresie."): string {
+  return `<tr><td colspan="${cols}" class="note" style="border:none;background:transparent">${escapeHtml(message)}</td></tr>`;
 }

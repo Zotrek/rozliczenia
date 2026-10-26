@@ -11,13 +11,21 @@ import {
 } from "./stats.js";
 import {
   defaultStatsView,
+  emptyPickupTable,
+  filterPeriodPickups,
   loadSectionsCollapsed,
   loadTablesCollapsed,
+  pickupCellText,
+  pickupColumnChoices,
   readStatsFold,
   renderStatsScreen,
+  sortPeriodPickups,
   STATS_FOLD_LS_PREFIX,
+  visiblePeriodPickups,
   writeStatsFold,
+  type PickupTableState,
 } from "./statsView.js";
+import type { PeriodPickup } from "./stats.js";
 import { readSettlementStats } from "./statement.js";
 import { statsParams } from "./range.js";
 
@@ -410,5 +418,110 @@ describe("stats fold storage", () => {
       bags: true,
       costs: false,
     });
+  });
+});
+
+function pickup(over: Partial<PeriodPickup> = {}): PeriodPickup {
+  return {
+    address: over.address ?? "A 1",
+    shopName: over.shopName ?? "Sklep",
+    contractor: over.contractor ?? "gpw",
+    pickupDate: over.pickupDate ?? "10.09.2026",
+    bagCount: over.bagCount === undefined ? 2 : over.bagCount,
+    mode: over.mode ?? "report",
+    settled: over.settled ?? true,
+    invoice: over.invoice ?? "FV/1",
+    invoiceKnown: over.invoiceKnown ?? true,
+    invoiceValue: over.invoiceValue === undefined ? 4_000 : over.invoiceValue,
+  };
+}
+
+describe("period pickup filter and sort", () => {
+  const rows = [
+    pickup({ address: "B 2", shopName: "Beta", contractor: "blue", pickupDate: "12.09.2026", bagCount: 10, settled: false, invoiceValue: null }),
+    pickup({ address: "A 10", shopName: "Alfa", contractor: "gpw", pickupDate: "02.09.2026", bagCount: 2, mode: "schedule" }),
+    pickup({ address: "A 2", shopName: "Alfa", contractor: "gpw", pickupDate: "11.09.2026", bagCount: null, invoiceValue: 1_500 }),
+  ];
+
+  it("test_filterPeriodPickups_keeps_rows_matching_every_column", () => {
+    const filtered = filterPeriodPickups(rows, {
+      contractor: ["gpw"],
+      mode: ["Na zgłoszenie"],
+    });
+    expect(filtered.map((row) => row.address)).toEqual(["A 2"]);
+  });
+
+  it("test_filterPeriodPickups_empty_selection_shows_nothing", () => {
+    expect(filterPeriodPickups(rows, { contractor: [] })).toEqual([]);
+  });
+
+  it("test_sortPeriodPickups_orders_dates_and_keeps_blank_bags_last", () => {
+    expect(sortPeriodPickups(rows, "date", "desc").map((row) => row.pickupDate)).toEqual([
+      "12.09.2026",
+      "11.09.2026",
+      "02.09.2026",
+    ]);
+    expect(sortPeriodPickups(rows, "bags", "asc").map((row) => row.bagCount)).toEqual([2, 10, null]);
+    expect(sortPeriodPickups(rows, "bags", "desc").map((row) => row.bagCount)).toEqual([10, 2, null]);
+    expect(sortPeriodPickups(rows, "shop", "asc").map((row) => row.address)).toEqual(["A 2", "A 10", "B 2"]);
+  });
+
+  it("test_pickupColumnChoices_ignores_the_open_column_and_uses_other_filters", () => {
+    expect(pickupColumnChoices(rows, { contractor: ["gpw"] }, "shop")).toEqual([
+      "A 2 · Alfa",
+      "A 10 · Alfa",
+    ]);
+    expect(pickupCellText(rows[0], "settled")).toBe("Nie");
+  });
+
+  it("test_visiblePeriodPickups_filters_before_sort", () => {
+    const state: PickupTableState = {
+      ...emptyPickupTable(),
+      sortKey: "date",
+      sortDir: "asc",
+      filters: { contractor: ["gpw"] },
+    };
+    expect(visiblePeriodPickups(rows, state).map((row) => row.pickupDate)).toEqual([
+      "02.09.2026",
+      "11.09.2026",
+    ]);
+  });
+
+  it("test_renderStats_pickup_menu_lists_values_and_marks_active_filter", () => {
+    const report = buildStatsReport(
+      [
+        row({ sheetRow: 2, contractor: "gpw", address: "A 2", shopName: "Alfa", pickupDate: "02.09.2026" }),
+        row({ sheetRow: 3, contractor: "blue", address: "B 2", shopName: "Beta", pickupDate: "12.09.2026" }),
+      ],
+      [],
+      { range: { from: "01.09.2026", to: "23.09.2026" } },
+    );
+    const html = renderStatsScreen(
+      defaultStatsView(TODAY, {
+        report,
+        appliedFrom: "01.09.2026",
+        appliedTo: "23.09.2026",
+        pickups: {
+          ...emptyPickupTable(),
+          sortKey: "date",
+          sortDir: "desc",
+          filters: { contractor: ["gpw"] },
+          menu: { column: "contractor", draft: ["gpw"], query: "" },
+        },
+      }),
+    );
+    const pickups = html.slice(html.indexOf("Odbiory w okresie"), html.indexOf("Ile worków zabrano"));
+    expect(pickups).toContain('data-action="pickup-menu"');
+    expect(pickups).toContain("Sortuj od A do Z");
+    expect(pickups).toContain("Sortuj od Z do A");
+    expect(pickups).toContain('aria-label="Sortuj i filtruj kolumnę Data, sortowanie malejąco">▼');
+    expect(pickups).toContain("(Zaznacz wszystko)");
+    expect(pickups).toContain('data-pickup-value="gpw"');
+    expect(pickups).toContain('data-pickup-value="blue"');
+    expect(pickups).toContain("Filtr: Podwykonawca");
+    expect(pickups).toContain("Sortowanie: Data, od najnowszych");
+    expect(pickups).toContain('class="xl-btn is-on"');
+    expect(pickups).toContain("A 2");
+    expect(pickups).not.toContain("B 2");
   });
 });

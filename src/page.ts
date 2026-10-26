@@ -67,6 +67,7 @@ import {
   findRow,
   formatPln,
   freshStatement,
+  invoiceCommentBody,
   parseAmountText,
   readSettlement,
   readSettlementStats,
@@ -549,7 +550,7 @@ async function runSearch(): Promise<void> {
         const invoiceRead = await loadInvoiceRows(started);
         if (invoiceRead.ok) {
           VIEW.invoices = rowsOfInvoice(invoiceRead.rows, VIEW.invoiceFocus);
-          VIEW.invoiceComment = retainInvoiceComment(VIEW.invoiceComment, VIEW.invoices);
+          VIEW.invoiceComment = invoiceCommentFromSheet(VIEW.invoiceComment, VIEW.invoices);
         } else {
           VIEW.invoices = [];
           if (!invoiceRead.silent) {
@@ -683,7 +684,7 @@ async function runInvoices(): Promise<void> {
     VIEW.screen = screenAfterInvoices();
     VIEW.invoices = rows;
     VIEW.invoiceNotice = "";
-    VIEW.invoiceComment = retainInvoiceComment(VIEW.invoiceComment, rows);
+    VIEW.invoiceComment = invoiceCommentFromSheet(VIEW.invoiceComment, rows);
     VIEW.status = "";
     VIEW.stats = { ...VIEW.stats, status: "" };
     VIEW.ratesOpen = false;
@@ -883,11 +884,11 @@ function onClick(event: MouseEvent): void {
   } else if (action === "approve") {
     void runApprove();
   } else if (action === "apply-comment") {
-    applyStatementComment();
+    void applyStatementComment();
   } else if (action === "check-comment-all") {
     toggleAllStatementComments();
   } else if (action === "apply-invoice-comment") {
-    applyInvoiceComment();
+    void applyInvoiceComment();
   } else if (action === "check-invoice-all") {
     toggleAllInvoiceComments();
   }
@@ -1007,6 +1008,10 @@ function syncDate(el: HTMLInputElement): void {
 
 function onChange(event: Event): void {
   const el = event.target;
+  if (el instanceof HTMLTextAreaElement && el.dataset.commentFor === "row") {
+    void commitInvoiceComment(el);
+    return;
+  }
   if (el instanceof HTMLSelectElement && el.dataset.stats) {
     applyStatsField(el.dataset.stats, el.value);
     return;
@@ -1385,7 +1390,64 @@ function clearStatementCommentPicks(): void {
   syncCommentChrome();
 }
 
-function applyStatementComment(): void {
+function invoiceCommentFromSheet(
+  prev: ReturnType<typeof emptyInvoiceComment>,
+  rows: readonly SettledInvoiceRow[],
+) {
+  const comments: Record<string, string> = {};
+  for (const row of rows) {
+    const text = row.invoiceComment.trim();
+    if (text !== "") {
+      comments[rowKey(row.sheetRow, row.transportNumber, row.sheetName)] = text;
+    }
+  }
+  return retainInvoiceComment({ ...prev, comments, notice: "" }, rows);
+}
+
+function savedCommentKeys(zapisane: unknown, fallback: readonly string[]): string[] {
+  if (!Array.isArray(zapisane)) {
+    return [...fallback];
+  }
+  const keys: string[] = [];
+  for (const item of zapisane) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const row = item as { sheetName?: unknown; sheetRow?: unknown; transportNumber?: unknown };
+    if (typeof row.sheetRow !== "number") {
+      continue;
+    }
+    const sheetName = typeof row.sheetName === "string" ? row.sheetName : "";
+    const transportNumber = typeof row.transportNumber === "string" ? row.transportNumber : "";
+    keys.push(rowKey(row.sheetRow, transportNumber, sheetName));
+  }
+  return keys;
+}
+
+function rememberInvoiceComment(key: string, text: string): void {
+  const statementComments = { ...VIEW.statement.invoiceComments };
+  const invoiceComments = { ...VIEW.invoiceComment.comments };
+  if (text === "") {
+    delete statementComments[key];
+    delete invoiceComments[key];
+  } else {
+    statementComments[key] = text;
+    invoiceComments[key] = text;
+  }
+  VIEW.statement = {
+    ...VIEW.statement,
+    invoiceComments: statementComments,
+    rows: VIEW.statement.rows.map((row) =>
+      rowKey(row.sheetRow, row.transportNumber, row.sheetName) === key ? { ...row, invoiceComment: text } : row,
+    ),
+  };
+  VIEW.invoiceComment = { ...VIEW.invoiceComment, comments: invoiceComments };
+  VIEW.invoices = VIEW.invoices.map((row) =>
+    rowKey(row.sheetRow, row.transportNumber, row.sheetName) === key ? { ...row, invoiceComment: text } : row,
+  );
+}
+
+async function applyStatementComment(): Promise<void> {
   const { chosen } = statementCommentModel();
   const next = applyComments(VIEW.statement.invoiceComments, chosen, VIEW.statement.commentDraft);
   if (!next) {
@@ -1393,20 +1455,37 @@ function applyStatementComment(): void {
     paint("comment");
     return;
   }
+  const keys = chosen.map((item) => item.key);
+  const wanted = new Set(keys);
+  const rows = VIEW.statement.rows.filter((row) =>
+    wanted.has(rowKey(row.sheetRow, row.transportNumber, row.sheetName)),
+  );
+  const built = invoiceCommentBody(rows, VIEW.statement.commentDraft, VIEW.mode);
+  if (!built.ok) {
+    VIEW.status = built.error;
+    paint();
+    return;
+  }
   const draft = VIEW.statement.commentDraft;
-  const count = chosen.length;
-  VIEW.statement = {
-    ...VIEW.statement,
-    invoiceComments: next,
-    commentPicks: {},
-    commentDraft: "",
-    commentNotice: commentApplyNotice(count, draft, "statement"),
-  };
-  paint();
+  await writeNow("Zapisuję komentarz do faktury…", built.body, (result) => {
+    const saved = savedCommentKeys(result.zapisane, keys);
+    for (const key of saved) {
+      rememberInvoiceComment(key, built.text);
+    }
+    const savedSet = new Set(saved);
+    const allSaved = keys.every((key) => savedSet.has(key));
+    VIEW.statement = {
+      ...VIEW.statement,
+      commentPicks: allSaved ? {} : VIEW.statement.commentPicks,
+      commentDraft: allSaved ? "" : draft,
+      commentNotice: allSaved ? commentApplyNotice(saved.length, draft, "statement") : "",
+    };
+    VIEW.status = allSaved ? "" : STATEMENT_ERROR.partial;
+  });
   document.querySelector<HTMLTextAreaElement>('[data-draft="comment"]')?.focus({ preventScroll: true });
 }
 
-function applyInvoiceComment(): void {
+async function applyInvoiceComment(): Promise<void> {
   const { chosen } = invoiceCommentModel();
   const next = applyComments(VIEW.invoiceComment.comments, chosen, VIEW.invoiceComment.draft);
   if (!next) {
@@ -1414,16 +1493,62 @@ function applyInvoiceComment(): void {
     paint("invoice-comment");
     return;
   }
+  const keys = chosen.map((item) => item.key);
+  const wanted = new Set(keys);
+  const rows = VIEW.invoices.filter((row) => wanted.has(rowKey(row.sheetRow, row.transportNumber, row.sheetName)));
+  const built = invoiceCommentBody(rows, VIEW.invoiceComment.draft, VIEW.mode);
+  if (!built.ok) {
+    VIEW.status = built.error;
+    paint();
+    return;
+  }
   const draft = VIEW.invoiceComment.draft;
-  const count = chosen.length;
-  VIEW.invoiceComment = {
-    comments: next,
-    picks: {},
-    draft: "",
-    notice: commentApplyNotice(count, draft, "invoice"),
-  };
-  paint();
+  await writeNow("Zapisuję komentarz do faktury…", built.body, (result) => {
+    const saved = savedCommentKeys(result.zapisane, keys);
+    for (const key of saved) {
+      rememberInvoiceComment(key, built.text);
+    }
+    const savedSet = new Set(saved);
+    const allSaved = keys.every((key) => savedSet.has(key));
+    VIEW.invoiceComment = {
+      ...VIEW.invoiceComment,
+      picks: allSaved ? {} : VIEW.invoiceComment.picks,
+      draft: allSaved ? "" : draft,
+      notice: allSaved ? commentApplyNotice(saved.length, draft, "invoice") : "",
+    };
+    VIEW.status = allSaved ? "" : STATEMENT_ERROR.partial;
+  });
   document.querySelector<HTMLTextAreaElement>('[data-draft="invoice-bulk"]')?.focus({ preventScroll: true });
+}
+
+async function commitInvoiceComment(el: HTMLTextAreaElement): Promise<void> {
+  const ref = sheetRef(el);
+  if (!ref) {
+    return;
+  }
+  const row = VIEW.invoices.find(
+    (item) =>
+      item.sheetRow === ref.sheetRow &&
+      item.transportNumber === ref.transportNumber &&
+      item.sheetName === ref.sheetName,
+  );
+  if (!row) {
+    return;
+  }
+  const built = invoiceCommentBody([row], el.value, VIEW.mode);
+  if (!built.ok) {
+    return;
+  }
+  const key = rowKey(row.sheetRow, row.transportNumber, row.sheetName);
+  await writeNow("Zapisuję komentarz do faktury…", built.body, (result) => {
+    const saved = savedCommentKeys(result.zapisane, [key]);
+    if (saved.includes(key)) {
+      rememberInvoiceComment(key, built.text);
+      VIEW.status = "";
+      return;
+    }
+    VIEW.status = STATEMENT_ERROR.partial;
+  });
 }
 
 function toggleAllStatementComments(): void {
@@ -1592,10 +1717,10 @@ function onKeyDown(event: KeyboardEvent): void {
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
       event.preventDefault();
       if (el.dataset.draft === "comment") {
-        applyStatementComment();
+        void applyStatementComment();
       }
       if (el.dataset.draft === "invoice-bulk") {
-        applyInvoiceComment();
+        void applyInvoiceComment();
       }
     }
     if (event.key === "Escape") {
@@ -1993,7 +2118,7 @@ async function postSheet(body: Record<string, unknown>): Promise<{
 async function writeNow(
   message: string,
   body: Record<string, unknown>,
-  apply: () => void | Promise<void>,
+  apply: (result: { zapisane?: unknown }) => void | Promise<void>,
 ): Promise<void> {
   if (webapp === "") {
     VIEW.status = "Brak adresu Web App.";
@@ -2025,7 +2150,7 @@ async function writeNow(
       );
       return;
     }
-    await apply();
+    await apply(result);
   } catch (err) {
     VIEW.status = STATEMENT_ERROR.write;
     reportFailure(

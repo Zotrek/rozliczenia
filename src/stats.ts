@@ -800,6 +800,7 @@ function matchesContractor(row: StatsRow, contractor?: string): boolean {
 
 function toRegisterRow(row: StatsRow): RegisterRow {
   return {
+    sheetName: row.sheetName,
     sheetRow: row.sheetRow,
     transportNumber: row.transportNumber,
     address: row.address,
@@ -811,6 +812,7 @@ function toRegisterRow(row: StatsRow): RegisterRow {
     routeRate: row.routeRate,
     pickupRate: row.pickupRate,
     bagRate: row.bagRate,
+    invoiceComment: row.invoiceComment,
   };
 }
 

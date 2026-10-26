@@ -28,6 +28,7 @@ function row(over: Partial<RegisterRow> & { sheetRow: number }): RegisterRow {
     routeRate: null,
     pickupRate: 2_000,
     bagRate: 0,
+    invoiceComment: "",
     ...over,
   };
 }

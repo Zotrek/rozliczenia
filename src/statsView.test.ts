@@ -47,6 +47,7 @@ function row(over: Partial<StatsRow> & Pick<StatsRow, "sheetRow">): StatsRow {
     happened: over.happened ?? true,
     receptionCost: over.receptionCost ?? 4_000,
     costPerBag: over.costPerBag ?? 2_000,
+    invoiceComment: over.invoiceComment ?? "",
     invoice: over.invoice,
     mode: over.mode,
   };

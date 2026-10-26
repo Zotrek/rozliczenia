@@ -222,7 +222,7 @@ Mapa nie dostaje tabeli rozliczeń ani wykresu. Zbiorczy protokół zostaje jak 
 |---------|------|--------|
 | `arkusz-mapa/src/routeName.ts` | `proposeRouteName`. Źródło wstrzyknięte w `phase6.ts`, gdy jest okno Word | Propozycja nazwy. Jedna funkcja, testowana. Pamięć sesji nie jest w tej funkcji: żyje w otwartej stronie |
 | `arkusz-mapa/src/phase6.ts`, okno `#doc-modal` | Funkcja nazwy jest w skrypcie strony. Pola kończą się na komentarzach | Checkbox „odbiór z trasy”, nazwa, stawka. Bez zaznaczenia pola schowane. POST niesie kolumny 10–11 albo ich nie niesie |
-| `transport-log.gs`, `COL` i `appendTransportRow_` | `appendRow` kończy się na komentarzu 2 | Przed dopisaniem wpisuje nagłówki 10–20, jeśli puste. Kolumn 1–9 nie przesuwa. Snapshot podjazdu/worka w 12–13 z Bazy. Komentarze na 19–20. Lista `tak`/`nie` na kolumnie 18. Body z trasą dopisuje 10–11 |
+| `transport-log.gs`, `COL` i `appendTransportRow_` | `appendRow` kończy się na komentarzu do faktury | Przed dopisaniem wpisuje nagłówki 10–21, jeśli puste. Kolumn 1–9 nie przesuwa. Snapshot podjazdu/worka w 13–14 z Bazy. Komentarze protokołu na 19–20, komentarz do faktury na 21. Lista `tak`/`nie` na kolumnie 10. Body z trasą dopisuje 11–12 |
 | `arkusz-mapa/docs/TRANSPORT_SHEET.md` | Kolumny 1–11 | Kolumny 1–20 (V2: stawki w rejestrze, komentarze na końcu) |
 
 Mapa nie wpisuje kolumn 14–17, nie woła Zatwierdź i nie rozstrzyga remisu. Nie ostrzega, gdy ta sama nazwa trasy trafia do dwóch podwykonawców.

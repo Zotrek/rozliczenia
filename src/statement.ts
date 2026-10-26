@@ -103,7 +103,7 @@ export interface StatementScreen {
   leftRoute: Record<string, string>;
   routeDraft: Record<string, RouteDraft>;
   routeDraftError: Record<string, string>;
-  /** Komentarz do faktury. Klucz z `rowKey`. Zapis do rejestru jest osobnym krokiem. */
+  /** Komentarz do faktury. Klucz z `rowKey`. Źródło: kolumna rejestru. */
   invoiceComments: Record<string, string>;
   /** Sklepy i podjazdy zaznaczone do jednego komentarza na dole. */
   commentPicks: Record<string, true>;
@@ -148,11 +148,26 @@ export function emptyStatement(): StatementScreen {
   };
 }
 
+/** Niepuste komentarze z odczytu rejestru. Klucz jak w `rowKey`. */
+export function invoiceCommentsFromRows(
+  rows: readonly Pick<RegisterRow, "sheetName" | "sheetRow" | "transportNumber" | "invoiceComment">[],
+): Record<string, string> {
+  const comments: Record<string, string> = {};
+  for (const row of rows) {
+    const text = row.invoiceComment.trim();
+    if (text !== "") {
+      comments[rowKey(row.sheetRow, row.transportNumber, row.sheetName)] = text;
+    }
+  }
+  return comments;
+}
+
 export function freshStatement(rows: RegisterRow[], rates: SettlementRateRow[]): StatementScreen {
-  const screen = { ...emptyStatement(), rows, rates };
+  const invoiceComments = invoiceCommentsFromRows(rows);
+  const screen = { ...emptyStatement(), rows, rates, invoiceComments };
   return {
     ...screen,
-    commentPicks: openingCommentPicks(commentTargets(currentStatement(screen), screen.invoiceComments)),
+    commentPicks: openingCommentPicks(commentTargets(currentStatement(screen), invoiceComments)),
   };
 }
 
@@ -531,10 +546,35 @@ export function adoptRows(
     leftRoute: pick(prev.leftRoute, keys),
     routeDraft: pick(prev.routeDraft, keys),
     routeDraftError: pick(prev.routeDraftError, keys),
-    invoiceComments: pick(prev.invoiceComments, keys),
+    invoiceComments: invoiceCommentsFromRows(rows),
     commentPicks: pick(prev.commentPicks, keys),
     commentDraft: prev.commentDraft,
     commentNotice: prev.commentNotice,
+  };
+}
+
+export function invoiceCommentBody(
+  rows: readonly Pick<RegisterRow, "sheetName" | "sheetRow" | "transportNumber">[],
+  text: string,
+  mode?: SettlementMode,
+): { ok: false; error: string } | { ok: true; text: string; body: Record<string, unknown> } {
+  if (rows.length === 0) {
+    return { ok: false, error: STATEMENT_ERROR.selection };
+  }
+  const trimmed = text.trim();
+  return {
+    ok: true,
+    text: trimmed,
+    body: {
+      action: "patchInvoiceComment",
+      ...scheduleTrybFields(mode),
+      wiersze: rows.map((row) => ({
+        sheetName: row.sheetName,
+        sheetRow: row.sheetRow,
+        transportNumber: row.transportNumber,
+        komentarzFaktury: trimmed,
+      })),
+    },
   };
 }
 
@@ -905,6 +945,7 @@ function readRegisterRow(value: unknown): RegisterRow | null {
     return null;
   }
   const sheetName = readText(value.sheetName) ?? "";
+  const invoiceComment = typeof value.invoiceComment === "string" ? value.invoiceComment : "";
   return {
     sheetName,
     sheetRow,
@@ -918,6 +959,7 @@ function readRegisterRow(value: unknown): RegisterRow | null {
     routeRate,
     pickupRate,
     bagRate,
+    invoiceComment,
   };
 }
 

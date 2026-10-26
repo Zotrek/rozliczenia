@@ -214,7 +214,7 @@ describe("page wiring", () => {
     expect(functionBody("onClick")).toContain('action === "rates-tab"');
   });
 
-  it("test_page_invoice_comment_stays_on_screen_without_a_sheet_write", () => {
+  it("test_page_invoice_comment_writes_the_register_column", () => {
     const click = functionBody("onClick");
     expect(click).toContain('action === "apply-comment"');
     expect(click).toContain('action === "apply-invoice-comment"');
@@ -222,9 +222,15 @@ describe("page wiring", () => {
     expect(click).toContain("applyInvoiceComment(");
     const apply = functionBody("applyStatementComment");
     expect(apply).toContain("applyComments(");
-    expect(apply).not.toContain("postSheet(");
-    expect(apply).not.toContain("fetch(");
-    expect(functionBody("applyInvoiceComment")).not.toContain("postSheet(");
+    expect(apply).toContain("invoiceCommentBody(");
+    expect(apply).toContain("writeNow(");
+    expect(apply).toContain("rememberInvoiceComment(");
+    expect(functionBody("applyInvoiceComment")).toContain("writeNow(");
+    expect(functionBody("applyInvoiceComment")).toContain("rememberInvoiceComment(");
+    expect(functionBody("commitInvoiceComment")).toContain("invoiceCommentBody(");
+    expect(functionBody("commitInvoiceComment")).toContain("writeNow(");
+    expect(functionBody("onChange")).toContain('el.dataset.commentFor === "row"');
+    expect(functionBody("onChange")).toContain("commitInvoiceComment(");
     expect(functionBody("onChange")).toContain('el.dataset.pick === "comment"');
     expect(functionBody("onChange")).toContain("el.dataset.pickRoute");
     expect(functionBody("onChange")).toContain('el.dataset.invoicePick === "1"');

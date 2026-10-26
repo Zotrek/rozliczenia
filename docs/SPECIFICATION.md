@@ -129,7 +129,7 @@ Słowniki (**Lista podwykonawców**, **Popraw adres**, **Baza stawek**) też są
 
 Kolumny rejestru są po **kolejności**, nie po nazwie nagłówka. Numer kolumny jest umową zapisu i odczytu, w makrze i w aplikacji rozliczeń. Nagłówek w wierszu 1 jest dla człowieka: ma stać w tej samej kolumnie i tym samym tekstem. Wstawienie albo zamiana kolumny w środku zmienia znaczenie danych. Nowe pole dopisuje się zwykle na końcu — wyjątek: migracje układu V2/V3 w [TRANSPORT_SHEET.md](../../arkusz-mapa/docs/TRANSPORT_SHEET.md).
 
-Właścicielem wiersza nagłówków rejestru jest makro mapy, to samo, które dopisuje protokół. Zanim pierwszy raz dopisze jakikolwiek wiersz protokołu, także gdy to nie jest odbiór z trasy, wpisuje nagłówki kolumn 10–20 w wierszu 1, jeśli te komórki są puste. W tym samym kroku, raz, zakłada na kolumnie 10 listę `tak` / `nie` i przekreślenie wiersza z `nie`. Kolumn 1–9 nie rusza i nie przesuwa. Brak nagłówka nie jest powodem, żeby pominąć zapis albo wybrać inną kolumnę. Aplikacja rozliczeń tych nagłówków nie wpisuje. Pisze w te same numery. Nie szuka kolumny po nazwie. Brak kolumny 10 znaczy to samo co pusta: transport się odbył.
+Właścicielem wiersza nagłówków rejestru jest makro mapy, to samo, które dopisuje protokół. Zanim pierwszy raz dopisze jakikolwiek wiersz protokołu, także gdy to nie jest odbiór z trasy, wpisuje nagłówki kolumn 10–21 w wierszu 1, jeśli te komórki są puste. W tym samym kroku, raz, zakłada na kolumnie 10 listę `tak` / `nie` i przekreślenie wiersza z `nie`. Kolumn 1–9 nie rusza i nie przesuwa. Brak nagłówka nie jest powodem, żeby pominąć zapis albo wybrać inną kolumnę. Nagłówków 10–20 aplikacja rozliczeń nie wpisuje. Gdy nagłówek kolumny 21 jest pusty, zapis komentarza do faktury go dopisuje. Pisze w te same numery. Nie szuka kolumny po nazwie. Brak kolumny 10 znaczy to samo co pusta: transport się odbył.
 
 | Jak się znajduje | Zakładka | Rola |
 |------------------|----------|------|
@@ -167,6 +167,7 @@ Kolejność kolumn rejestru (układ V3):
 18. **Koszt odbioru per worek** — w tym samym zapisie co kolumna 17, nie wcześniej. `Koszt odbioru / Ilość worków`. Gdy Ilość worków jest pusta albo równa 0, dzielimy przez 1. Koszt na worek Harmonogramu to kolumna 17, razem z kosztem w 16. Kolumna 18 tego rejestru to komentarz.
 19. **Komentarz 1** — tylko rejestr / protokół mapy. Rozliczenia nie czytają.
 20. **Komentarz 2** — j.w.
+21. **Komentarz do faktury** — tekst rozliczeń. Pusty, dopóki ktoś go nie wpisze. Zapis idzie od razu, także na wierszu już rozliczonym (`Rozliczony` `tak`). Nie rusza Rozliczony, numeru faktury ani kosztów. W Harmonogramie to kolumna 20. Komentarz 1 i 2 zostają kolumnami protokołu.
 
 Gdy **transport się odbył** (kolumna 10) ma wartość `nie`, także wpisaną w arkuszu przed otwarciem rozliczenia, wiersz nie wchodzi do wyszukiwania. W rejestrze jest przekreślony. W aplikacji rozliczeń go nie ma. Arkusz-mapa traktuje worki tego wiersza jako nieodebrane. Data tego wiersza nie odcina worków tak, jak data transportu, który się odbył. W pozostałych miejscach wiersz jest transportem, który się nie odbył. Nie wchodzi w koszt: bez podjazdu, bez worków i bez udziału w trasie. Przy trasie ten sklep nie wchodzi w liczbę sklepów ani w sumę worków. Gdy żaden sklep trasy się nie odbył, kosztu trasy nie ma.
 

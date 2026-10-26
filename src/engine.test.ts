@@ -15,6 +15,7 @@ function reception(over: Partial<RegisterRow> & Pick<RegisterRow, "sheetRow">): 
     routeRate: null,
     pickupRate: 2_000,
     bagRate: 1_000,
+    invoiceComment: "",
     ...over,
   };
 }

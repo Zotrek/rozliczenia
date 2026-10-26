@@ -76,6 +76,7 @@ function invoiceRow(over: Partial<SettledInvoiceRow> & { sheetRow: number }): Se
     invoice: "FV/1",
     receptionCost: 0,
     costPerBag: 0,
+    invoiceComment: "",
     ...over,
   };
 }

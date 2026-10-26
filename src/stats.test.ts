@@ -51,6 +51,7 @@ function statsRow(over: Partial<StatsRow> & Pick<StatsRow, "sheetRow">): StatsRo
     happened: true,
     receptionCost: null,
     costPerBag: null,
+    invoiceComment: "",
     ...over,
   };
 }

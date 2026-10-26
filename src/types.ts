@@ -30,6 +30,8 @@ export interface RegisterRow {
   pickupRate: Grosze | null;
   /** Kolumna 13. Snapshot z Bazy stawek przy protokole. null = puste. */
   bagRate: Grosze | null;
+  /** Komentarz do faktury. Na zgłoszenie kolumna 21, Harmonogram kolumna 20. Pusty = brak. */
+  invoiceComment: string;
 }
 
 /** Wiersz Bazy stawek. Kwoty w groszach. Data tekstem `dd.mm.yyyy` albo pusta. */

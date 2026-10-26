@@ -183,6 +183,7 @@ describe("renderApp", () => {
             invoice: "FV/1",
             receptionCost: 15000,
             costPerBag: 5000,
+            invoiceComment: "",
           },
         ],
       }),
@@ -215,6 +216,7 @@ describe("renderApp", () => {
             invoice: "FV/1",
             receptionCost: 15000,
             costPerBag: 5000,
+            invoiceComment: "",
           },
           {
             sheetName: "Arkusz1",
@@ -229,6 +231,7 @@ describe("renderApp", () => {
             invoice: "FV/2",
             receptionCost: 2000,
             costPerBag: 2000,
+            invoiceComment: "",
           },
         ],
       }),
@@ -258,6 +261,7 @@ describe("renderApp", () => {
         invoice: "FV/1",
         receptionCost: 15000,
         costPerBag: 5000,
+        invoiceComment: "",
       },
       {
         sheetName: "Arkusz1",
@@ -272,6 +276,7 @@ describe("renderApp", () => {
         invoice: "FV/2",
         receptionCost: 2000,
         costPerBag: 2000,
+        invoiceComment: "",
       },
     ];
     const html = renderApp(

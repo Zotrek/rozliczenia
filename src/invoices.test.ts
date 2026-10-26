@@ -23,6 +23,7 @@ function row(over: Partial<SettledInvoiceRow> = {}): SettledInvoiceRow {
     invoice: "FV/1",
     receptionCost: 15000,
     costPerBag: 5000,
+    invoiceComment: "",
     ...over,
   };
 }
@@ -82,6 +83,7 @@ describe("renderInvoiceList", () => {
         costPerBag: null,
         routeName: "trasa-1",
         bagCount: null,
+        invoiceComment: "folia",
       }),
     ]);
     expect(html).toContain("FV/1");
@@ -92,6 +94,7 @@ describe("renderInvoiceList", () => {
     expect(html).toContain("Podgląd.");
     expect(html).toContain("nie da się tu zmienić ani cofnąć");
     expect(html).toContain('data-comment-for="row"');
+    expect(html).toContain("folia");
     expect(html).toContain('data-invoice-pick="1"');
     expect(html).toContain("Komentarz dla zaznaczonych pozycji");
     expect(html).not.toContain("data-action=\"approve\"");

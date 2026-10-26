@@ -10,6 +10,7 @@ import {
   approveShow,
   attachDecision,
   bagsBody,
+  invoiceCommentBody,
   pickupDateBody,
   buildApprove,
   canPressApprove,
@@ -62,6 +63,7 @@ function row(over: Partial<RegisterRow> & { sheetRow: number }): RegisterRow {
     routeRate: null,
     pickupRate: 2_000,
     bagRate: 0,
+    invoiceComment: "",
     ...over,
   };
 }
@@ -359,7 +361,7 @@ describe("adoptRows", () => {
     expect(next.screenByRow["\t3\t3"]).toBeUndefined();
   });
 
-  it("test_adoptRows_keeps_invoice_comment_only_for_rows_that_stay", () => {
+  it("test_adoptRows_takes_invoice_comment_from_the_sheet_row", () => {
     const prev = freshStatement(
       [row({ sheetRow: 2, address: "Zostaje" }), row({ sheetRow: 3, address: "Znika" })],
       [],
@@ -367,8 +369,8 @@ describe("adoptRows", () => {
     prev.invoiceComments = { "\t2\t2": "folia", "\t3\t3": "pet" };
     prev.commentPicks = { "\t3\t3": true };
     prev.commentDraft = "nowy";
-    const next = adoptRows(prev, [row({ sheetRow: 2, address: "Zostaje" })], []);
-    expect(next.invoiceComments).toEqual({ "\t2\t2": "folia" });
+    const next = adoptRows(prev, [row({ sheetRow: 2, address: "Zostaje", invoiceComment: "z arkusza" })], []);
+    expect(next.invoiceComments).toEqual({ "\t2\t2": "z arkusza" });
     expect(next.commentPicks).toEqual({});
     expect(next.commentDraft).toBe("nowy");
   });
@@ -389,6 +391,46 @@ describe("freshStatement", () => {
     expect(screen.commentPicks["\t4\t4"]).toBeUndefined();
     expect(screen.invoiceComments).toEqual({});
   });
+
+  it("test_freshStatement_loads_a_saved_comment_and_leaves_that_shop_unchecked", () => {
+    const screen = freshStatement(
+      [
+        row({ sheetRow: 2, routeName: "Trasa", shopName: "A", invoiceComment: "  folia  " }),
+        row({ sheetRow: 3, routeName: "Trasa", shopName: "B" }),
+      ],
+      [],
+    );
+    expect(screen.invoiceComments).toEqual({ "\t2\t2": "folia" });
+    expect(screen.commentPicks["\t2\t2"]).toBeUndefined();
+    expect(screen.commentPicks["\t3\t3"]).toBe(true);
+  });
+});
+
+describe("invoiceCommentBody", () => {
+  it("test_invoiceCommentBody_posts_trimmed_text_for_each_row", () => {
+    const built = invoiceCommentBody(
+      [row({ sheetRow: 4, sheetName: "Harmonogram Październik 2026", transportNumber: "" })],
+      "  folia  ",
+      "schedule",
+    );
+    expect(built).toEqual({
+      ok: true,
+      text: "folia",
+      body: {
+        action: "patchInvoiceComment",
+        tryb: "harmonogram",
+        wiersze: [
+          {
+            sheetName: "Harmonogram Październik 2026",
+            sheetRow: 4,
+            transportNumber: "",
+            komentarzFaktury: "folia",
+          },
+        ],
+      },
+    });
+    expect(invoiceCommentBody([], "folia").ok).toBe(false);
+  });
 });
 
 describe("readSettlement", () => {
@@ -396,13 +438,14 @@ describe("readSettlement", () => {
     expect(readSettlement({ ok: true, rows: [] }).ok).toBe(false);
     const read = readSettlement({
       ok: true,
-      rows: [row({ sheetRow: 2, bagCount: null, routeRate: null, pickupRate: null, bagRate: null })],
+      rows: [row({ sheetRow: 2, bagCount: null, routeRate: null, pickupRate: null, bagRate: null, invoiceComment: "folia" })],
       rates: [rate({ sheetRow: 8, shop: "Sklepowa 1", validFrom: "" })],
     });
     expect(read.ok).toBe(true);
     if (read.ok) {
       expect(read.rows[0].bagCount).toBeNull();
       expect(read.rows[0].pickupRate).toBeNull();
+      expect(read.rows[0].invoiceComment).toBe("folia");
       expect(read.rates[0].sheetRow).toBe(8);
     }
   });

@@ -16,6 +16,8 @@ export interface SettledInvoiceRow {
   invoice: string;
   receptionCost: Grosze | null;
   costPerBag: Grosze | null;
+  /** Komentarz do faktury z rejestru. Pusty = brak. */
+  invoiceComment: string;
 }
 
 export interface InvoiceGroup {
@@ -187,6 +189,7 @@ function readSettledInvoiceRow(value: unknown): SettledInvoiceRow | null {
     invoice: invoice.trim(),
     receptionCost,
     costPerBag,
+    invoiceComment: typeof value.invoiceComment === "string" ? value.invoiceComment : "",
   };
 }
 

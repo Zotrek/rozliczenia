@@ -624,6 +624,9 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
   flex-direction: column;
   gap: 16px;
 }
+/* Sekcje mają overflow: hidden. W kolumnie na wysokość okna
+   przeglądarka ściska je do kreski, zamiast przewijać raport. */
+.stats .body > * { flex-shrink: 0; }
 .period-label {
   margin: 0;
   font-size: 13px;

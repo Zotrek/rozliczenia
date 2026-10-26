@@ -2,7 +2,8 @@
 
 > **Task:** 0012_zestawienie-harmonogram  
 > **Data:** 2026-09-28  
-> **Źródło:** arkusz ewidencji (`1hvSvy9c…`) — kontynuacja 0011
+> **Źródło:** arkusz ewidencji (`1hvSvy9c…`) — kontynuacja 0011  
+> **Dopisek 2026-10-26:** reguły stawek i worków są w decyzjach 19–21 w `-context.md` i w specyfikacji, sekcja „Harmonogram — stawki i liczba worków”. Ten plan ich nie zastępuje. Szukaj Harmonogramu od tej reguły nie jest samym odczytem.
 
 ## Zakres
 

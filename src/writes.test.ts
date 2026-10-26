@@ -1274,12 +1274,13 @@ describe("zapis w transport-log.gs", () => {
     expect(run).not.toContain("saveRate");
     expect(functionSource("resolveRateTie_")).not.toContain("getDataSheet_");
     expect(functionSource("resolveRateTie_")).not.toContain("getOrCreateRateSheet_");
-    for (const name of ["patchBags_", "patchRouteRate_", "patchPickupDate_", "detachRoute_", "attachRoute_"]) {
+    for (const name of ["patchRouteRate_", "patchPickupDate_", "detachRoute_", "attachRoute_"]) {
       const src = functionSource(name);
       expect(src).not.toContain("kosztOdbioru");
       expect(src).not.toContain("kosztPerWorek");
       expect(src).not.toContain("ensureTransportRegisterColumns_");
     }
+    expect(functionSource("patchBags_")).not.toContain("ensureTransportRegisterColumns_");
     const approve = functionSource("approve_");
     expect(approve).not.toContain("ensureTransportRegisterColumns_");
     expect(approve).not.toContain("getOrCreateRateSheet_");

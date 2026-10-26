@@ -243,6 +243,57 @@ describe("buildApprove", () => {
     expect(schedule.ok).toBe(true);
     if (schedule.ok) {
       expect(schedule.body.tryb).toBe("harmonogram");
+      expect(schedule.body.wiersze[0]).toMatchObject({
+        stawkaPodjazdu: "20.00",
+        stawkaWorka: "0.00",
+      });
+    }
+    if (built.ok) {
+      expect(built.body.wiersze[0]).not.toHaveProperty("stawkaPodjazdu");
+      expect(built.body.wiersze[0]).not.toHaveProperty("stawkaWorka");
+    }
+  });
+
+  it("test_buildApprove_schedule_sends_screen_rates_and_route_only_bag", () => {
+    const plain = setBagRate(
+      setPickup(screen([row({ sheetRow: 2, bagCount: 2, bagRate: 100 })]), 2, "2", 5_000),
+      2,
+      "2",
+      250,
+    );
+    const plainBuilt = buildApprove("FV/2", currentStatement(plain), { "\t2\t2": true }, "schedule");
+    expect(plainBuilt.ok).toBe(true);
+    if (plainBuilt.ok) {
+      expect(plainBuilt.body.wiersze[0]).toMatchObject({
+        koszt: 5_500,
+        stawkaPodjazdu: "50.00",
+        stawkaWorka: "2.50",
+      });
+    }
+
+    const routeScreen = screen([
+      row({
+        sheetRow: 3,
+        address: "A",
+        routeName: "trasa",
+        routeRate: 15_000,
+        pickupRate: 9_999,
+        bagRate: 1_000,
+        bagCount: 2,
+      }),
+    ]);
+    const routeBuilt = buildApprove("FV/3", currentStatement(routeScreen), { [routeSelectionKey("trasa")]: true }, "schedule");
+    expect(routeBuilt.ok).toBe(true);
+    if (routeBuilt.ok) {
+      expect(routeBuilt.body.wiersze[0]).toMatchObject({ stawkaWorka: "10.00" });
+      expect(routeBuilt.body.wiersze[0]).not.toHaveProperty("stawkaPodjazdu");
+    }
+
+    const emptyBag = screen([row({ sheetRow: 4, bagCount: 2, bagRate: null, pickupRate: 2_000 })]);
+    const emptyBuilt = buildApprove("FV/4", currentStatement(emptyBag), { "\t4\t4": true }, "schedule");
+    expect(emptyBuilt.ok).toBe(true);
+    if (emptyBuilt.ok) {
+      expect(emptyBuilt.body.wiersze[0]).toMatchObject({ stawkaPodjazdu: "20.00", stawkaWorka: "" });
     }
   });
 

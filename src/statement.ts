@@ -110,6 +110,8 @@ export interface ApproveShop {
   transportNumber: string;
   nieOdbył?: true;
   koszt?: number;
+  stawkaPodjazdu?: string;
+  stawkaWorka?: string;
 }
 
 export type ApproveBuild =
@@ -670,9 +672,10 @@ export function buildApprove(
       blocked = true;
       continue;
     }
-    const shops = line.kind === "plain" ? [line.shop] : line.shops;
+    const route = line.kind === "route";
+    const shops = route ? line.shops : [line.shop];
     for (const shop of shops) {
-      const item = shopItem(shop);
+      const item = shopItem(shop, mode === "schedule", route);
       if (!item) {
         blocked = true;
         continue;
@@ -733,7 +736,7 @@ export function statementSums(screen: StatementScreen): { total: Grosze; selecte
   };
 }
 
-function shopItem(shop: ShopCost): ApproveShop | null {
+function shopItem(shop: ShopCost, schedule = false, route = false): ApproveShop | null {
   if (!shop.happened) {
     return {
       sheetName: shop.sheetName,
@@ -751,6 +754,12 @@ function shopItem(shop: ShopCost): ApproveShop | null {
     transportNumber: shop.transportNumber,
     koszt: shop.receptionCost,
   };
+  if (schedule) {
+    item.stawkaWorka = shop.bagRate === null ? "" : groszeToZlotyText(shop.bagRate);
+    if (!route) {
+      item.stawkaPodjazdu = shop.legAmount === null ? "" : groszeToZlotyText(shop.legAmount);
+    }
+  }
   return item;
 }
 

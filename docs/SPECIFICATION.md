@@ -1,7 +1,7 @@
 # SPECIFICATION.md — Rozliczanie kosztów odbiorów
 
 > **Status:** Faza 1 — specyfikacja biznesowa  
-> **Ostatnia aktualizacja:** 2026-10-21  
+> **Ostatnia aktualizacja:** 2026-10-26  
 > **Właściciel:** Zespół Zwrotka  
 > **Źródło:** Wytyczne „Aplikacja do rozliczania kosztów odbiorów” + doprecyzowanie względem rejestru transportów Arkusz-mapa + makiety `rozliczenia/docs/makiety-tabeli.html` i `rozliczenia/docs/makiety-statystyki.html`
 
@@ -17,7 +17,7 @@ Aplikacja nie służy do wpisywania odbiorów. Dane odbioru powstają przy gener
 
 **Dlaczego to robimy?**
 
-Koszt podjazdu, worków i trasy ma być liczony z danych już zapisanych przy protokole (w tym snapshot stawek podjazdu i worka w rejestrze). Bez przepisywania sklepu, daty, worków i numeru protokołu do drugiego miejsca.
+Koszt podjazdu, worków i trasy ma być liczony z danych już zapisanych przy protokole (w tym snapshot stawek podjazdu i worka w rejestrze). Bez przepisywania sklepu, daty, worków i numeru protokołu do drugiego miejsca. W Harmonogramie nierozliczony wiersz przy Szukaj dostaje aktualną stawkę z Bazy cen harmonogram. Szczegóły: [Harmonogram — stawki i liczba worków](#harmonogram--stawki-i-liczba-worków).
 
 ---
 
@@ -36,13 +36,12 @@ Koszt podjazdu, worków i trasy ma być liczony z danych już zapisanych przy pr
 Dwa obszary aplikacji docelowo:
 
 1. **Na zgłoszenie** — ta specyfikacja (Zakres, Zestawienie, Statystyki, Baza stawek).
-2. **Harmonogram** — MVP: checkbox wybieralny; Szukaj buduje zestawienie z dni podjazdu (`Baza cen harmonogram` + worki z `odebrane z harmonogramu`, także 0 worków). Zatwierdź / faktura w tej wersji niedostępne. Wspólny plik Google (ewidencja), bez drugiej mili.
+2. **Harmonogram** — Szukaj i Zatwierdź na rejestrze `Harmonogram {Miesiąc} {Rok}` (legacy `zestawienie z harmonogramu` zostaje w odczytach). Wspólny plik Google. Stawki i przeliczenie worków: [Harmonogram — stawki i liczba worków](#harmonogram--stawki-i-liczba-worków).
 3. **Baza stawek** — wprowadzanie i edycja kwoty za podjazd i za worek. Robi to Arkusz-mapa i aplikacja rozliczeń, ta sama zakładka. Osobno: **Baza cen harmonogram** (to samo okno, druga zakładka; + dni transportu).
 
 Poza zakresem, świadomie:
 
 - Cofanie rozliczenia i edycja numeru faktury po zatwierdzeniu. W tej wersji tego nie ma.
-- Zatwierdzenie faktury w trybie Harmonogram (MVP tylko podgląd kosztów).
 - Biblioteki wykresów (Chart.js itd.) i wykres składu kosztów na Zestawieniu. Na Statystykach dozwolone są proste słupki CSS.
 - Raport po numerze faktury; lista sklepów bez odbiorów (np. 2 tygodnie); prognoza / trend na przyszłe tygodnie.
 - Wybór technologii aplikacji rozliczeń. Z zachowania nie wynika Symfony, Vue ani PostgreSQL.
@@ -99,7 +98,7 @@ Odepnij od trasy: sklep traci nazwę i stawkę tej trasy. Nie jest rozliczony. S
 
 ### Koszt odbioru
 
-**Koszt odbioru** to kwota jednego sklepu zapisana w kolumnie 17 rejestru. Na zestawieniu nie ma kolumny o tej nazwie. Przy odbiorze zwykłym ta kwota stoi w **Razem**. Przy trasie **Razem** jest kwotą całej trasy, a Koszt odbioru sklepu powstaje przy Zatwierdź. W kolumnach 17 i 18 jest pusta do Zatwierdź. Dopiero wtedy koszt jest zaakceptowany i te dwie kolumny dostają kwotę. Po Zatwierdź się nie zmienia.
+**Koszt odbioru** to kwota jednego sklepu zapisana w kolumnie 17 rejestru Na zgłoszenie. Na zestawieniu nie ma kolumny o tej nazwie. Przy odbiorze zwykłym ta kwota stoi w **Razem**. Przy trasie **Razem** jest kwotą całej trasy, a Koszt odbioru sklepu powstaje przy Zatwierdź. W kolumnach 17 i 18 jest pusta do Zatwierdź. To numery Na zgłoszenie. W Harmonogramie koszt i koszt na worek to 16 i 17. Dopiero wtedy koszt jest zaakceptowany i te dwie kolumny dostają kwotę. Po Zatwierdź się nie zmienia. Wyjątek Harmonogramu: edycja **Ilość worków** na rozliczonym wierszu przelicza obie kwoty — [Harmonogram — stawki i liczba worków](#harmonogram--stawki-i-liczba-worków).
 
 Koszt odbioru = koszt z kolumny Kwota podjazdu/trasy plus suma za worki tego sklepu. Przy trasie do kosztu sklepu wchodzi udział w stawce, nie cała stawka.
 
@@ -160,12 +159,12 @@ Kolejność kolumn rejestru (układ V3):
 10. **transport się odbył** — puste = odbył się. `nie` wyklucza wiersz z wyszukiwania i daty ostatniego transportu. Lista tak/nie + przekreślenie w arkuszu.
 11. **Trasa** — nazwa lub numer trasy. Pusta, gdy to nie jest odbiór z trasy, także po odpięciu od trasy. Nie zastępuje numeru transportowego.
 12. **Stawka za trasę** — jedna kwota dla całej nazwy trasy. Pusta, gdy to nie jest odbiór z trasy. W bazie stawek tej kwoty nie ma. Zmiana przy protokole i edycja na zestawieniu rozliczeń nadpisują **Stawka za trasę** na wszystkich nierozliczonych wierszach z tą samą nazwą w **Trasa**. Kluczem zapisu jest sam tekst nazwy. Zapis nie patrzy na **Kto odbiera** i nie patrzy na zakres dat. Dzielnik przy rozliczeniu patrzy: liczy tylko sklepy tego podwykonawcy w bieżącym zestawieniu. Własna nazwa, nie ze schematu, może więc nadpisać stawkę innego podwykonawcy z tym samym tekstem w **Trasa**. Zmiana na zestawieniu z jednego dnia nadpisuje też sklepy tej nazwy z innego dnia, choć ich na ekranie nie ma i to Zatwierdź ich nie oznacza. System nie ostrzega i nie blokuje. Wiersze już rozliczone są pominięte. Ten zapis jest od razu. Kolumn 17 i 18 nie rusza. Szczegóły: [Tabela — odbiór z trasy](#tabela--odbiór-z-trasy).
-13. **Stawka za podjazd** — snapshot z Bazy stawek przy dopisaniu wiersza protokołu (adres + kto odbiera + data odbioru). Remis albo brak pary → puste. Aplikacja rozliczeń liczy koszt z tej kolumny, nie z Bazy na żywo. Nadpisanie na ekranie zestawienia nie wraca tu ani do Bazy.
-14. **Stawka za worek** — j.w. snapshot przy protokole.
+13. **Stawka za podjazd** — snapshot z Bazy stawek przy dopisaniu wiersza protokołu (adres + kto odbiera + data odbioru). Remis albo brak pary → puste. Aplikacja rozliczeń liczy koszt z tej kolumny, nie z Bazy na żywo. Nadpisanie na ekranie zestawienia nie wraca tu ani do Bazy. Tryb Harmonogram: [Harmonogram — stawki i liczba worków](#harmonogram--stawki-i-liczba-worków).
+14. **Stawka za worek** — j.w. snapshot przy protokole. W Harmonogramie obowiązuje ten sam wyjątek co przy stawce za podjazd.
 15. **Rozliczony** — puste do momentu Zatwierdź. Po zatwierdzeniu `tak`. Wpisuje aplikacja rozliczeń, nie mapa. Wiersz z `tak` jest rozliczony i nie wraca do wyszukiwania. Inna wartość niż `tak`, także pusta, znaczy, że nie jest rozliczony.
 16. **Numer faktury** — pusty do zatwierdzenia. Potem jeden numer, tylko na transportach rozliczonych na tym ekranie. Wiersze pokazane, ale niezaznaczone, oraz transporty spoza tego ekranu numeru nie dostają. Wpisuje aplikacja rozliczeń.
-17. **Koszt odbioru** — kwota tego sklepu. Wzór: [Koszt odbioru](#koszt-odbioru). Pusta do Zatwierdź. Wpisuje ją aplikacja rozliczeń dopiero wtedy, razem z **Rozliczony** `tak`. Po Zatwierdź się nie zmienia.
-18. **Koszt odbioru per worek** — w tym samym zapisie co kolumna 17, nie wcześniej. `Koszt odbioru / Ilość worków`. Gdy Ilość worków jest pusta albo równa 0, dzielimy przez 1.
+17. **Koszt odbioru** — kwota tego sklepu. Wzór: [Koszt odbioru](#koszt-odbioru). Pusta do Zatwierdź. Wpisuje ją aplikacja rozliczeń dopiero wtedy, razem z **Rozliczony** `tak`. Po Zatwierdź się nie zmienia. Wyjątek Harmonogramu: edycja **Ilość worków** na rozliczonym wierszu przelicza tę kwotę — [Harmonogram — stawki i liczba worków](#harmonogram--stawki-i-liczba-worków).
+18. **Koszt odbioru per worek** — w tym samym zapisie co kolumna 17, nie wcześniej. `Koszt odbioru / Ilość worków`. Gdy Ilość worków jest pusta albo równa 0, dzielimy przez 1. Koszt na worek Harmonogramu to kolumna 17, razem z kosztem w 16. Kolumna 18 tego rejestru to komentarz.
 19. **Komentarz 1** — tylko rejestr / protokół mapy. Rozliczenia nie czytają.
 20. **Komentarz 2** — j.w.
 
@@ -179,7 +178,7 @@ Przykład: stawka 150 zł, trzy sklepy, jeden oznaczony na ekranie, że transpor
 
 Koszt worków jest liczony jak w regułach worków, ze **Stawka za worek** w rejestrze: tylko gdy nie jest pusta ani równa 0. Inaczej 0 zł. Koszt podjazdu bierze się z **Stawka za podjazd** w tym samym wierszu rejestru. Puste snapshoty dają 0 zł za podjazd i 0 zł za worki.
 
-Kolumny 17 i 18 są puste do zatwierdzenia. Aplikacja rozliczeń pokazuje koszt na ekranie z aktualnych stawek i z kwot wpisanych na zestawieniu. Przy **Zatwierdź** wpisuje obie, jako kwotę ostateczną. Dopisanie kolejnego sklepu do trasy i późniejsza zmiana stawek nie przeliczają już kwot zapisanych przy zatwierdzeniu. Edycja stawki za trasę nie rusza wierszy już rozliczonych i nie wpisuje kolumn 17 ani 18.
+Kolumny 17 i 18 są puste do zatwierdzenia. Aplikacja rozliczeń pokazuje koszt na ekranie z aktualnych stawek i z kwot wpisanych na zestawieniu. Przy **Zatwierdź** wpisuje obie, jako kwotę ostateczną. Dopisanie kolejnego sklepu do trasy i późniejsza zmiana stawek nie przeliczają już kwot zapisanych przy zatwierdzeniu. Edycja stawki za trasę nie rusza wierszy już rozliczonych i nie wpisuje kolumn 17 ani 18. W Harmonogramie późniejsza zmiana **Ilość worków** na rozliczonym wierszu przelicza koszt w kolumnach 16 i 17 — [Harmonogram — stawki i liczba worków](#harmonogram--stawki-i-liczba-worków).
 
 Rozliczony wiersz nie wraca do wyszukiwania. Wiersz z **transport się odbył** `nie` też nie, nawet gdy **Rozliczony** jest puste.
 
@@ -323,7 +322,7 @@ Zapis stawek podjazdu i worka jest od razu, nie czeka na Zatwierdź. Nie zmienia
 Na początku użytkownik widzi dwa checkboxy:
 
 - **Na zgłoszenie** — na starcie zaznaczony. Wyszukiwanie dotyczy rejestru Na zgłoszenie (miesięczne + legacy `Arkusz1`).
-- **Harmonogram** — zaznaczalny. Szukaj czyta `Baza cen harmonogram` (dni podjazdu) i `odebrane z harmonogramu` (liczba worków; może być 0). Zatwierdź niedostępne.
+- **Harmonogram** — zaznaczalny. Szukaj czyta rejestr `Harmonogram {Miesiąc} {Rok}` i legacy `zestawienie z harmonogramu`. Zatwierdź działa. Stawki nierozliczonych wierszy i przeliczenie worków na zamkniętej fakturze: [Harmonogram — stawki i liczba worków](#harmonogram--stawki-i-liczba-worków).
 
 Podwykonawcę znajduje się tak samo jak na mapie, z tej samej **Listy podwykonawców**. Kolumny to **Nazwa** i **Dane do Worda**. Nazwa to nazwa krótka, ta sama co **Kto odbiera**. Adresu nie ma w osobnej kolumnie. Jest w **Dane do Worda**, sklejony z nazwą do protokołu, BDO i NIP, tak jak zapisuje go mapa.
 
@@ -358,7 +357,7 @@ Znacznik podjazd albo trasa stoi w **Podjazd/Trasa**. Kwota jest obok, w **Kwota
 
 Liczba worków to **Ilość worków** tego odbioru. Na tym ekranie da się ją zmienić. Nowa liczba zapisuje się od razu do **Ilość worków** tego konkretnego wiersza na zakładce rejestru (`sheetName`) w pliku `1hvSvy9c069SefhYH3rCUDtCViRhAoRQ6DDj_EIlmWNk`. Nie czeka na Zatwierdź. Suma za worki i Razem na ekranie liczą się od nowa. W rejestrze **Koszt odbioru** i **Koszt odbioru per worek** powstają dopiero przy zatwierdzeniu.
 
-Kwota za worek na starcie to stawka obowiązująca w dniu odbioru. Kwotę za podjazd i kwotę za worek też da się tu zmienić. Te zmiany nie zapisują się w Bazie stawek. Inne odbiory tego sklepu dalej biorą stawkę z bazy. Do zatwierdzenia obowiązują tylko na ekranie i wchodzą w Razem tego wiersza. Gdy wiersz jest zaznaczony jako rozliczony i użytkownik klika Zatwierdź, ten Koszt odbioru zapisuje się w kolumnie **Koszt odbioru**. **Koszt odbioru per worek** to **Koszt odbioru** podzielony przez **Ilość worków**. Gdy Ilość worków jest pusta albo równa 0, dzielimy przez 1.
+Kwota za worek na starcie to stawka obowiązująca w dniu odbioru. Kwotę za podjazd i kwotę za worek też da się tu zmienić. Te zmiany nie zapisują się w Bazie stawek. Inne odbiory tego sklepu dalej biorą stawkę z bazy. Do zatwierdzenia obowiązują tylko na ekranie i wchodzą w Razem tego wiersza. Gdy wiersz jest zaznaczony jako rozliczony i użytkownik klika Zatwierdź, ten Koszt odbioru zapisuje się w kolumnie **Koszt odbioru**. **Koszt odbioru per worek** to **Koszt odbioru** podzielony przez **Ilość worków**. Gdy Ilość worków jest pusta albo równa 0, dzielimy przez 1. W Harmonogramie w tym samym Zatwierdź do kolumn stawki zatwierdzanego wiersza schodzi stawka podjazdu i stawka worka, z których policzył się koszt, a nie sama kwota kosztu. Baza cen harmonogram zostaje. Szczegóły: [Harmonogram — stawki i liczba worków](#harmonogram--stawki-i-liczba-worków).
 
 ### Tabela — odbiór z trasy
 
@@ -383,13 +382,13 @@ Kolumna Numer protokołu jest w tabeli, ale na wierszu trasy pokazuje „—". N
 
 Rozwinięcie wiersza pokazuje sklepy tej trasy: numer protokołu, adres, nazwę sklepu, datę, liczbę worków, opcję, że transport się nie odbył, i **odepnij od trasy**. Datę jednego sklepu zmienia się przy tym sklepie. Data na wierszu trasy zmienia wszystkie sklepy tej trasy widoczne w zestawieniu. Zapis jest od razu, te same reguły co przy odbiorze zwykłym. Adres rozróżnia sklep, nie nazwa. Sumy za worki w rozwinięciu nie ma. Kwota za worek jest w rozwinięciu tylko wtedy, gdy adresy nie mają jednej wspólnej kwoty.
 
-Liczbę worków edytuje się przy adresie, nie na zsumowanym wierszu trasy. Zapisuje się od razu do **Ilość worków** wiersza tego adresu. Kwota za worek, gdy jest wspólna, jest na wierszu trasy. Jej zmiana dotyczy na ekranie każdego adresu tej trasy, który się odbył, i nie zapisuje się w Bazie stawek. Gdy kwoty się różnią, zmianę robi się przy adresie i dotyczy tylko jego, też tylko na ekranie. Po zaznaczeniu rozliczenia i Zatwierdź Koszt odbioru tego adresu trafia do kolumny **Koszt odbioru**, a **Koszt odbioru per worek** to **Koszt odbioru** podzielony przez **Ilość worków** (przy pustej ilości albo 0 dzielimy przez 1). Razem po rozwinięciu nadal jest raz, na wierszu trasy. Rozwinięcie nie służy do rozliczania pojedynczego sklepu osobno.
+Liczbę worków edytuje się przy adresie, nie na zsumowanym wierszu trasy. Zapisuje się od razu do **Ilość worków** wiersza tego adresu. Kwota za worek, gdy jest wspólna, jest na wierszu trasy. Jej zmiana dotyczy na ekranie każdego adresu tej trasy, który się odbył, i nie zapisuje się w Bazie stawek. Gdy kwoty się różnią, zmianę robi się przy adresie i dotyczy tylko jego, też tylko na ekranie. W Harmonogramie przy Zatwierdź ta kwota schodzi do **Stawka za worek** adresów objętych zatwierdzeniem. Po zaznaczeniu rozliczenia i Zatwierdź Koszt odbioru tego adresu trafia do kolumny **Koszt odbioru**, a **Koszt odbioru per worek** to **Koszt odbioru** podzielony przez **Ilość worków** (przy pustej ilości albo 0 dzielimy przez 1). Razem po rozwinięciu nadal jest raz, na wierszu trasy. Rozwinięcie nie służy do rozliczania pojedynczego sklepu osobno.
 
 Stawkę trasy edytuje się na zsumowanym wierszu, w Kwota podjazdu/trasy, nie przy sklepie. Zapis jest od razu, nie czeka na Zatwierdź i nie idzie do Bazy stawek.
 
 Nowa kwota nadpisuje **Stawka za trasę** na każdym nierozliczonym wierszu rejestru z tą samą nazwą w **Trasa**, bez względu na **Kto odbiera** i na datę odbioru. Tak samo jak zmiana przy protokole. Dzielnik tego nie powtarza: liczy tylko sklepy wybranego podwykonawcy w tym zestawieniu. System nie ostrzega i nie blokuje. Kolumny 17 i 18 zostają puste. Wiersze już rozliczone są pominięte.
 
-Na ekranie **Koszt odbioru** liczy się od nowa. Wzór i zaokrąglenie udziału do dwóch miejsc po przecinku są w [Koszt odbioru](#koszt-odbioru). Liczba sklepów jest ta sama co w [rejestrze Na zgłoszenie](#rejestr-na-zgłoszenie-miesięczne--arkusz1): stan zestawienia w tej chwili. Sklep oznaczony, że transport się nie odbył, dostaje 0 zł i nie wchodzi w dzielnik, także zanim w arkuszu stoi `nie`. Stawka 150 zł i trzy sklepy, z których jeden jest tak oznaczony: dzielnik 2, udział 75 zł. Pusta albo zerowa stawka daje udział 0 zł. Gdy żaden sklep się nie odbył, kosztu trasy nie ma i stawki nie dzieli się przez 1. Rozliczony wiersz nie jest w zestawieniu i jego kolumny 17 i 18 się nie zmieniają.
+Na ekranie **Koszt odbioru** liczy się od nowa. Wzór i zaokrąglenie udziału do dwóch miejsc po przecinku są w [Koszt odbioru](#koszt-odbioru). Liczba sklepów jest ta sama co w [rejestrze Na zgłoszenie](#rejestr-na-zgłoszenie-miesięczne--arkusz1): stan zestawienia w tej chwili. Sklep oznaczony, że transport się nie odbył, dostaje 0 zł i nie wchodzi w dzielnik, także zanim w arkuszu stoi `nie`. Stawka 150 zł i trzy sklepy, z których jeden jest tak oznaczony: dzielnik 2, udział 75 zł. Pusta albo zerowa stawka daje udział 0 zł. Gdy żaden sklep się nie odbył, kosztu trasy nie ma i stawki nie dzieli się przez 1. Rozliczony wiersz nie jest w zestawieniu i z tego ekranu jego kolumny 17 i 18 się nie zmieniają. W Harmonogramie edycja **Ilość worków** w arkuszu rusza kolumny 16 i 17 — [Harmonogram — stawki i liczba worków](#harmonogram--stawki-i-liczba-worków).
 
 Przy Zatwierdź kolumny 17 i 18 są zapisywane z kwot z ekranu w tym momencie.
 
@@ -430,9 +429,10 @@ Dopiero wtedy, na wierszach rejestru objętych zaznaczeniem, poza sklepami z tra
 - Rozliczony dostaje `tak`,
 - Numer faktury zostaje zapisany tylko na transportach rozliczonych na tym ekranie,
 - Koszt odbioru, kolumna 17, zostaje zapisany jako kwota ostateczna tego sklepu,
-- Koszt odbioru per worek, kolumna 17, zostaje zapisany jako Koszt odbioru / Ilość worków. Gdy Ilość worków jest pusta albo równa 0, dzielimy przez 1.
+- Koszt odbioru per worek, kolumna 18, zostaje zapisany jako Koszt odbioru / Ilość worków. Gdy Ilość worków jest pusta albo równa 0, dzielimy przez 1,
+- w Harmonogramie dodatkowo stawka użyta do tego kosztu schodzi do kolumn stawki tego wiersza — [Harmonogram — stawki i liczba worków](#harmonogram--stawki-i-liczba-worków). W Na zgłoszenie kolumn stawki Zatwierdź nie rusza. Harmonogram zapisuje koszt w 16 i koszt na worek w 17.
 
-Sklep, u którego ustawiono, że transport się nie odbył, dostaje w tym zapisie samo `nie` w **transport się odbył**. Nie dostaje `tak`, numeru faktury, kolumn 16 i 17, udziału w stawce ani całej stawki trasy. Dotyczy odbioru zwykłego i sklepu w rozwinięciu trasy. Checkbox trasy i tak go obejmuje, ale tylko po to, żeby zapisać `nie`.
+Sklep, u którego ustawiono, że transport się nie odbył, dostaje w tym zapisie samo `nie` w **transport się odbył**. Nie dostaje `tak` ani numeru faktury (Na zgłoszenie kolumna 16, Harmonogram kolumna 15). Na zgłoszenie nie dostaje kolumn 17 i 18. Harmonogram nie dostaje kolumn 16 i 17. Nie dostaje udziału w stawce ani całej stawki trasy. Dotyczy odbioru zwykłego i sklepu w rozwinięciu trasy. Checkbox trasy i tak go obejmuje, ale tylko po to, żeby zapisać `nie`.
 
 Wiersz trasy aktualizuje każdy sklep z rozwinięcia, nie jeden zbiorczy rekord. Niezaznaczone zostają nierozliczone. U nich `nie` też się nie zapisuje.
 
@@ -447,6 +447,35 @@ W trakcie zapisu poniżej 10 000 zł widać to samo pulsujące logo co przy każ
 - **Suma zaznaczonych** — to samo, tylko dla wierszy z checkboxem. Aktualizuje się przy zaznaczaniu, jeszcze przed Zatwierdź.
 
 ---
+
+## Harmonogram — stawki i liczba worków
+
+Dotyczy zakładek `Harmonogram {Miesiąc} {Rok}` i legacy `zestawienie z harmonogramu`. Rejestr Na zgłoszenie zostaje przy regułach z [rejestru Na zgłoszenie](#rejestr-na-zgłoszenie-miesięczne--arkusz1) i z [tabeli odbioru zwykłego](#tabela--odbiór-zwykły): snapshot z chwili protokołu, zmiana kwoty na ekranie nie wraca do kolumny stawki ani do Bazy stawek, a **Koszt odbioru** po Zatwierdź się nie zmienia.
+
+**Szukaj.** Zestawienie bierze nierozliczone wiersze rejestru Harmonogram tego podwykonawcy i tego zakresu dat. Zapis stawek dotyczy tylko tych wierszy, nie całej zakładki. Szukaj bierze datę tak jak sync zestawienia. Przy tym odczycie **Stawka za podjazd** (kolumna 12) i **Stawka za worek** (kolumna 13) dostają stawkę z **Bazy cen harmonogram** obowiązującą na datę odbioru: adres i podwykonawca, najpóźniejsza data nie późniejsza niż odbiór. Pusta data w Bazie cen to „od zawsze” i jest starsza niż każda wpisana. Remis tej samej daty zostawia pierwszy wiersz w kolejności zakładki. „Tak jak sync” dotyczy całego wyboru daty, nie tylko dwóch wierszy z jedną datą. Para, której każda data jest późniejsza niż odbiór, jest tym samym co brak pary: czyszczone są kolumny 12 i 13. **Trasa** i **Stawka za trasę** zostają. Wiersz z **Rozliczony** `tak` i wiersz z **transport się odbył** `nie` nie wchodzą do zestawienia i kolumn nie dostają. Baza cen się od tego nie zmienia. `saveRateHarmonogram` pustą datę pomija (`resolveHarmonogramSnapshot_` przeskakuje `\u0000`) i nadal przepisuje też trasę. Szukaj tego pominięcia nie kopiuje. Sync mapki zostaje przy swoim przepisywaniu trasy: dalej pomija rozliczone, nie czyści zakładki i nadal sam przepisuje też trasę na nierozliczonych.
+
+Kolumny Harmonogramu, bez numeru transportowego: **Ilość worków** 8, **Stawka za podjazd** 12, **Stawka za worek** 13, **Koszt odbioru** 16, **Koszt odbioru per worek** 17. Numery 17 i 18 w rejestrze Na zgłoszenie to inne pola.
+
+Kwota wpisana z ręki na zestawieniu, jeszcze niezatwierdzona, zostaje na ekranie. Do kolumn schodzi dopiero przy Zatwierdź. Ponowne Szukaj przed zatwierdzeniem znowu bierze bazę do kolumn podjazdu i worka. Ekran liczy z kwoty wpisanej z ręki, gdy ta kwota na zestawieniu stoi.
+
+**Zatwierdź.** Na wierszach objętych zaznaczeniem, które dostają **Rozliczony** `tak`, w kolumny schodzi stawka, z której policzył się koszt faktury.
+
+- Odbiór zwykły: **Stawka za podjazd** i **Stawka za worek**.
+- Odbiór z trasy: **Stawka za worek** tego adresu. Udział w trasie nie wchodzi do **Stawka za podjazd**. **Stawka za trasę** jest zapisana wcześniej i przy Zatwierdź nie rozlewa się na kolejne wiersze.
+
+Brak wymaganego klucza w body (`stawkaPodjazdu` przy odbiorze zwykłym, `stawkaWorka` przy obu) pomija ten wiersz. Żadna komórka się nie zmienia: stara stawka zostaje, nie ma `tak`, numeru faktury ani kosztu. Klucz obecny i pusty czyści tę kolumnę stawki, a wiersz i tak dostaje `tak`, fakturę i koszt z ekranu. Przy trasie `stawkaPodjazdu` nie jest wymagane i nie jest zapisywane, także gdy przyjdzie w body.
+
+**Baza cen harmonogram** i podjazdy spoza tego zatwierdzenia zostają przy swojej stawce. Po zatwierdzeniu sync i późniejsza zmiana bazy tych wierszy nie cofają. Faktury zamknięte wcześniej apka sama nie poprawia: kolumna stawki zostaje taka, jaka była w dniu zatwierdzenia.
+
+**Stawka za trasę** bez zmian względem [odbioru z trasy](#tabela--odbiór-z-trasy): zapis od razu, na wszystkie nierozliczone wiersze z tą samą nazwą w **Trasa**, rozliczone pominięte, kolumn kosztu ten zapis nie rusza.
+
+**Ilość worków na rozliczonym wierszu.** Zmiana kolumny **Ilość worków** w arkuszu, na wierszu z **Rozliczony** `tak`, przelicza **Koszt odbioru** i **Koszt odbioru per worek** w chwili edycji. Przeładowanie mapki tego nie robi. Sync rozliczonego wiersza nie rusza.
+
+Zostaje część za podjazd albo udział w trasie. Zmienia się tylko opłata za worki. Nowa kwota to dotychczasowy koszt bez opłaty za worki plus nowa liczba razy **Stawka za worek** z tego wiersza. Opłata za worki jest zerem, gdy stawka worka jest pusta albo równa 0. Wtedy koszt faktury zostaje, a **Koszt odbioru per worek** to ten koszt podzielony przez nową liczbę. Pusta liczba albo 0 dzieli przez 1. **Rozliczony**, numer faktury i kolumny stawek zostają.
+
+Liczba worków zmieniona w Excelu przed rozliczeniem wchodzi do zestawienia przy następnym Szukaj. **Koszt odbioru** i tak powstaje dopiero przy Zatwierdź. Liczba wpisana w apce nadal zapisuje się od razu do **Ilość worków** i nie czeka na Zatwierdź.
+
+W rejestrze Na zgłoszenie edycja **Ilość worków** na rozliczonym wierszu kosztu nie przelicza.
 
 ## Statystyki
 

@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — Rozliczenia
 
 > **Status:** Zatwierdzone 2026-09-19; uzupełnienie Statystyk 2026-09-23. Kolejność prac jest w [`PLAN.md`](PLAN.md).  
-> **Ostatnia aktualizacja:** 2026-09-23  
+> **Ostatnia aktualizacja:** 2026-10-26  
 > **Na podstawie:** `rozliczenia/docs/SPECIFICATION.md`, makiety `makiety-tabeli.html` i `makiety-statystyki.html`  
 > **Wzorzec wdrożenia:** Arkusz-mapa i Druga Mila (strona + Apps Script + ten sam plik Google). Nie Symfony, nie Vue, nie PostgreSQL.
 
@@ -72,8 +72,8 @@ flowchart LR
 Podział odpowiedzialności:
 
 - **Przeglądarka** liczy koszt, grupuje trasy, trzyma stan ekranu, który nie ma kolumny: przekreślenie „transport się nie odbył” przed zatwierdzeniem, podgląd stawki podjazdu i worka innej niż w bazie. Podjazd 0 zł wpisuje się w kwotę podjazdu. Osobnej opcji „tylko za liczbę worków” nie ma. Na Statystykach agreguje KPI i rankingi (czyste funkcje TS + Vitest).
-- **Apps Script** jest jedynym miejscem zapisu. Nie liczy kosztu na nowo z bazy, bo część kwot żyje tylko na ekranie do Zatwierdź. Zapisuje to, co ekran już policzył, po sprawdzeniu, że wiersz wolno ruszyć. Odczyt Statystyk nic nie zapisuje.
-- **Arkusz** jest stanem trwałym. Po Zatwierdź kolumny 16 i 17 się nie przeliczają.
+- **Apps Script** jest jedynym miejscem zapisu. Przy Zatwierdź nie liczy kosztu na nowo z bazy: zapisuje to, co ekran już policzył, po sprawdzeniu, że wiersz wolno ruszyć. W Harmonogramie Szukaj przepisuje stawki podjazdu i worka z Bazy cen harmonogram, a edycja liczby worków na rozliczonym wierszu przelicza koszt z kolumn tego wiersza. Odczyt Statystyk nic nie zapisuje.
+- **Arkusz** jest stanem trwałym. Po Zatwierdź koszt odbioru i koszt na worek się nie przeliczają. Wyjątek: edycja **Ilość worków** na rozliczonym wierszu Harmonogramu.
 
 ---
 
@@ -111,6 +111,8 @@ Makro szuka rejestru po nazwie (`REGISTER_SHEET_NAME`), nie po kolejności kart.
 | 17 | Koszt odbioru per worek | Aplikacja | Tylko Zatwierdź, razem z 16 |
 | 18 | transport się odbył | Arkusz ręcznie albo aplikacja | `nie` przy Zatwierdź wiersza, który sklep obejmuje. Inna wartość niż `nie` = odbył się |
 
+To układ sprzed przesunięcia „transport się odbył”. Harmonogram na tej tabeli nie stoi.
+
 Wiersz z kolumną 14 = `tak` albo kolumną 18 = `nie` nie wraca do wyszukiwania.
 
 Data w kolumnie 5 jest tekstem `dd.mm.yyyy`, tak jak zapisuje ją dziś mapa. Silnik i wyszukanie parsują ten tekst. Nie zakładają ISO.
@@ -132,6 +134,8 @@ Te rzeczy są tylko na ekranie, aż do Zatwierdź. Payload zatwierdzenia musi je
 - znacznik „transport się nie odbył” ustawiony na zestawieniu, zanim w kolumnie 18 stoi `nie`,
 - kwota za podjazd i kwota za worek zmienione na wierszu, inne niż w Bazie stawek.
 
+W Na zgłoszenie te kwoty po Zatwierdź zostają tylko w koszcie. Kolumn stawki zatwierdzenie nie rusza. W Harmonogramie Zatwierdź zapisuje je w kolumnach stawki zatwierdzanego wiersza. Przy trasie sam worek. Udział w trasie nie wchodzi do stawki podjazdu. Szczegóły: specyfikacja, [Harmonogram — stawki i liczba worków](SPECIFICATION.md#harmonogram--stawki-i-liczba-worków).
+
 ---
 
 ## Silnik kosztów
@@ -144,10 +148,10 @@ Wyjście: wiersze tabeli (zwykły albo trasa), kwoty, sumy, lista błędów remi
 Reguły, których test nie może pominąć:
 
 - Podjazd i trasa wykluczają się. Trzy składniki naraz nie występują.
-- Brak stawki, pusta albo 0 za worek, brak pary: 0 zł, bez błędu i bez blokady zatwierdzenia. Remis to błąd, nie 0 zł.
+- Brak stawki, pusta albo 0 za worek, brak pary: 0 zł, bez błędu i bez blokady zatwierdzenia. Remis w Bazie stawek (Na zgłoszenie) to błąd, nie 0 zł. W Bazie cen harmonogram dwa wiersze z tą samą datą nie są remisem: Szukaj bierze pierwszy z najpóźniejszą datą.
 - Udział trasy = stawka / liczba sklepów, które się odbyły, w tym zestawieniu, u tego podwykonawcy. Zaokrąglenie matematyczne do dwóch miejsc. Reszta grosza przepada. Pusta albo zerowa stawka: udział 0. Zero sklepów, które się odbyły: kosztu trasy nie ma, nie dzielimy przez 1.
 - Zapis stawki trasy idzie po samym tekście nazwy, na nierozliczone wiersze, bez filtra podwykonawcy i dat. Dzielnik jest węższy.
-- Kolumny 16 i 17 powstają przy Zatwierdź i potem się nie zmieniają.
+- Koszt odbioru i koszt na worek powstają przy Zatwierdź i potem się nie zmieniają. Wyjątek: Harmonogram, edycja **Ilość worków** na wierszu z **Rozliczony** `tak` (tam te kwoty są w kolumnach 16 i 17, bo rejestr nie ma numeru transportowego).
 
 ---
 
@@ -157,7 +161,7 @@ Nowe akcje obok istniejących (`modalData`, `listReferenceData`, zapis protokoł
 
 | Akcja | Kierunek | Co robi |
 |-------|----------|---------|
-| `settlementSearch` | GET lub POST | Podwykonawca (nazwa krótka), data od (albo brak), data do. Zwraca wiersze rejestru w zakresie, które nie mają Rozliczony `tak` i nie mają transport `nie`, plus pasujące wiersze Bazy stawek. Każdy wiersz rejestru niesie numer wiersza arkusza i numer z kolumny 1 |
+| `settlementSearch` | GET lub POST | Podwykonawca (nazwa krótka), data od (albo brak), data do. Zwraca wiersze rejestru w zakresie, które nie mają Rozliczony `tak` i nie mają transport `nie`, plus pasujące wiersze Bazy stawek. Każdy wiersz rejestru niesie numer wiersza arkusza i numer z kolumny 1. `tryb=harmonogram`: przed odpowiedzią przepisuje **Stawka za podjazd** i **Stawka za worek** z Bazy cen harmonogram tylko na wierszach tego zestawienia. Brak pary czyści obie kolumny. Ta sama data: pierwszy wiersz, nie remis. **Trasa** i **Stawka za trasę** zostają. Rozliczonych i transport `nie` nie rusza. To jest zapis tych dwóch kolumn, nie sam odczyt |
 | `settlementStats` | GET | Odczyt pod Statystyki: rozliczone w zakresie dat + nierozliczone (backlog / problemy ze stawkami); **worki Harmonogram** z `odebrane z harmonogramu` (`mode: schedule`); pola P/Q/I, status, data, podwykonawca, adres, snapshoty; dane do remisów. **Bez zapisu**, bez locka |
 | `listContractors` | GET | Lista podwykonawców: Nazwa i Dane do Worda. Można oprzeć na `listReferenceData`, jeśli pola już tam są |
 | `listStoreAddresses` | GET | Unikalne adresy z kolumny Adres sklepu rejestru. Okno stawek. Nie pinezki, nie kolumna Sklep. Nic nie zapisuje |
@@ -175,11 +179,14 @@ Nowe akcje obok istniejących (`modalData`, `listReferenceData`, zapis protokoł
 
 1. Odmawia, gdy brak numeru albo brak zaznaczenia.
 2. Odmawia wiersza z nierozstrzygniętym remisem. Pozostałe zaznaczone może zapisać.
-3. Dla sklepu oznaczonego, że transport się nie odbył: samo `nie` w kolumnie 18. Bez `tak`, bez faktury, bez kolumn 16 i 17.
-4. Dla odbytych: `tak`, numer faktury, kolumna 16, kolumna 17 (`koszt / ilość worków`, przy pustej ilości albo 0 dzieli przez 1).
-5. Wiersz trasy rozpisuje na sklepy z rozwinięcia, nie na jeden rekord.
-6. Nie rusza wierszy spoza zaznaczenia. U nich `nie` też się nie zapisuje.
-7. Nie rusza wiersza, który w międzyczasie dostał `tak`.
+3. Dla sklepu oznaczonego, że transport się nie odbył: samo `nie` w **transport się odbył** (`COL.transportOdbył` albo `SCHEDULE_COL.transportOdbył`). Bez `tak` i bez numeru faktury (`COL` 16 albo `SCHEDULE_COL` 15). Na zgłoszenie nie dostaje kosztu ani kosztu na worek (`COL` 17 i 18). Harmonogram nie dostaje kosztu ani kosztu na worek (`SCHEDULE_COL` 16 i 17).
+4. Dla odbytych: `tak` w **Rozliczony**, numer faktury, koszt i koszt na worek (`koszt / ilość worków`, przy pustej ilości albo 0 dzieli przez 1). Na zgłoszenie (`COL`): rozliczony 15, faktura 16, koszt 17, koszt na worek 18. Harmonogram (`SCHEDULE_COL`): rozliczony 14, faktura 15, koszt 16, koszt na worek 17.
+5. W trybie harmonogram body odbytego wiersza niesie stawki użyte do kosztu, w złotych jak inne stawki. Brak klucza, pusta wartość i trasa: specyfikacja, [Harmonogram — stawki i liczba worków](SPECIFICATION.md#harmonogram--stawki-i-liczba-worków). Bazy cen ten zapis nie rusza.
+6. Wiersz trasy rozpisuje na sklepy z rozwinięcia, nie na jeden rekord.
+7. Nie rusza wierszy spoza zaznaczenia. U nich `nie` też się nie zapisuje.
+8. Nie rusza wiersza, który w międzyczasie dostał `tak`.
+
+Edycja **Ilość worków** w arkuszu na wierszu Harmonogramu z **Rozliczony** `tak` przelicza **Koszt odbioru** i **Koszt odbioru per worek** od razu. Część za podjazd albo udział w trasie zostaje. Nowa opłata za worki to nowa liczba razy **Stawka za worek** tego wiersza. Pusta albo zerowa stawka worka zostawia koszt i przelicza tylko koszt na worek (przy pustej liczbie albo 0 dzieli przez 1). Sync mapki i Szukaj tego wiersza nie ruszają. W Na zgłoszenie ta edycja kosztu nie przelicza.
 
 Odczyt nie wybiera kolumny po nagłówku. Zapis nie przesuwa kolumn 1–11. Każdy zapis wiersza rejestru niesie numer wiersza i numer z kolumny 1 i odpada, gdy para się nie zgadza.
 

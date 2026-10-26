@@ -203,6 +203,8 @@ describe("page wiring", () => {
     expect(functionBody("runStats")).toContain("readSettlementStats(");
     expect(functionBody("runStats")).toContain("buildStatsReport(");
     expect(functionBody("runStats")).toContain("loadTablesCollapsed(");
+    expect(functionBody("runStats")).toContain("invoicesPage: 1");
+    expect(functionBody("shiftStatsPage")).toContain('pager === "invoices"');
   });
 
   it("test_page_writes_go_through_writeNow_and_reload", () => {

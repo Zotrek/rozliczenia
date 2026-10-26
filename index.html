@@ -4604,6 +4604,72 @@ function invoiceTotals(rows) {
     }
     return totals;
 }
+/**
+ * Ostatnie faktury w okresie.
+ * Tylko rozliczone odbiory z numerem. Sort: od najnowszej daty odbioru.
+ */
+function listPeriodInvoices(rows, filters) {
+    const matched = rows.filter((row) => row.happened &&
+        row.settled &&
+        row.invoice != null &&
+        row.invoice.trim() !== "" &&
+        matchesContractor(row, filters.contractor) &&
+        inSheetDateRange(row.pickupDate, filters.range));
+    const groups = new Map();
+    for (const row of matched) {
+        const invoice = row.invoice?.trim() ?? "";
+        const key = invoiceGroupKey(row, invoice);
+        const group = groups.get(key) ?? {
+            invoice,
+            contractor: row.contractor,
+            mode: rowMode(row),
+            bags: 0,
+            bagAny: false,
+            amount: 0,
+            amountAny: false,
+            pickupDate: row.pickupDate,
+        };
+        if (row.bagCount != null) {
+            group.bags += row.bagCount;
+            group.bagAny = true;
+        }
+        if (row.receptionCost != null) {
+            group.amount += row.receptionCost;
+            group.amountAny = true;
+        }
+        if (compareSheetDate(row.pickupDate, group.pickupDate) > 0) {
+            group.pickupDate = row.pickupDate;
+        }
+        groups.set(key, group);
+    }
+    return [...groups.values()]
+        .map((group) => ({
+        invoice: group.invoice,
+        contractor: group.contractor,
+        mode: group.mode,
+        bagCount: group.bagAny ? group.bags : null,
+        amount: group.amountAny ? group.amount : null,
+        pickupDate: group.pickupDate,
+    }))
+        .sort((a, b) => {
+        const byDate = compareSheetDate(b.pickupDate, a.pickupDate);
+        if (byDate !== 0) {
+            return byDate;
+        }
+        const byName = a.invoice.localeCompare(b.invoice, "pl", { numeric: true, sensitivity: "base" });
+        if (byName !== 0) {
+            return byName;
+        }
+        const byWho = a.contractor.localeCompare(b.contractor, "pl");
+        if (byWho !== 0) {
+            return byWho;
+        }
+        if (a.mode === b.mode) {
+            return 0;
+        }
+        return a.mode === "report" ? -1 : 1;
+    });
+}
 function invoiceGroupKey(row, invoice) {
     return `${rowMode(row)}\n${row.contractor}\n${invoice}`;
 }
@@ -4854,6 +4920,7 @@ function buildStatsReport(rows, rates, filters) {
         contractorRanks: aggregateContractorRanks(rows, filters),
         zeroBags: listZeroBagPickups(rows, filters),
         periodPickups: listPeriodPickups(rows, filters),
+        periodInvoices: listPeriodInvoices(rows, filters),
     };
 }
 /** Poprzednie pełne miesiące (bez bieżącego), od najnowszego. */
@@ -5200,6 +5267,7 @@ function defaultStatsView(today, over = {}) {
         emptyBagsPage: 1,
         gapsPage: 1,
         pickupsPage: 1,
+        invoicesPage: 1,
         pickups: emptyPickupTable(),
         sectionsCollapsed: {},
         tablesCollapsed: {},
@@ -5322,6 +5390,7 @@ function statsBody(model) {
         `<p class="period-label">${periodLabel}</p>` +
         kpiGrid(model.report) +
         section("pickups", model, "Odbiory w okresie", "Każdy transport osobno · przy rozliczonym podgląd i edycja faktury · po 5 na stronę", periodPickupsBlock(model), true) +
+        section("invoices", model, "Ostatnie faktury", "Z tego okresu · liczba worków i kwota faktury · podgląd i edycja · po 5 na stronę", periodInvoicesBlock(model), true) +
         section("bags", model, "Ile worków zabrano w czasie", bagsTimeSub(model.report.bagsOverTime), timeSeriesBlock("bags", model, model.report.bagsOverTime, false)) +
         section("costs", model, "Ile zapłacono w czasie", costsTimeSub(model.report.costsOverTime), timeSeriesBlock("costs", model, model.report.costsOverTime, true)) +
         section("q", model, "Koszt w przeliczeniu na worek", "Tylko rozliczone odbiory, w których zabrano worki · 5 najdroższych i 5 najtańszych sklepów", qRanksBlock(model.report)) +
@@ -5536,6 +5605,37 @@ function invoiceLinks(row) {
     if (!row.settled && row.mode !== "schedule") {
         return "";
     }
+    return invoiceActionLinks(row);
+}
+function periodInvoicesBlock(model) {
+    const report = model.report;
+    if (!report) {
+        return "";
+    }
+    const paged = pageSlice(report.periodInvoices, model.invoicesPage);
+    const body = paged.slice
+        .map((row) => {
+        const bags = row.bagCount === null ? "—" : String(row.bagCount);
+        const amount = row.amount === null ? "—" : formatPln(row.amount);
+        const sub = `${row.contractor} · ${modeLabel(row.mode)} · ${row.pickupDate}`;
+        return (`<tr><td class="shop">${escapeHtml(row.invoice)}` +
+            `<span class="sub">${escapeHtml(sub)}</span></td>` +
+            `<td class="num">${escapeHtml(bags)}</td>` +
+            `<td class="num">${escapeHtml(amount)}</td>` +
+            `<td>${invoiceActionLinks({ ...row, settled: true, invoiceKnown: true })}</td></tr>`);
+    })
+        .join("");
+    return ("<table><thead><tr>" +
+        '<th>Nazwa</th><th class="num">Worki</th><th class="num">Kwota</th><th></th>' +
+        `</tr></thead><tbody>${body || emptyRow(4, "Brak faktur w tym okresie.")}</tbody></table>` +
+        pager("invoices", paged) +
+        '<p class="note" style="margin: 10px 12px 12px;">' +
+        "Każdy wiersz to jeden numer faktury u jednego podwykonawcy. " +
+        "Worki i kwota są sumą odbiorów z tym numerem w wybranym okresie. " +
+        "Lista jest od najnowszej faktury. " +
+        `Po ${STATS_PAGE_SIZE} pozycji na stronę.</p>`);
+}
+function invoiceActionLinks(row) {
     const attrs = ` data-contractor="${escapeHtml(row.contractor)}"` +
         ` data-mode="${row.mode}"` +
         ` data-invoice="${escapeHtml(row.invoice)}"` +
@@ -8503,6 +8603,11 @@ function shiftStatsPage(pager, dir) {
         paint();
         return;
     }
+    if (pager === "invoices") {
+        const next = VIEW.stats.invoicesPage + (dir === "next" ? 1 : -1);
+        VIEW.stats = { ...VIEW.stats, invoicesPage: Math.max(1, next) };
+        paint();
+    }
 }
 async function runStats() {
     if (webapp === "") {
@@ -8577,6 +8682,7 @@ async function runStats() {
             emptyBagsPage: 1,
             gapsPage: 1,
             pickupsPage: 1,
+            invoicesPage: 1,
             pickups: emptyPickupTable(),
             tablesCollapsed: loadTablesCollapsed(storage, ["bags", "costs"], stacked),
         };

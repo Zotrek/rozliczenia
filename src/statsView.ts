@@ -283,6 +283,7 @@ export interface StatsViewModel {
   emptyBagsPage: number;
   gapsPage: number;
   pickupsPage: number;
+  invoicesPage: number;
   /** Sortowanie i filtr kolumn w tabeli odbiorów. */
   pickups: PickupTableState;
   /** Sekcje zwinięte (id → true). */
@@ -321,6 +322,7 @@ export function defaultStatsView(
     emptyBagsPage: 1,
     gapsPage: 1,
     pickupsPage: 1,
+    invoicesPage: 1,
     pickups: emptyPickupTable(),
     sectionsCollapsed: {},
     tablesCollapsed: {},
@@ -485,6 +487,14 @@ function statsBody(model: StatsViewModel): string {
       "Odbiory w okresie",
       "Każdy transport osobno · przy rozliczonym podgląd i edycja faktury · po 5 na stronę",
       periodPickupsBlock(model),
+      true,
+    ) +
+    section(
+      "invoices",
+      model,
+      "Ostatnie faktury",
+      "Z tego okresu · liczba worków i kwota faktury · podgląd i edycja · po 5 na stronę",
+      periodInvoicesBlock(model),
       true,
     ) +
     section(
@@ -839,6 +849,49 @@ function invoiceLinks(row: StatsReport["periodPickups"][number]): string {
   if (!row.settled && row.mode !== "schedule") {
     return "";
   }
+  return invoiceActionLinks(row);
+}
+
+function periodInvoicesBlock(model: StatsViewModel): string {
+  const report = model.report;
+  if (!report) {
+    return "";
+  }
+  const paged = pageSlice(report.periodInvoices, model.invoicesPage);
+  const body = paged.slice
+    .map((row) => {
+      const bags = row.bagCount === null ? "—" : String(row.bagCount);
+      const amount = row.amount === null ? "—" : formatPln(row.amount);
+      const sub = `${row.contractor} · ${modeLabel(row.mode)} · ${row.pickupDate}`;
+      return (
+        `<tr><td class="shop">${escapeHtml(row.invoice)}` +
+        `<span class="sub">${escapeHtml(sub)}</span></td>` +
+        `<td class="num">${escapeHtml(bags)}</td>` +
+        `<td class="num">${escapeHtml(amount)}</td>` +
+        `<td>${invoiceActionLinks({ ...row, settled: true, invoiceKnown: true })}</td></tr>`
+      );
+    })
+    .join("");
+  return (
+    "<table><thead><tr>" +
+    '<th>Nazwa</th><th class="num">Worki</th><th class="num">Kwota</th><th></th>' +
+    `</tr></thead><tbody>${body || emptyRow(4, "Brak faktur w tym okresie.")}</tbody></table>` +
+    pager("invoices", paged) +
+    '<p class="note" style="margin: 10px 12px 12px;">' +
+    "Każdy wiersz to jeden numer faktury u jednego podwykonawcy. " +
+    "Worki i kwota są sumą odbiorów z tym numerem w wybranym okresie. " +
+    "Lista jest od najnowszej faktury. " +
+    `Po ${STATS_PAGE_SIZE} pozycji na stronę.</p>`
+  );
+}
+
+function invoiceActionLinks(row: {
+  contractor: string;
+  mode: StatsReport["periodPickups"][number]["mode"];
+  invoice: string;
+  settled: boolean;
+  invoiceKnown: boolean;
+}): string {
   const attrs =
     ` data-contractor="${escapeHtml(row.contractor)}"` +
     ` data-mode="${row.mode}"` +

@@ -174,6 +174,19 @@ export interface PeriodPickup {
   invoiceValue: Grosze | null;
 }
 
+/** Faktura w okresie: jeden numer u jednego podwykonawcy i w jednym trybie. */
+export interface PeriodInvoice {
+  invoice: string;
+  contractor: string;
+  mode: SettlementMode;
+  /** Suma worków. `null`, gdy żaden odbiór nie ma liczby. */
+  bagCount: number | null;
+  /** Suma kosztów odbioru. `null`, gdy żaden odbiór nie ma kwoty. */
+  amount: Grosze | null;
+  /** Najnowsza data odbioru tej faktury w okresie. */
+  pickupDate: string;
+}
+
 /** Próg inkluzywnej długości okresu: ≤ → tygodnie, inaczej miesiące. */
 export const TIME_SERIES_WEEK_MAX_DAYS = 45;
 
@@ -590,6 +603,91 @@ function invoiceTotals(
   return totals;
 }
 
+/**
+ * Ostatnie faktury w okresie.
+ * Tylko rozliczone odbiory z numerem. Sort: od najnowszej daty odbioru.
+ */
+export function listPeriodInvoices(
+  rows: readonly StatsRow[],
+  filters: StatsFilters,
+): PeriodInvoice[] {
+  const matched = rows.filter(
+    (row) =>
+      row.happened &&
+      row.settled &&
+      row.invoice != null &&
+      row.invoice.trim() !== "" &&
+      matchesContractor(row, filters.contractor) &&
+      inSheetDateRange(row.pickupDate, filters.range),
+  );
+  const groups = new Map<
+    string,
+    {
+      invoice: string;
+      contractor: string;
+      mode: SettlementMode;
+      bags: number;
+      bagAny: boolean;
+      amount: number;
+      amountAny: boolean;
+      pickupDate: string;
+    }
+  >();
+  for (const row of matched) {
+    const invoice = row.invoice?.trim() ?? "";
+    const key = invoiceGroupKey(row, invoice);
+    const group = groups.get(key) ?? {
+      invoice,
+      contractor: row.contractor,
+      mode: rowMode(row),
+      bags: 0,
+      bagAny: false,
+      amount: 0,
+      amountAny: false,
+      pickupDate: row.pickupDate,
+    };
+    if (row.bagCount != null) {
+      group.bags += row.bagCount;
+      group.bagAny = true;
+    }
+    if (row.receptionCost != null) {
+      group.amount += row.receptionCost;
+      group.amountAny = true;
+    }
+    if (compareSheetDate(row.pickupDate, group.pickupDate) > 0) {
+      group.pickupDate = row.pickupDate;
+    }
+    groups.set(key, group);
+  }
+  return [...groups.values()]
+    .map((group) => ({
+      invoice: group.invoice,
+      contractor: group.contractor,
+      mode: group.mode,
+      bagCount: group.bagAny ? group.bags : null,
+      amount: group.amountAny ? group.amount : null,
+      pickupDate: group.pickupDate,
+    }))
+    .sort((a, b) => {
+      const byDate = compareSheetDate(b.pickupDate, a.pickupDate);
+      if (byDate !== 0) {
+        return byDate;
+      }
+      const byName = a.invoice.localeCompare(b.invoice, "pl", { numeric: true, sensitivity: "base" });
+      if (byName !== 0) {
+        return byName;
+      }
+      const byWho = a.contractor.localeCompare(b.contractor, "pl");
+      if (byWho !== 0) {
+        return byWho;
+      }
+      if (a.mode === b.mode) {
+        return 0;
+      }
+      return a.mode === "report" ? -1 : 1;
+    });
+}
+
 function invoiceGroupKey(row: StatsRow, invoice: string): string {
   return `${rowMode(row)}\n${row.contractor}\n${invoice}`;
 }
@@ -882,6 +980,7 @@ export interface StatsReport {
   contractorRanks: ContractorRankStats;
   zeroBags: ZeroBagPickup[];
   periodPickups: PeriodPickup[];
+  periodInvoices: PeriodInvoice[];
 }
 
 export const STATS_PAGE_SIZE = 5;
@@ -925,6 +1024,7 @@ export function buildStatsReport(
     contractorRanks: aggregateContractorRanks(rows, filters),
     zeroBags: listZeroBagPickups(rows, filters),
     periodPickups: listPeriodPickups(rows, filters),
+    periodInvoices: listPeriodInvoices(rows, filters),
   };
 }
 

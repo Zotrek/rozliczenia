@@ -22,6 +22,7 @@ import {
   inSheetDateRange,
   listZeroBagPickups,
   listPeriodPickups,
+  listPeriodInvoices,
   monthOptionLabel,
   previousQuarterOptions,
   previousQuarterPeriod,
@@ -924,6 +925,141 @@ describe("aggregateContractorRanks / listZeroBagPickups", () => {
     expect(byAddress.A.invoiceValue).toBe(4_000);
     expect(byAddress.B.invoiceValue).toBe(1_500);
     expect(byAddress.C).toMatchObject({ mode: "schedule", invoiceValue: 2_500 });
+  });
+
+  it("test_listPeriodInvoices_sums_bags_and_amount_and_lists_newest_first", () => {
+    const list = listPeriodInvoices(
+      [
+        statsRow({
+          sheetRow: 2,
+          settled: true,
+          invoice: " FV/1 ",
+          bagCount: 2,
+          receptionCost: 1_000,
+          contractor: "gpw",
+          pickupDate: "10.09.2026",
+        }),
+        statsRow({
+          sheetRow: 3,
+          settled: true,
+          invoice: "FV/1",
+          bagCount: null,
+          receptionCost: 1_500,
+          contractor: "gpw",
+          pickupDate: "18.09.2026",
+        }),
+        statsRow({
+          sheetRow: 4,
+          settled: true,
+          invoice: "FV/2",
+          bagCount: 4,
+          receptionCost: 2_000,
+          contractor: "gpw",
+          pickupDate: "20.09.2026",
+        }),
+        statsRow({
+          sheetRow: 5,
+          settled: true,
+          invoice: "FV/1",
+          bagCount: 9,
+          receptionCost: 9_000,
+          contractor: "blue",
+          pickupDate: "12.09.2026",
+        }),
+        statsRow({
+          sheetRow: 6,
+          settled: true,
+          invoice: "FV/1",
+          bagCount: 3,
+          receptionCost: 2_500,
+          contractor: "gpw",
+          mode: "schedule",
+          pickupDate: "19.09.2026",
+        }),
+        statsRow({
+          sheetRow: 7,
+          settled: false,
+          invoice: "FV/9",
+          bagCount: 8,
+          receptionCost: 8_000,
+          pickupDate: "21.09.2026",
+        }),
+        statsRow({
+          sheetRow: 8,
+          settled: true,
+          invoice: "",
+          bagCount: 1,
+          receptionCost: 500,
+          pickupDate: "22.09.2026",
+        }),
+        statsRow({
+          sheetRow: 9,
+          settled: true,
+          invoice: "FV/3",
+          bagCount: 1,
+          receptionCost: 100,
+          pickupDate: "01.08.2026",
+        }),
+        statsRow({
+          sheetRow: 10,
+          settled: true,
+          happened: false,
+          invoice: "FV/4",
+          bagCount: 6,
+          receptionCost: 600,
+          pickupDate: "15.09.2026",
+        }),
+      ],
+      { range, contractor: "gpw" },
+    );
+    expect(list.map((row) => row.invoice)).toEqual(["FV/2", "FV/1", "FV/1"]);
+    expect(list[0]).toMatchObject({
+      invoice: "FV/2",
+      contractor: "gpw",
+      mode: "report",
+      bagCount: 4,
+      amount: 2_000,
+      pickupDate: "20.09.2026",
+    });
+    expect(list[1]).toMatchObject({
+      mode: "schedule",
+      bagCount: 3,
+      amount: 2_500,
+      pickupDate: "19.09.2026",
+    });
+    expect(list[2]).toMatchObject({
+      contractor: "gpw",
+      mode: "report",
+      bagCount: 2,
+      amount: 2_500,
+      pickupDate: "18.09.2026",
+    });
+  });
+
+  it("test_listPeriodInvoices_blank_bags_and_costs_stay_empty", () => {
+    expect(
+      listPeriodInvoices(
+        [
+          statsRow({
+            sheetRow: 2,
+            settled: true,
+            invoice: "FV/1",
+            bagCount: null,
+            receptionCost: null,
+          }),
+        ],
+        { range },
+      ),
+    ).toEqual([
+      {
+        invoice: "FV/1",
+        contractor: "gpw",
+        mode: "report",
+        bagCount: null,
+        amount: null,
+        pickupDate: "18.09.2026",
+      },
+    ]);
   });
 
   it("test_aggregateBacklog_skips_schedule_rows", () => {

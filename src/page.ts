@@ -2750,6 +2750,11 @@ function shiftStatsPage(pager: string, dir: string): void {
     paint();
     return;
   }
+  if (pager === "invoices") {
+    const next = VIEW.stats.invoicesPage + (dir === "next" ? 1 : -1);
+    VIEW.stats = { ...VIEW.stats, invoicesPage: Math.max(1, next) };
+    paint();
+  }
 }
 
 async function runStats(): Promise<void> {
@@ -2843,6 +2848,7 @@ async function runStats(): Promise<void> {
       emptyBagsPage: 1,
       gapsPage: 1,
       pickupsPage: 1,
+      invoicesPage: 1,
       pickups: emptyPickupTable(),
       tablesCollapsed: loadTablesCollapsed(storage, ["bags", "costs"], stacked),
     };

@@ -141,6 +141,7 @@ describe("buildStatsReport", () => {
     expect(report.settled.count).toBe(1);
     expect(report.zeroBags).toHaveLength(1);
     expect(report.periodPickups).toHaveLength(2);
+    expect(report.periodInvoices).toHaveLength(0);
     expect(report.bagsOverTime.buckets.length).toBeGreaterThan(0);
   });
 });
@@ -313,8 +314,9 @@ describe("renderStatsScreen", () => {
     expect(html).toContain("Numer faktury");
     expect(html).toContain("75,00");
     expect(html).toContain('>Tak</td><td><span class="invoice-no">FV/9</span><div class="row-links">');
-    expect(html.match(/data-action="invoice-preview"/g)).toHaveLength(3);
-    expect(html.match(/data-action="invoice-edit"/g)).toHaveLength(3);
+    const pickups = html.slice(html.indexOf("Odbiory w okresie"), html.indexOf("Ostatnie faktury"));
+    expect(pickups.match(/data-action="invoice-preview"/g)).toHaveLength(3);
+    expect(pickups.match(/data-action="invoice-edit"/g)).toHaveLength(3);
     expect(html).toContain('data-mode="schedule"');
     expect(html).toContain('data-invoice="FV/9"');
     expect(html).toContain('data-invoice-known="1"');
@@ -323,6 +325,70 @@ describe("renderStatsScreen", () => {
     const open = html.slice(html.indexOf("Otwarte 3"), html.indexOf("Harm 4"));
     expect(open).toContain(">Nie</td><td>—</td>");
     expect(open).not.toContain("invoice-preview");
+  });
+
+  it("test_renderStats_lists_recent_invoices_under_period_pickups", () => {
+    const report = buildStatsReport(
+      [
+        row({
+          sheetRow: 2,
+          settled: true,
+          invoice: "FV/9",
+          bagCount: 2,
+          receptionCost: 5_000,
+          address: "Drogi 1",
+          contractor: "gpw",
+          pickupDate: "10.09.2026",
+        }),
+        row({
+          sheetRow: 3,
+          settled: true,
+          invoice: "FV/9",
+          bagCount: 2,
+          receptionCost: 2_500,
+          address: "Drogi 2",
+          contractor: "gpw",
+          pickupDate: "11.09.2026",
+        }),
+        row({
+          sheetRow: 4,
+          settled: false,
+          invoice: "FV/8",
+          address: "Otwarte 3",
+          pickupDate: "12.09.2026",
+        }),
+      ],
+      [],
+      { range: { from: "01.09.2026", to: "23.09.2026" } },
+    );
+    const html = renderStatsScreen(
+      defaultStatsView(TODAY, {
+        report,
+        appliedFrom: "01.09.2026",
+        appliedTo: "23.09.2026",
+      }),
+    );
+    const pickupsAt = html.indexOf("Odbiory w okresie");
+    const invoicesAt = html.indexOf("Ostatnie faktury");
+    const bagsAt = html.indexOf("Ile worków zabrano w czasie");
+    expect(invoicesAt).toBeGreaterThan(pickupsAt);
+    expect(bagsAt).toBeGreaterThan(invoicesAt);
+    const block = html.slice(invoicesAt, bagsAt);
+    expect(block).toContain(">Nazwa</th>");
+    expect(block).toContain(">Worki</th>");
+    expect(block).toContain(">Kwota</th>");
+    expect(block).toContain("FV/9");
+    expect(block).toContain("gpw · Na zgłoszenie · 11.09.2026");
+    expect(block).toContain(">4</td>");
+    expect(block).toContain("75,00");
+    expect(block).toContain('data-action="invoice-preview"');
+    expect(block).toContain('data-action="invoice-edit"');
+    expect(block).toContain('data-invoice="FV/9"');
+    expect(block).toContain('data-invoice-known="1"');
+    expect(block).toContain('data-contractor="gpw"');
+    expect(block).toContain('data-pager="invoices"');
+    expect(block).not.toContain("FV/8");
+    expect(block).not.toContain("Otwarte 3");
   });
 
   it("test_renderStats_marks_incomplete_week_column", () => {

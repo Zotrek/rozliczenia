@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { buildPage } from "../scripts/build-page.mjs";
 import type { RegisterRow } from "./types.js";
 import type { SettlementRateRow } from "./search.js";
+import { commentTargets, openingCommentPicks } from "./invoiceComment.js";
 import {
   commitDetach,
+  currentStatement,
   formatPln,
   freshStatement,
   routeSelectionKey,
@@ -165,7 +167,7 @@ describe("renderStatement", () => {
     expect(html).toContain('data-out="sel-count">1<');
     expect(html).not.toContain("99,99");
     expect(html).toContain("Zatwierdź");
-    expect(html).not.toContain("disabled");
+    expect(html).not.toContain('data-action="approve" disabled');
   });
 
   it("test_renderStatement_didNotHappen_strikes_row_before_save", () => {
@@ -231,6 +233,67 @@ describe("renderStatement", () => {
     expect(html).toContain("disabled");
     expect(html).toContain("Suma zestawienia");
     expect(html).toContain("Suma zaznaczonych");
+  });
+
+  it("test_renderStatement_comment_bar_keeps_settlement_and_warns_before_overwrite", () => {
+    const rows = [
+      row({
+        sheetRow: 2,
+        address: "Świętojańska 12",
+        shopName: "Świętojańska",
+        routeName: "Trasa Wybrzeże",
+        routeRate: 45_000,
+        pickupDate: "18.10.2026",
+      }),
+      row({
+        sheetRow: 3,
+        address: "Sobieskiego 4",
+        shopName: "Sobieskiego",
+        routeName: "Trasa Wybrzeże",
+        routeRate: 45_000,
+        pickupDate: "18.10.2026",
+      }),
+      row({
+        sheetRow: 4,
+        address: "Dębogórska 3",
+        shopName: "Dębogórska",
+        routeName: "Trasa Wybrzeże",
+        routeRate: 45_000,
+        pickupDate: "18.10.2026",
+      }),
+      row({ sheetRow: 5, address: "Porzyny 108", shopName: "Zwoleń", pickupDate: "19.10.2026" }),
+    ];
+    const rates = rows.map((item) => rate({ sheetRow: item.sheetRow + 10, shop: item.address }));
+    const base = screen(rows, rates, { openRoutes: { "Trasa Wybrzeże": true } });
+    const comments = { "\t4\t4": "Odbiór po 16:00, brama od podwórza" };
+    const withComments = { ...base, invoiceComments: comments };
+    const picks = openingCommentPicks(commentTargets(currentStatement(withComments), comments));
+    const html = renderStatement({ ...withComments, commentPicks: picks });
+    expect(html).toContain("Komentarz do faktury");
+    expect(html).toContain("Zaznaczone: 2 sklepy · Trasa Wybrzeże.");
+    expect(html).toContain('data-pick-route="Trasa Wybrzeże"');
+    expect(html).toContain('data-sheet-row="2" data-transport="2" checked aria-label="Zaznacz Świętojańska do komentarza"');
+    expect(html).toContain('data-sheet-row="3" data-transport="3" checked aria-label="Zaznacz Sobieskiego do komentarza"');
+    expect(html).toContain('data-sheet-row="4" data-transport="4" aria-label="Zaznacz Dębogórska do komentarza"');
+    expect(html).not.toContain('data-transport="4" checked aria-label="Zaznacz Dębogórska');
+    expect(html).toContain('aria-label="Zaznacz Zwoleń do komentarza"');
+    expect(html).not.toContain('checked aria-label="Zaznacz Zwoleń do komentarza"');
+    expect(html).toContain("Odbiór po 16:00, brama od podwórza");
+    expect(html).toContain("Suma zestawienia");
+    expect(html).toContain("Suma zaznaczonych");
+    expect(html).toContain('data-toggle="checked"');
+    expect(html).toContain('data-action="approve"');
+    expect(html).toContain('data-action="expand"');
+    expect(html).toContain("odepnij od trasy");
+    expect(html).toContain("nie odbył się");
+    expect(html).toContain('data-edit="route-rate"');
+    const overwrite = renderStatement({
+      ...withComments,
+      commentPicks: { ...picks, "\t4\t4": true },
+      commentDraft: "folia osobno",
+    });
+    expect(overwrite).toContain("Nadpisze istniejący komentarz: Dębogórska.");
+    expect(overwrite).toContain("will-overwrite");
   });
 });
 

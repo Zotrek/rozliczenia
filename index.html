@@ -26,10 +26,10 @@ body {
   background: var(--bg);
 }
 #app { position: relative; }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
-button:focus-visible, input:focus-visible, select:focus-visible {
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 2px solid var(--teal);
   outline-offset: 2px;
 }
@@ -331,11 +331,26 @@ table input[type="checkbox"]:checked {
   border-color: var(--teal);
 }
 table input[type="checkbox"]:checked::after { border-color: #fff; }
+table input[type="checkbox"]:indeterminate {
+  background: var(--teal);
+  border-color: var(--teal);
+}
+table input[type="checkbox"]:indeterminate::after {
+  width: 8px;
+  height: 0;
+  border: none;
+  border-bottom: 2px solid #fff;
+  transform: none;
+}
 table input[type="checkbox"]:focus-visible { outline-offset: 2px; }
 tr.is-route td { background: #f0fdfa; }
 tr.is-child td { background: #f8fafc; }
 tr.is-checked td { background: rgba(13, 148, 136, 0.08); }
 tr.is-route.is-checked td { background: #d1fae5; }
+tr.is-picked td { background: #ecfdf5; }
+tr.is-partial td { background: #f0fdfa; }
+tr.will-overwrite td { background: #fff7ed; }
+tr.is-picked td.adres, tr.is-partial td.adres { box-shadow: inset 3px 0 0 var(--teal); }
 tr.is-dead { color: #94a3b8; }
 .strike { text-decoration: line-through; }
 .who-line { display: flex; align-items: flex-start; gap: 4px; }
@@ -398,12 +413,81 @@ td input[type="text"]:focus { border-color: var(--teal); background: #fff; outli
 .chev { border: none; background: transparent; color: var(--teal-deep); font-size: 14px; padding: 0 2px; }
 .money, .stat b { font-variant-numeric: tabular-nums; }
 .footer {
+  flex: none;
   display: flex;
   align-items: flex-end;
   gap: 22px;
   padding: 12px 16px;
   border-top: 1px solid var(--line);
   background: #fff;
+}
+.pick-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+.pick-line input { margin-top: 3px; flex: none; }
+.pick-line .stack, .comment-col .stack { display: flex; flex-direction: column; min-width: 0; }
+th.comment-col, td.comment-col { white-space: normal; min-width: 14rem; max-width: 18rem; }
+th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
+.comment-snip {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-weight: 650;
+  line-height: 1.35;
+}
+.comment-input, .composer textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 2.6rem;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  background: #fff;
+  text-align: left;
+  font-weight: 550;
+}
+.comment-input:focus, .composer textarea:focus { border-color: var(--teal); outline: none; }
+.composer {
+  flex: none;
+  padding: 12px 16px 14px;
+  border-top: 1px solid rgba(13, 148, 136, 0.35);
+  background: #f8fafc;
+}
+.composer h2 { margin: 0 0 2px; font-size: 14px; }
+.composer .selection-summary { margin: 0; font-size: 13px; font-weight: 650; }
+.composer-bar { display: flex; gap: 12px; align-items: flex-end; }
+.composer-lead { flex: 0 1 22rem; min-width: 12rem; }
+.composer textarea { flex: 1; margin-top: 0; }
+.composer .btn-teal { width: auto; margin-top: 0; flex: none; }
+.composer-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.text-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--teal-deep);
+  font-size: 12px;
+  font-weight: 700;
+}
+.overwrite-hint { color: var(--orange-deep); font-weight: 650; }
+.overwrite-hint[hidden] { display: none; }
+.composer-foot { margin-top: 8px; }
+.notice {
+  flex: none;
+  margin: 8px 16px 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--teal-soft);
+  color: var(--teal-deep);
+  font-size: 13px;
+  font-weight: 650;
+}
+@media (max-width: 820px) {
+  .composer-bar { flex-wrap: wrap; }
+  .composer textarea { flex-basis: 16rem; }
 }
 .stat span {
   display: block;
@@ -1672,172 +1756,6 @@ function isRecord(value) {
     return typeof value === "object" && value !== null;
 }
 
-
-function invoiceCountLabel(count) {
-    const n = Math.abs(count);
-    const lastTwo = n % 100;
-    const last = n % 10;
-    let word = "pozycji";
-    if (n === 1) {
-        word = "pozycja";
-    }
-    else if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) {
-        word = "pozycje";
-    }
-    return `${count} ${word}`;
-}
-/** Grupy po numerze faktury. Pusty numer na końcu. W grupie: data, potem wiersz arkusza. */
-function groupSettledInvoices(rows) {
-    const buckets = new Map();
-    for (const row of rows) {
-        const key = row.invoice.trim();
-        const list = buckets.get(key);
-        if (list) {
-            list.push(row);
-        }
-        else {
-            buckets.set(key, [row]);
-        }
-    }
-    const groups = [];
-    for (const [invoice, items] of buckets) {
-        const sorted = [...items].sort(compareInvoiceRows);
-        groups.push({
-            invoice,
-            label: invoice === "" ? "bez numeru" : invoice,
-            rows: sorted,
-            total: sumCosts(sorted),
-        });
-    }
-    groups.sort((a, b) => {
-        if (a.invoice === "" && b.invoice !== "") {
-            return 1;
-        }
-        if (b.invoice === "" && a.invoice !== "") {
-            return -1;
-        }
-        return a.invoice.localeCompare(b.invoice, "pl", { numeric: true, sensitivity: "base" });
-    });
-    return groups;
-}
-function readSettledInvoices(body) {
-    if (!isRecord(body) || body.ok !== true || !Array.isArray(body.rows)) {
-        const error = isRecord(body) && typeof body.error === "string" ? body.error : "Odczyt faktur nie doszedł.";
-        return { ok: false, error };
-    }
-    const rows = [];
-    for (const item of body.rows) {
-        const row = readSettledInvoiceRow(item);
-        if (!row) {
-            return { ok: false, error: "Odczyt faktur nie doszedł." };
-        }
-        rows.push(row);
-    }
-    return { ok: true, rows };
-}
-function sumCosts(rows) {
-    let total = 0;
-    let any = false;
-    for (const row of rows) {
-        if (row.receptionCost == null) {
-            continue;
-        }
-        total += row.receptionCost;
-        any = true;
-    }
-    return any ? total : null;
-}
-function compareInvoiceRows(a, b) {
-    const byDate = compareSheetDate(a.pickupDate, b.pickupDate);
-    if (byDate !== 0) {
-        return byDate;
-    }
-    if (a.sheetRow !== b.sheetRow) {
-        return a.sheetRow - b.sheetRow;
-    }
-    return a.transportNumber.localeCompare(b.transportNumber, "pl", { numeric: true });
-}
-function readSettledInvoiceRow(value) {
-    if (!isRecord(value)) {
-        return null;
-    }
-    const sheetRow = value.sheetRow;
-    const transportNumber = readText(value.transportNumber);
-    const address = readText(value.address);
-    const shopName = readText(value.shopName);
-    const pickupDate = readText(value.pickupDate);
-    const contractor = readText(value.contractor);
-    const routeName = readText(value.routeName);
-    const invoice = readText(value.invoice);
-    const receptionCost = readGrosze(value.receptionCost);
-    const costPerBag = readGrosze(value.costPerBag);
-    if (typeof sheetRow !== "number" ||
-        !Number.isInteger(sheetRow) ||
-        sheetRow < 2 ||
-        transportNumber === null ||
-        address === null ||
-        shopName === null ||
-        pickupDate === null ||
-        contractor === null ||
-        routeName === null ||
-        invoice === null ||
-        receptionCost === undefined ||
-        costPerBag === undefined) {
-        return null;
-    }
-    let bagCount;
-    if (value.bagCount === null) {
-        bagCount = null;
-    }
-    else if (typeof value.bagCount === "number" && Number.isFinite(value.bagCount) && value.bagCount >= 0) {
-        bagCount = value.bagCount;
-    }
-    else {
-        return null;
-    }
-    try {
-        parseSheetDate(pickupDate);
-    }
-    catch {
-        return null;
-    }
-    return {
-        sheetName: readText(value.sheetName) ?? "",
-        sheetRow,
-        transportNumber,
-        address,
-        shopName,
-        pickupDate,
-        contractor,
-        bagCount,
-        routeName,
-        invoice: invoice.trim(),
-        receptionCost,
-        costPerBag,
-    };
-}
-function isRecord(value) {
-    return typeof value === "object" && value !== null;
-}
-function readText(value) {
-    if (typeof value === "string") {
-        return value;
-    }
-    if (typeof value === "number" && Number.isFinite(value)) {
-        return String(value);
-    }
-    return null;
-}
-function readGrosze(value) {
-    if (value === null) {
-        return null;
-    }
-    if (typeof value === "number" && Number.isInteger(value)) {
-        return value;
-    }
-    return undefined;
-}
-
 /**
  * Złote z arkusza albo z pola na grosze.
  * Połówki w górę. Wejście silnika i tak jest już w groszach — to brama dla odczytu.
@@ -2085,6 +2003,418 @@ function sumLines(lines) {
 }
 
 
+function invoiceCountLabel(count) {
+    const n = Math.abs(count);
+    const lastTwo = n % 100;
+    const last = n % 10;
+    let word = "pozycji";
+    if (n === 1) {
+        word = "pozycja";
+    }
+    else if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) {
+        word = "pozycje";
+    }
+    return `${count} ${word}`;
+}
+/** Grupy po numerze faktury. Pusty numer na końcu. W grupie: data, potem wiersz arkusza. */
+function groupSettledInvoices(rows) {
+    const buckets = new Map();
+    for (const row of rows) {
+        const key = row.invoice.trim();
+        const list = buckets.get(key);
+        if (list) {
+            list.push(row);
+        }
+        else {
+            buckets.set(key, [row]);
+        }
+    }
+    const groups = [];
+    for (const [invoice, items] of buckets) {
+        const sorted = [...items].sort(compareInvoiceRows);
+        groups.push({
+            invoice,
+            label: invoice === "" ? "bez numeru" : invoice,
+            rows: sorted,
+            total: sumCosts(sorted),
+        });
+    }
+    groups.sort((a, b) => {
+        if (a.invoice === "" && b.invoice !== "") {
+            return 1;
+        }
+        if (b.invoice === "" && a.invoice !== "") {
+            return -1;
+        }
+        return a.invoice.localeCompare(b.invoice, "pl", { numeric: true, sensitivity: "base" });
+    });
+    return groups;
+}
+function readSettledInvoices(body) {
+    if (!isRecord(body) || body.ok !== true || !Array.isArray(body.rows)) {
+        const error = isRecord(body) && typeof body.error === "string" ? body.error : "Odczyt faktur nie doszedł.";
+        return { ok: false, error };
+    }
+    const rows = [];
+    for (const item of body.rows) {
+        const row = readSettledInvoiceRow(item);
+        if (!row) {
+            return { ok: false, error: "Odczyt faktur nie doszedł." };
+        }
+        rows.push(row);
+    }
+    return { ok: true, rows };
+}
+function sumCosts(rows) {
+    let total = 0;
+    let any = false;
+    for (const row of rows) {
+        if (row.receptionCost == null) {
+            continue;
+        }
+        total += row.receptionCost;
+        any = true;
+    }
+    return any ? total : null;
+}
+function compareInvoiceRows(a, b) {
+    const byDate = compareSheetDate(a.pickupDate, b.pickupDate);
+    if (byDate !== 0) {
+        return byDate;
+    }
+    if (a.sheetRow !== b.sheetRow) {
+        return a.sheetRow - b.sheetRow;
+    }
+    return a.transportNumber.localeCompare(b.transportNumber, "pl", { numeric: true });
+}
+function readSettledInvoiceRow(value) {
+    if (!isRecord(value)) {
+        return null;
+    }
+    const sheetRow = value.sheetRow;
+    const transportNumber = readText(value.transportNumber);
+    const address = readText(value.address);
+    const shopName = readText(value.shopName);
+    const pickupDate = readText(value.pickupDate);
+    const contractor = readText(value.contractor);
+    const routeName = readText(value.routeName);
+    const invoice = readText(value.invoice);
+    const receptionCost = readGrosze(value.receptionCost);
+    const costPerBag = readGrosze(value.costPerBag);
+    if (typeof sheetRow !== "number" ||
+        !Number.isInteger(sheetRow) ||
+        sheetRow < 2 ||
+        transportNumber === null ||
+        address === null ||
+        shopName === null ||
+        pickupDate === null ||
+        contractor === null ||
+        routeName === null ||
+        invoice === null ||
+        receptionCost === undefined ||
+        costPerBag === undefined) {
+        return null;
+    }
+    let bagCount;
+    if (value.bagCount === null) {
+        bagCount = null;
+    }
+    else if (typeof value.bagCount === "number" && Number.isFinite(value.bagCount) && value.bagCount >= 0) {
+        bagCount = value.bagCount;
+    }
+    else {
+        return null;
+    }
+    try {
+        parseSheetDate(pickupDate);
+    }
+    catch {
+        return null;
+    }
+    return {
+        sheetName: readText(value.sheetName) ?? "",
+        sheetRow,
+        transportNumber,
+        address,
+        shopName,
+        pickupDate,
+        contractor,
+        bagCount,
+        routeName,
+        invoice: invoice.trim(),
+        receptionCost,
+        costPerBag,
+    };
+}
+function isRecord(value) {
+    return typeof value === "object" && value !== null;
+}
+function readText(value) {
+    if (typeof value === "string") {
+        return value;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return String(value);
+    }
+    return null;
+}
+function readGrosze(value) {
+    if (value === null) {
+        return null;
+    }
+    if (typeof value === "number" && Number.isInteger(value)) {
+        return value;
+    }
+    return undefined;
+}
+
+
+
+const COMMENT_NEEDS_TEXT = "Wpisz komentarz albo zaznacz pozycję, która już go ma.";
+function emptyInvoiceComment() {
+    return { comments: {}, picks: {}, draft: "", notice: "" };
+}
+function commentKey(shop) {
+    return rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName);
+}
+/** Sklepy i podjazdy, które weszłyby na fakturę. Transport, który się nie odbył, odpada. */
+function commentTargets(statement, comments) {
+    const targets = [];
+    for (const line of statement.lines) {
+        if (line.kind === "plain") {
+            if (line.shop.happened) {
+                targets.push(targetOf(line.shop, null, comments));
+            }
+            continue;
+        }
+        for (const shop of line.shops) {
+            if (shop.happened) {
+                targets.push(targetOf(shop, line.routeName, comments));
+            }
+        }
+    }
+    return targets;
+}
+/** Na starcie zestawienia: sklepy trasy bez własnego komentarza. Podjazdy zostają odznaczone. */
+function openingCommentPicks(targets) {
+    const picks = {};
+    for (const target of targets) {
+        if (target.routeName !== null && target.comment.trim() === "") {
+            picks[target.key] = true;
+        }
+    }
+    return picks;
+}
+function invoiceCommentTargets(rows, comments) {
+    const choices = [];
+    for (const group of groupSettledInvoices(rows)) {
+        for (const row of group.rows) {
+            const key = rowKey(row.sheetRow, row.transportNumber, row.sheetName);
+            choices.push({
+                key,
+                shopName: shownShop(row.shopName, row.address),
+                comment: comments[key] ?? "",
+            });
+        }
+    }
+    return choices;
+}
+function retainInvoiceComment(state, rows) {
+    const keys = new Set(rows.map((row) => rowKey(row.sheetRow, row.transportNumber, row.sheetName)));
+    return {
+        comments: keepRecord(state.comments, keys),
+        picks: keepRecord(state.picks, keys),
+        draft: state.draft,
+        notice: "",
+    };
+}
+function chosenComments(targets, picks) {
+    return targets.filter((target) => picks[target.key] === true);
+}
+function allPicked(targets, picks) {
+    return targets.length > 0 && targets.every((target) => picks[target.key] === true);
+}
+function setCommentPicks(picks, keys, on) {
+    const next = { ...picks };
+    for (const key of keys) {
+        if (on) {
+            next[key] = true;
+        }
+        else {
+            delete next[key];
+        }
+    }
+    return next;
+}
+function picksForAll(targets, on) {
+    if (!on) {
+        return {};
+    }
+    const next = {};
+    for (const target of targets) {
+        next[target.key] = true;
+    }
+    return next;
+}
+function prunePicks(picks, targets) {
+    const allowed = new Set(targets.map((target) => target.key));
+    return keepRecord(picks, allowed);
+}
+function selectionSummary(targets, picks) {
+    const chosen = chosenComments(targets, picks);
+    if (chosen.length === 0) {
+        return "Nic nie zaznaczono. Zaznacz trasę, sklep w trasie albo podjazd.";
+    }
+    const routeNames = [];
+    const seen = new Set();
+    let stops = 0;
+    for (const item of chosen) {
+        if (item.routeName === null) {
+            stops += 1;
+            continue;
+        }
+        if (!seen.has(item.routeName)) {
+            seen.add(item.routeName);
+            routeNames.push(item.routeName);
+        }
+    }
+    const parts = [];
+    for (const name of routeNames) {
+        const count = chosen.filter((item) => item.routeName === name).length;
+        parts.push(`${sklepy(count)} · ${name}`);
+    }
+    if (stops > 0) {
+        parts.push(podjazdy(stops));
+    }
+    return `Zaznaczone: ${parts.join(" i ")}.`;
+}
+function invoiceSelectionSummary(count) {
+    if (count === 0) {
+        return "Nic nie zaznaczono. Zaznacz pozycje w tabeli.";
+    }
+    return `Zaznaczone: ${pozycji(count)}.`;
+}
+function commentsToOverwrite(chosen, draft) {
+    const trimmed = draft.trim();
+    return chosen.filter((item) => item.comment.trim() !== "" && item.comment.trim() !== trimmed);
+}
+function overwriteHint(list, draft) {
+    if (list.length === 0) {
+        return "";
+    }
+    const verb = draft.trim() === "" ? "Wyczyści istniejący komentarz" : "Nadpisze istniejący komentarz";
+    if (list.length <= 3) {
+        return `${verb}: ${list.map((item) => item.shopName).join(", ")}.`;
+    }
+    return `${verb} przy ${przy(list.length)}.`;
+}
+function applyIsDisabled(draft, chosen) {
+    return chosen.length === 0 || (draft.trim() === "" && !chosen.some((item) => item.comment.trim() !== ""));
+}
+function applyButtonLabel(draft, chosen) {
+    const clearing = draft.trim() === "" && chosen.some((item) => item.comment.trim() !== "");
+    const base = clearing ? "Wyczyść na zaznaczonych" : "Wpisz na zaznaczone";
+    return chosen.length === 0 ? base : `${base} (${chosen.length})`;
+}
+/** null = nie ma czego wpisać ani wyczyścić. */
+function applyComments(comments, chosen, draft) {
+    const trimmed = draft.trim();
+    if (chosen.length === 0 || (trimmed === "" && chosen.every((item) => item.comment.trim() === ""))) {
+        return null;
+    }
+    const next = { ...comments };
+    for (const item of chosen) {
+        if (trimmed === "") {
+            delete next[item.key];
+        }
+        else {
+            next[item.key] = trimmed;
+        }
+    }
+    return next;
+}
+function commentApplyNotice(count, draft, where) {
+    const verb = draft.trim() === "" ? `Wyczyszczone przy ${przy(count)}` : `Wpisane przy ${przy(count)}`;
+    return where === "invoice" ? `${verb} tej faktury.` : `${verb}.`;
+}
+function routePickNote(total, picked) {
+    if (picked === 0) {
+        return "zaznaczenie trasy bierze jej sklepy";
+    }
+    if (total > 0 && picked === total) {
+        return "zaznaczone wszystkie sklepy";
+    }
+    return `zaznaczone ${picked} z ${total}`;
+}
+function routeCommentFace(shops) {
+    const filled = shops.filter((shop) => shop.comment.trim() !== "");
+    if (shops.length === 0 || filled.length === 0) {
+        return { snip: "", sub: "brak komentarza", sharedByAll: false };
+    }
+    const unique = [...new Set(filled.map((shop) => shop.comment.trim()))];
+    if (unique.length === 1 && filled.length === shops.length) {
+        return { snip: unique[0], sub: `ten sam przy ${sklepach(shops.length)}`, sharedByAll: true };
+    }
+    if (unique.length === 1) {
+        return { snip: unique[0], sub: `przy ${filled.length} z ${shops.length}`, sharedByAll: false };
+    }
+    return { snip: "", sub: `różne · ${filled.length} z ${shops.length}`, sharedByAll: false };
+}
+function willOverwrite(comment, picked, draft) {
+    return picked && comment.trim() !== "" && comment.trim() !== draft.trim();
+}
+function targetOf(shop, routeName, comments) {
+    const key = commentKey(shop);
+    return {
+        key,
+        shopName: shownShop(shop.shopName, shop.address),
+        routeName,
+        comment: comments[key] ?? "",
+    };
+}
+function shownShop(shopName, address) {
+    const name = shopName.trim();
+    return name === "" ? address.trim() : name;
+}
+function keepRecord(source, keys) {
+    const next = {};
+    for (const [key, value] of Object.entries(source)) {
+        if (keys.has(key)) {
+            next[key] = value;
+        }
+    }
+    return next;
+}
+function polish(count, one, few, many) {
+    const n = Math.abs(count);
+    const last = n % 10;
+    const lastTwo = n % 100;
+    if (n === 1) {
+        return `1 ${one}`;
+    }
+    if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) {
+        return `${count} ${few}`;
+    }
+    return `${count} ${many}`;
+}
+function sklepy(count) {
+    return polish(count, "sklep", "sklepy", "sklepów");
+}
+function podjazdy(count) {
+    return polish(count, "podjazd", "podjazdy", "podjazdów");
+}
+function pozycji(count) {
+    return polish(count, "pozycja", "pozycje", "pozycji");
+}
+function przy(count) {
+    return count === 1 ? "1 pozycji" : `${count} pozycjach`;
+}
+function sklepach(count) {
+    return count === 1 ? "1 sklepie" : `${count} sklepach`;
+}
+
+
+
 
 
 /**
@@ -2161,10 +2491,18 @@ function emptyStatement() {
         leftRoute: {},
         routeDraft: {},
         routeDraftError: {},
+        invoiceComments: {},
+        commentPicks: {},
+        commentDraft: "",
+        commentNotice: "",
     };
 }
 function freshStatement(rows, rates) {
-    return { ...emptyStatement(), rows, rates };
+    const screen = { ...emptyStatement(), rows, rates };
+    return {
+        ...screen,
+        commentPicks: openingCommentPicks(commentTargets(currentStatement(screen), screen.invoiceComments)),
+    };
 }
 function currentStatement(screen) {
     return settle({
@@ -2447,6 +2785,10 @@ function adoptRows(prev, rows, rates) {
         leftRoute: pick(prev.leftRoute, keys),
         routeDraft: pick(prev.routeDraft, keys),
         routeDraftError: pick(prev.routeDraftError, keys),
+        invoiceComments: pick(prev.invoiceComments, keys),
+        commentPicks: pick(prev.commentPicks, keys),
+        commentDraft: prev.commentDraft,
+        commentNotice: prev.commentNotice,
     };
 }
 function bagsBody(row, text, mode) {
@@ -2848,17 +3190,24 @@ function readRateRow(value) {
 
 
 
+
+
 const INVOICE_DASH = '<span class="muted">—</span>';
-function renderInvoiceList(rows, focus = null) {
+function renderInvoiceList(rows, focus = null, comment = emptyInvoiceComment()) {
     const groups = groupSettledInvoices(rows);
     if (groups.length === 0) {
         return ('<div class="blank"><strong>Brak rozliczonych faktur.</strong>' +
             "<p>Ten podwykonawca nie ma rozliczonych odbiorów w podanym zakresie.</p></div>");
     }
-    const note = '<p class="note invoice-note">Podgląd. Kwoty są z arkusza. Tych pozycji nie da się tu zmienić ani cofnąć.</p>';
-    return `<div class="invoice-body">${note}${groups.map((group) => renderGroup(group, focus)).join("")}</div>`;
+    const note = '<p class="note invoice-note">Podgląd. Kwoty są z arkusza. Tych pozycji nie da się tu zmienić ani cofnąć. ' +
+        "Komentarz przy pozycji zmieniasz w jej polu. Wspólny tekst dla kilku pozycji wpisujesz na dole.</p>";
+    const notice = comment.notice
+        ? `<p class="notice" role="status" data-out="invoice-comment-notice">${escapeHtml(comment.notice)}</p>`
+        : "";
+    return (`<div class="invoice-body">${note}${notice}${groups.map((group) => renderGroup(group, focus, comment)).join("")}</div>` +
+        invoiceComposer(rows, comment));
 }
-function renderGroup(group, focus) {
+function renderGroup(group, focus, comment) {
     const total = group.total == null ? INVOICE_DASH : escapeHtml(formatPln(group.total));
     const on = focus !== null && group.invoice === focus;
     return (`<section class="invoice-card${on ? " is-focus" : ""}" data-invoice="${escapeHtml(group.invoice)}">` +
@@ -2867,12 +3216,24 @@ function renderGroup(group, focus) {
         `<span>${escapeHtml(invoiceCountLabel(group.rows.length))} · ${total}</span>` +
         "</header>" +
         '<div class="table-wrap"><table><thead><tr>' +
+        '<th class="c">Zaznacz</th>' +
         "<th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th><th>Trasa</th>" +
         '<th class="num">Liczba worków</th><th class="num">Koszt odbioru</th><th class="num">Koszt na worek</th>' +
-        `</tr></thead><tbody>${group.rows.map(renderRow).join("")}</tbody></table></div></section>`);
+        '<th class="comment-col wrap">Komentarz do faktury</th>' +
+        `</tr></thead><tbody>${group.rows.map((row) => renderRow(row, comment)).join("")}</tbody></table></div></section>`);
 }
-function renderRow(row) {
-    return ("<tr>" +
+function renderRow(row, comment) {
+    const key = rowKey(row.sheetRow, row.transportNumber, row.sheetName);
+    const textValue = comment.comments[key] ?? "";
+    const picked = comment.picks[key] === true;
+    const overwrite = willOverwrite(textValue, picked, comment.draft);
+    const classes = [
+        row.routeName.trim() === "" ? "" : "is-child",
+        overwrite ? "will-overwrite" : picked ? "is-picked" : "",
+    ].filter(Boolean);
+    const label = row.shopName.trim() === "" ? row.address : row.shopName;
+    return (`<tr${classes.length ? ` class="${classes.join(" ")}"` : ""}>` +
+        `<td class="c"><input type="checkbox" data-invoice-pick="1" ${ref(row)}${picked ? " checked" : ""} aria-label="${escapeHtml(`Zaznacz ${label} do wspólnego komentarza`)}"></td>` +
         `<td>${text(row.transportNumber)}</td>` +
         `<td class="adres">${text(addressWithCommaAfterLocality(row.address))}</td>` +
         `<td>${text(row.shopName)}</td>` +
@@ -2881,7 +3242,27 @@ function renderRow(row) {
         `<td class="num">${row.bagCount == null ? INVOICE_DASH : escapeHtml(String(row.bagCount))}</td>` +
         `<td class="num">${money(row.receptionCost)}</td>` +
         `<td class="num">${money(row.costPerBag)}</td>` +
+        `<td class="comment-col"><textarea class="comment-input" data-comment-for="row" ${ref(row)} rows="2" aria-label="${escapeHtml(`Komentarz do faktury, ${label}`)}">${escapeHtml(textValue)}</textarea></td>` +
         "</tr>");
+}
+function invoiceComposer(rows, comment) {
+    const targets = invoiceCommentTargets(rows, comment.comments);
+    const chosen = chosenComments(targets, comment.picks);
+    const hint = overwriteHint(commentsToOverwrite(chosen, comment.draft), comment.draft);
+    const summary = invoiceSelectionSummary(chosen.length);
+    const disabled = applyIsDisabled(comment.draft, chosen);
+    return ('<footer class="composer" data-composer="invoice"><div class="composer-bar"><div class="composer-lead">' +
+        "<h2>Komentarz dla zaznaczonych pozycji</h2>" +
+        `<p class="selection-summary${chosen.length === 0 ? " muted" : ""}" data-out="invoice-comment-summary">${escapeHtml(summary)}</p></div>` +
+        `<textarea data-draft="invoice-bulk" data-keep="invoice-comment" rows="2" placeholder="np. folia osobno, bez PET" aria-label="Komentarz dla zaznaczonych pozycji">${escapeHtml(comment.draft)}</textarea>` +
+        `<button type="button" class="btn-teal" data-action="apply-invoice-comment"${disabled ? " disabled" : ""}>${escapeHtml(applyButtonLabel(comment.draft, chosen))}</button></div>` +
+        '<div class="composer-actions">' +
+        `<button type="button" class="text-btn" data-action="check-invoice-all">${allPicked(targets, comment.picks) ? "odznacz" : "zaznacz wszystkie"}</button></div>` +
+        `<p class="note overwrite-hint" data-out="invoice-overwrite-hint"${hint ? "" : " hidden"}>${escapeHtml(hint)}</p>` +
+        '<p class="note composer-foot">Na tym ekranie. Numer i kwoty bez zmian. Do rejestru jeszcze nie schodzi.</p></footer>');
+}
+function ref(row) {
+    return `data-sheet-name="${escapeHtml(row.sheetName)}" data-sheet-row="${row.sheetRow}" data-transport="${escapeHtml(row.transportNumber)}"`;
 }
 function text(value) {
     const trimmed = value.trim();
@@ -2897,6 +3278,7 @@ function money(grosze) {
 
 
 
+
 const DASH = '<span class="muted">—</span>';
 function renderStatement(screen, status = "", options = {}) {
     const allowApprove = options.allowApprove !== false;
@@ -2904,42 +3286,50 @@ function renderStatement(screen, status = "", options = {}) {
     const selectedSum = sumSelected(statement, selectedKeys(screen.selected));
     const count = selectedLineCount(statement, screen.selected);
     const note = status ? `<p class="err status-block">${escapeHtml(status)}</p>` : "";
+    const commentNote = screen.commentNotice
+        ? `<p class="notice" role="status" data-out="comment-notice">${escapeHtml(screen.commentNotice)}</p>`
+        : "";
     const emptyHint = allowApprove
         ? "Brak nierozliczonych odbiorów tego podwykonawcy w podanym zakresie."
         : "Brak dni podjazdu tego podwykonawcy w podanym zakresie (Baza cen harmonogram).";
     const body = statement.lines.length === 0
         ? `<div class="blank"><strong>Brak pozycji.</strong><p>${emptyHint}</p></div>`
-        : table(screen, statement.lines);
+        : table(screen, statement);
+    const composer = statement.lines.length === 0 ? "" : commentComposer(screen, statement);
     return (`<div class="center-h">${escapeHtml(positionLabel(statement.lines.length))}</div>` +
         note +
+        commentNote +
         body +
+        composer +
         footer(screen.invoice, statement.total, selectedSum, count, allowApprove));
 }
-function table(screen, lines) {
+function table(screen, statement) {
+    const targets = commentTargets(statement, screen.invoiceComments);
     const rows = [];
-    for (const line of lines) {
+    for (const line of statement.lines) {
         if (line.kind === "plain") {
-            rows.push(plainRow(screen, line.shop));
+            rows.push(plainRow(screen, line.shop, targets));
             continue;
         }
-        rows.push(routeRow(screen, line));
+        rows.push(routeRow(screen, line, targets));
         if (!screen.openRoutes[line.routeName]) {
             continue;
         }
         const shared = line.bagRate !== null;
         for (const shop of line.shops) {
-            rows.push(childRow(screen, shop, shared));
+            rows.push(childRow(screen, shop, shared, targets));
         }
     }
     return ('<div class="table-wrap"><table><thead><tr>' +
-        `<th class="c"><span class="col-check"><span>Rozliczone</span>${selectAllBox(lines, screen.selected)}</span></th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>` +
+        `<th class="c"><span class="col-check"><span>Rozliczone</span>${selectAllBox(statement.lines, screen.selected)}</span></th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>` +
         "<th>Podjazd/Trasa</th><th class=\"num\">Kwota podjazdu/trasy</th><th class=\"num\">Liczba worków</th><th class=\"num\">Kwota za worek</th>" +
         "<th class=\"num\">Suma za worki</th>" +
         "<th class=\"num\" title=\"Podjazd: kwota podjazdu plus worki. Trasa: stawka raz plus worki.\">Razem</th>" +
         "<th>transport się odbył</th>" +
+        '<th class="comment-col wrap">Komentarz do faktury</th>' +
         `</tr></thead><tbody>${rows.join("")}</tbody></table></div>`);
 }
-function plainRow(screen, shop) {
+function plainRow(screen, shop, targets) {
     const key = rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName);
     const line = encodeURIComponent(key);
     const dead = !shop.happened;
@@ -2954,10 +3344,11 @@ function plainRow(screen, shop) {
     const bagCell = shop.tie
         ? DASH
         : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
-    return (`<tr class="${rowClass(dead, checked, "plain")}" data-kind="plain">` +
+    const target = targets.find((item) => item.key === commentKey(shop));
+    return (`<tr class="${joinClass(rowClass(dead, checked, "plain"), shopCommentClass(target, screen))}" data-kind="plain">` +
         `<td class="c">${lineBox(line, checked)}</td>` +
         `<td>${text(shop.transportNumber, dead)}</td>` +
-        `<td class="adres">${text(addressWithCommaAfterLocality(shop.address), dead)}</td>` +
+        shopAddress(shop, dead, target, screen) +
         `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}${newRouteBox(screen, shop)}</div></td>` +
         `<td>${dateInput(shop, "pickup-date", shop.pickupDate, "Zapis od razu do Data odbioru.")}</td>` +
         `<td>${legKind}</td>` +
@@ -2967,9 +3358,10 @@ function plainRow(screen, shop) {
         `<td class="num">${money(shop.bagSum, dead)}</td>` +
         `<td class="num">${money(shop.receptionCost, dead)}</td>` +
         `<td>${tripBox(shop)}</td>` +
+        commentCell(shop, target) +
         "</tr>");
 }
-function routeRow(screen, line) {
+function routeRow(screen, line, targets) {
     const key = routeSelectionKey(line.routeName);
     const checked = screen.selected[key] === true;
     const open = screen.openRoutes[line.routeName] === true;
@@ -2987,11 +3379,13 @@ function routeRow(screen, line) {
     const rateInput = anchor
         ? amountInput(anchor, "route-rate", undefined, line.routeRate, "Zapis od razu do Stawka za trasę. Kolumny 16 i 17 dopiero przy Zatwierdź", line.routeName)
         : DASH;
-    return (`<tr class="${rowClass(false, checked, "route")}" data-kind="route">` +
+    const shops = targets.filter((item) => item.routeName === line.routeName);
+    const pickedShops = shops.filter((item) => screen.commentPicks[item.key] === true).length;
+    return (`<tr class="${joinClass(rowClass(false, checked, "route"), routeCommentClass(shops.length, pickedShops))}" data-kind="route">` +
         `<td class="c">${lineBox(encodeURIComponent(key), checked)}</td>` +
         `<td>${DASH}</td>` +
         `<td class="adres"><div class="who-line"><button type="button" class="chev" data-action="expand" data-route="${escapeHtml(line.routeName)}" aria-expanded="${open ? "true" : "false"}" aria-label="Sklepy trasy">${open ? "▾" : "▸"}</button>` +
-        `<div><div>${escapeHtml(line.routeName)}</div><div class="sub">trasa · ${escapeHtml(sub)}</div>${none}${tie}</div></div></td>` +
+        `<div>${routePick(line.routeName, sub, shops.length, pickedShops)}${none}${tie}</div></div></td>` +
         `<td class="sklep">${DASH}</td>` +
         `<td data-out="route-date">${date}</td>` +
         `<td><span class="tag tag-route">trasa</span></td>` +
@@ -3001,18 +3395,20 @@ function routeRow(screen, line) {
         `<td class="num">${money(line.bagSum, false)}</td>` +
         `<td class="num">${money(line.routeSum, false)}</td>` +
         `<td>${DASH}</td>` +
+        routeCommentCell(shops) +
         "</tr>");
 }
-function childRow(screen, shop, sharedBagRate) {
+function childRow(screen, shop, sharedBagRate, targets) {
     const dead = !shop.happened;
     const state = screen.screenByRow[rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName)] ?? {};
     const bagCell = shop.tie || sharedBagRate
         ? DASH
         : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie zapisuje kolumn rejestru ani Bazy stawek.");
-    return (`<tr class="${rowClass(dead, false, "child")}" data-kind="child">` +
+    const target = targets.find((item) => item.key === commentKey(shop));
+    return (`<tr class="${joinClass(rowClass(dead, false, "child"), shopCommentClass(target, screen))}" data-kind="child">` +
         "<td></td>" +
         `<td>${text(shop.transportNumber, dead)}</td>` +
-        `<td class="adres">${text(addressWithCommaAfterLocality(shop.address), dead)}</td>` +
+        shopAddress(shop, dead, target, screen) +
         `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}</div></td>` +
         `<td>${dateInput(shop, "pickup-date", shop.pickupDate, "Zapis od razu do Data odbioru tego sklepu.")}</td>` +
         `<td>${DASH}</td>` +
@@ -3022,7 +3418,84 @@ function childRow(screen, shop, sharedBagRate) {
         `<td class="num">${DASH}</td>` +
         `<td class="num">${DASH}</td>` +
         `<td><div class="trip-stack">${tripBox(shop)}${detachButton(shop)}</div></td>` +
+        commentCell(shop, target) +
         "</tr>");
+}
+function commentComposer(screen, statement) {
+    const targets = commentTargets(statement, screen.invoiceComments);
+    const chosen = chosenComments(targets, screen.commentPicks);
+    const hint = overwriteHint(commentsToOverwrite(chosen, screen.commentDraft), screen.commentDraft);
+    const summary = selectionSummary(targets, screen.commentPicks);
+    const disabled = applyIsDisabled(screen.commentDraft, chosen);
+    return ('<footer class="composer" data-composer="statement"><div class="composer-bar"><div class="composer-lead">' +
+        "<h2>Komentarz dla zaznaczonych</h2>" +
+        `<p class="selection-summary${chosen.length === 0 ? " muted" : ""}" data-out="comment-summary">${escapeHtml(summary)}</p></div>` +
+        `<textarea data-draft="comment" data-keep="comment" rows="2" placeholder="np. folia osobno, bez PET" aria-label="Komentarz dla zaznaczonych">${escapeHtml(screen.commentDraft)}</textarea>` +
+        `<button type="button" class="btn-teal" data-action="apply-comment"${disabled ? " disabled" : ""}>${escapeHtml(applyButtonLabel(screen.commentDraft, chosen))}</button></div>` +
+        '<div class="composer-actions">' +
+        `<button type="button" class="text-btn" data-action="check-comment-all">${allPicked(targets, screen.commentPicks) ? "odznacz" : "zaznacz wszystkie"}</button></div>` +
+        `<p class="note overwrite-hint" data-out="overwrite-hint"${hint ? "" : " hidden"}>${escapeHtml(hint)}</p>` +
+        '<p class="note composer-foot">Na tym ekranie. Numer i kwoty bez zmian. Do rejestru jeszcze nie schodzi.</p></footer>');
+}
+function routePick(routeName, sub, total, picked) {
+    if (total === 0) {
+        return `<div>${escapeHtml(routeName)}</div><div class="sub">trasa · ${escapeHtml(sub)}</div>`;
+    }
+    const checked = picked === total ? " checked" : "";
+    return (`<label class="pick-line"><input type="checkbox" data-pick-route="${escapeHtml(routeName)}" aria-label="${escapeHtml(`Zaznacz sklepy trasy ${routeName}`)}"${checked}>` +
+        `<span class="stack"><span>${escapeHtml(routeName)}</span>` +
+        `<span class="sub">trasa · ${escapeHtml(sub)} · <span data-route-note="${escapeHtml(routeName)}">${escapeHtml(routePickNote(total, picked))}</span></span></span></label>`);
+}
+function shopAddress(shop, dead, target, screen) {
+    const shown = text(addressWithCommaAfterLocality(shop.address), dead);
+    if (!target) {
+        return `<td class="adres">${shown}</td>`;
+    }
+    const picked = screen.commentPicks[target.key] === true;
+    const label = shop.shopName.trim() === "" ? shop.address : shop.shopName;
+    return (`<td class="adres"><label class="pick-line"><input type="checkbox" data-pick="comment" ${ref(shop)}${picked ? " checked" : ""} aria-label="${escapeHtml(`Zaznacz ${label} do komentarza`)}">` +
+        `<span>${shown}</span></label></td>`);
+}
+function commentCell(shop, target) {
+    if (!shop.happened || !target) {
+        return '<td class="comment-col"><span class="muted" title="Transport się nie odbył. Ten sklep nie wchodzi na fakturę.">—</span></td>';
+    }
+    return `<td class="comment-col">${commentPlain(target.comment)}</td>`;
+}
+function routeCommentCell(shops) {
+    if (shops.length === 0) {
+        return '<td class="comment-col"><span class="muted">—</span></td>';
+    }
+    const face = routeCommentFace(shops);
+    if (!face.sharedByAll) {
+        return `<td class="comment-col"><span class="muted">${escapeHtml(face.sub)}</span></td>`;
+    }
+    return ('<td class="comment-col"><span class="stack">' +
+        `<span class="comment-snip">${escapeHtml(face.snip)}</span>` +
+        `<span class="sub">${escapeHtml(face.sub)}</span></span></td>`);
+}
+function commentPlain(value) {
+    const trimmed = value.trim();
+    return trimmed === "" ? '<span class="muted">brak</span>' : `<span class="comment-snip">${escapeHtml(trimmed)}</span>`;
+}
+function shopCommentClass(target, screen) {
+    if (!target) {
+        return "";
+    }
+    const picked = screen.commentPicks[target.key] === true;
+    if (willOverwrite(target.comment, picked, screen.commentDraft)) {
+        return "will-overwrite";
+    }
+    return picked ? "is-picked" : "";
+}
+function routeCommentClass(total, picked) {
+    if (total === 0 || picked === 0) {
+        return "";
+    }
+    return picked === total ? "is-picked" : "is-partial";
+}
+function joinClass(base, extra) {
+    return [base, extra].filter(Boolean).join(" ");
 }
 function footer(invoice, total, selected, count, allowApprove) {
     if (!allowApprove) {
@@ -4340,6 +4813,7 @@ function emptyRow(cols) {
 
 
 
+
 function brand(mode) {
     return ('<div class="brand"><img src="logo.png" alt="" width="36" height="36">' +
         `<div><strong>Rozliczenia</strong><em>${escapeHtml(modeLabel(mode))}</em></div></div>`);
@@ -4522,7 +4996,7 @@ function renderInvoicesScreen(model) {
         workBackButton(model) +
         "</div>" +
         status +
-        renderInvoiceList(model.invoices, model.invoiceFocus) +
+        renderInvoiceList(model.invoices, model.invoiceFocus, model.invoiceComment ?? emptyInvoiceComment()) +
         "</div>");
 }
 function renderRatesDialog(model) {
@@ -4776,6 +5250,7 @@ host.showRozErrorCard = showRozErrorCard;
 
 
 
+
 const STATS_SECTION_IDS = ["pickups", "bags", "costs", "q", "contractors", "empty-bags", "gaps"];
 function todayCalendar() {
     const now = new Date();
@@ -4802,6 +5277,7 @@ const VIEW = {
     webappMissing: false,
     statement: emptyStatement(),
     invoices: [],
+    invoiceComment: emptyInvoiceComment(),
     invoiceFocus: null,
     workReturn: "range",
     loadKind: "logo",
@@ -4911,6 +5387,8 @@ function paint(keep) {
     if (focused instanceof HTMLElement) {
         focused.scrollIntoView({ block: "nearest" });
     }
+    syncCommentChrome();
+    syncInvoiceComment();
 }
 /** Zaznaczenie nie przebudowuje listy: zostaje przewinięcie i fokus na checkboxie. */
 function syncCheckedRows() {
@@ -5170,6 +5648,7 @@ async function runInvoices() {
         VIEW.applied = started;
         VIEW.screen = screenAfterInvoices();
         VIEW.invoices = read.rows;
+        VIEW.invoiceComment = retainInvoiceComment(VIEW.invoiceComment, read.rows);
         VIEW.status = "";
         VIEW.stats = { ...VIEW.stats, status: "" };
         VIEW.ratesOpen = false;
@@ -5345,9 +5824,50 @@ function onClick(event) {
     else if (action === "approve") {
         void runApprove();
     }
+    else if (action === "apply-comment") {
+        applyStatementComment();
+    }
+    else if (action === "check-comment-all") {
+        toggleAllStatementComments();
+    }
+    else if (action === "apply-invoice-comment") {
+        applyInvoiceComment();
+    }
+    else if (action === "check-invoice-all") {
+        toggleAllInvoiceComments();
+    }
 }
 function onInput(event) {
     const el = event.target;
+    if (el instanceof HTMLTextAreaElement) {
+        if (el.dataset.draft === "comment") {
+            VIEW.statement = { ...VIEW.statement, commentDraft: el.value, commentNotice: "" };
+            dropCommentNotice();
+            syncCommentChrome();
+            return;
+        }
+        if (el.dataset.draft === "invoice-bulk") {
+            VIEW.invoiceComment = { ...VIEW.invoiceComment, draft: el.value, notice: "" };
+            dropInvoiceCommentNotice();
+            syncInvoiceComment();
+            return;
+        }
+        if (el.dataset.commentFor === "row") {
+            const ref = sheetRef(el);
+            if (!ref) {
+                return;
+            }
+            const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+            VIEW.invoiceComment = {
+                ...VIEW.invoiceComment,
+                comments: { ...VIEW.invoiceComment.comments, [key]: el.value },
+                notice: "",
+            };
+            dropInvoiceCommentNotice();
+            syncInvoiceComment();
+        }
+        return;
+    }
     if (!(el instanceof HTMLInputElement)) {
         return;
     }
@@ -5459,9 +5979,55 @@ function onChange(event) {
         if (!ref) {
             return;
         }
-        VIEW.statement = setDidNotHappen(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked, ref.sheetName);
+        const next = setDidNotHappen(VIEW.statement, ref.sheetRow, ref.transportNumber, el.checked, ref.sheetName);
+        VIEW.statement = {
+            ...next,
+            commentPicks: prunePicks(next.commentPicks, commentTargets(currentStatement(next), next.invoiceComments)),
+            commentNotice: "",
+        };
         VIEW.status = "";
         paint();
+        return;
+    }
+    if (el.dataset.pick === "comment") {
+        const ref = sheetRef(el);
+        if (!ref) {
+            return;
+        }
+        const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+        VIEW.statement = {
+            ...VIEW.statement,
+            commentPicks: setCommentPicks(VIEW.statement.commentPicks, [key], el.checked),
+            commentNotice: "",
+        };
+        dropCommentNotice();
+        syncCommentChrome();
+        return;
+    }
+    if (el.dataset.pickRoute !== undefined) {
+        const shops = commentTargets(currentStatement(VIEW.statement), VIEW.statement.invoiceComments).filter((target) => target.routeName === el.dataset.pickRoute);
+        VIEW.statement = {
+            ...VIEW.statement,
+            commentPicks: setCommentPicks(VIEW.statement.commentPicks, shops.map((target) => target.key), el.checked),
+            commentNotice: "",
+        };
+        dropCommentNotice();
+        syncCommentChrome();
+        return;
+    }
+    if (el.dataset.invoicePick === "1") {
+        const ref = sheetRef(el);
+        if (!ref) {
+            return;
+        }
+        const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+        VIEW.invoiceComment = {
+            ...VIEW.invoiceComment,
+            picks: setCommentPicks(VIEW.invoiceComment.picks, [key], el.checked),
+            notice: "",
+        };
+        dropInvoiceCommentNotice();
+        syncInvoiceComment();
         return;
     }
     if (el.dataset.edit === "bags" ||
@@ -5695,9 +6261,229 @@ function moveRateActive(field, delta) {
     }
     items[next].scrollIntoView({ block: "nearest" });
 }
+function statementCommentModel() {
+    const statement = currentStatement(VIEW.statement);
+    const targets = commentTargets(statement, VIEW.statement.invoiceComments);
+    const chosen = chosenComments(targets, VIEW.statement.commentPicks);
+    return { targets, chosen };
+}
+function invoiceCommentModel() {
+    const targets = invoiceCommentTargets(VIEW.invoices, VIEW.invoiceComment.comments);
+    const chosen = chosenComments(targets, VIEW.invoiceComment.picks);
+    return { targets, chosen };
+}
+function dropCommentNotice() {
+    document.querySelector("[data-out='comment-notice']")?.remove();
+}
+function dropInvoiceCommentNotice() {
+    document.querySelector("[data-out='invoice-comment-notice']")?.remove();
+}
+function clearStatementCommentPicks() {
+    if (VIEW.screen !== "statement" || Object.keys(VIEW.statement.commentPicks).length === 0) {
+        return;
+    }
+    VIEW.statement = { ...VIEW.statement, commentPicks: {}, commentNotice: "" };
+    dropCommentNotice();
+    syncCommentChrome();
+}
+function applyStatementComment() {
+    const { chosen } = statementCommentModel();
+    const next = applyComments(VIEW.statement.invoiceComments, chosen, VIEW.statement.commentDraft);
+    if (!next) {
+        VIEW.statement = { ...VIEW.statement, commentNotice: COMMENT_NEEDS_TEXT };
+        paint("comment");
+        return;
+    }
+    const draft = VIEW.statement.commentDraft;
+    const count = chosen.length;
+    VIEW.statement = {
+        ...VIEW.statement,
+        invoiceComments: next,
+        commentPicks: {},
+        commentDraft: "",
+        commentNotice: commentApplyNotice(count, draft, "statement"),
+    };
+    paint();
+    document.querySelector('[data-draft="comment"]')?.focus({ preventScroll: true });
+}
+function applyInvoiceComment() {
+    const { chosen } = invoiceCommentModel();
+    const next = applyComments(VIEW.invoiceComment.comments, chosen, VIEW.invoiceComment.draft);
+    if (!next) {
+        VIEW.invoiceComment = { ...VIEW.invoiceComment, notice: COMMENT_NEEDS_TEXT };
+        paint("invoice-comment");
+        return;
+    }
+    const draft = VIEW.invoiceComment.draft;
+    const count = chosen.length;
+    VIEW.invoiceComment = {
+        comments: next,
+        picks: {},
+        draft: "",
+        notice: commentApplyNotice(count, draft, "invoice"),
+    };
+    paint();
+    document.querySelector('[data-draft="invoice-bulk"]')?.focus({ preventScroll: true });
+}
+function toggleAllStatementComments() {
+    const { targets } = statementCommentModel();
+    const on = !allPicked(targets, VIEW.statement.commentPicks);
+    VIEW.statement = {
+        ...VIEW.statement,
+        commentPicks: picksForAll(targets, on),
+        commentNotice: "",
+    };
+    dropCommentNotice();
+    syncCommentChrome();
+}
+function toggleAllInvoiceComments() {
+    const { targets } = invoiceCommentModel();
+    const on = !allPicked(targets, VIEW.invoiceComment.picks);
+    VIEW.invoiceComment = {
+        ...VIEW.invoiceComment,
+        picks: picksForAll(targets, on),
+        notice: "",
+    };
+    dropInvoiceCommentNotice();
+    syncInvoiceComment();
+}
+function syncCommentChrome() {
+    const root = document.querySelector('.statement[data-screen="statement"]');
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+    const { targets, chosen } = statementCommentModel();
+    const draft = VIEW.statement.commentDraft;
+    const picks = VIEW.statement.commentPicks;
+    for (const input of root.querySelectorAll('[data-pick="comment"]')) {
+        const ref = sheetRef(input);
+        const line = input.closest("tr");
+        if (!ref || !line) {
+            continue;
+        }
+        const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+        const target = targets.find((item) => item.key === key);
+        if (!target) {
+            continue;
+        }
+        const on = picks[key] === true;
+        input.checked = on;
+        const overwrite = willOverwrite(target.comment, on, draft);
+        line.classList.toggle("will-overwrite", overwrite);
+        line.classList.toggle("is-picked", on && !overwrite);
+    }
+    const names = new Set();
+    for (const target of targets) {
+        if (target.routeName !== null) {
+            names.add(target.routeName);
+        }
+    }
+    for (const name of names) {
+        const shops = targets.filter((target) => target.routeName === name);
+        const count = shops.filter((target) => picks[target.key] === true).length;
+        const box = root.querySelector(`[data-pick-route="${CSS.escape(name)}"]`);
+        if (box instanceof HTMLInputElement) {
+            box.checked = shops.length > 0 && count === shops.length;
+            box.indeterminate = count > 0 && count < shops.length;
+            const line = box.closest("tr");
+            if (line) {
+                line.classList.toggle("is-picked", box.checked);
+                line.classList.toggle("is-partial", box.indeterminate);
+            }
+        }
+        const note = root.querySelector(`[data-route-note="${CSS.escape(name)}"]`);
+        if (note) {
+            note.textContent = routePickNote(shops.length, count);
+        }
+    }
+    const summary = root.querySelector('[data-out="comment-summary"]');
+    if (summary) {
+        summary.textContent = selectionSummary(targets, picks);
+        summary.classList.toggle("muted", chosen.length === 0);
+    }
+    const hint = root.querySelector('[data-out="overwrite-hint"]');
+    if (hint instanceof HTMLElement) {
+        const message = overwriteHint(commentsToOverwrite(chosen, draft), draft);
+        hint.hidden = message === "";
+        hint.textContent = message;
+    }
+    const apply = root.querySelector('[data-action="apply-comment"]');
+    if (apply instanceof HTMLButtonElement) {
+        apply.disabled = applyIsDisabled(draft, chosen);
+        apply.textContent = applyButtonLabel(draft, chosen);
+    }
+    const checkAll = root.querySelector('[data-action="check-comment-all"]');
+    if (checkAll) {
+        checkAll.textContent = allPicked(targets, picks) ? "odznacz" : "zaznacz wszystkie";
+    }
+}
+function syncInvoiceComment() {
+    const root = document.querySelector('.statement[data-screen="invoices"]');
+    if (!(root instanceof HTMLElement)) {
+        return;
+    }
+    const { targets, chosen } = invoiceCommentModel();
+    const draft = VIEW.invoiceComment.draft;
+    const picks = VIEW.invoiceComment.picks;
+    for (const input of root.querySelectorAll('[data-invoice-pick="1"]')) {
+        const ref = sheetRef(input);
+        const line = input.closest("tr");
+        if (!ref || !line) {
+            continue;
+        }
+        const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+        const target = targets.find((item) => item.key === key);
+        if (!target) {
+            continue;
+        }
+        const on = picks[key] === true;
+        input.checked = on;
+        const overwrite = willOverwrite(target.comment, on, draft);
+        line.classList.toggle("will-overwrite", overwrite);
+        line.classList.toggle("is-picked", on && !overwrite);
+    }
+    const summary = root.querySelector('[data-out="invoice-comment-summary"]');
+    if (summary) {
+        summary.textContent = invoiceSelectionSummary(chosen.length);
+        summary.classList.toggle("muted", chosen.length === 0);
+    }
+    const hint = root.querySelector('[data-out="invoice-overwrite-hint"]');
+    if (hint instanceof HTMLElement) {
+        const message = overwriteHint(commentsToOverwrite(chosen, draft), draft);
+        hint.hidden = message === "";
+        hint.textContent = message;
+    }
+    const apply = root.querySelector('[data-action="apply-invoice-comment"]');
+    if (apply instanceof HTMLButtonElement) {
+        apply.disabled = applyIsDisabled(draft, chosen);
+        apply.textContent = applyButtonLabel(draft, chosen);
+    }
+    const checkAll = root.querySelector('[data-action="check-invoice-all"]');
+    if (checkAll) {
+        checkAll.textContent = allPicked(targets, picks) ? "odznacz" : "zaznacz wszystkie";
+    }
+}
 function onKeyDown(event) {
     const el = event.target;
+    if (el instanceof HTMLTextAreaElement) {
+        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+            event.preventDefault();
+            if (el.dataset.draft === "comment") {
+                applyStatementComment();
+            }
+            if (el.dataset.draft === "invoice-bulk") {
+                applyInvoiceComment();
+            }
+        }
+        if (event.key === "Escape") {
+            clearStatementCommentPicks();
+        }
+        return;
+    }
     if (!(el instanceof HTMLInputElement)) {
+        if (event.key === "Escape") {
+            clearStatementCommentPicks();
+        }
         return;
     }
     if (el.dataset.filter === "contractor") {
@@ -5723,6 +6509,9 @@ function onKeyDown(event) {
         return;
     }
     if (el.dataset.rate !== "shop" && el.dataset.rate !== "contractor") {
+        if (event.key === "Escape") {
+            clearStatementCommentPicks();
+        }
         return;
     }
     const field = el.dataset.rate === "shop" ? "shop" : "contractor";

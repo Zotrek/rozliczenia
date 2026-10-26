@@ -180,6 +180,29 @@ describe("page wiring", () => {
     expect(functionBody("saveRates")).not.toContain('VIEW.mode === "report"');
     expect(functionBody("onClick")).toContain('action === "rates-tab"');
   });
+
+  it("test_page_invoice_comment_stays_on_screen_without_a_sheet_write", () => {
+    const click = functionBody("onClick");
+    expect(click).toContain('action === "apply-comment"');
+    expect(click).toContain('action === "apply-invoice-comment"');
+    expect(click).toContain("applyStatementComment(");
+    expect(click).toContain("applyInvoiceComment(");
+    const apply = functionBody("applyStatementComment");
+    expect(apply).toContain("applyComments(");
+    expect(apply).not.toContain("postSheet(");
+    expect(apply).not.toContain("fetch(");
+    expect(functionBody("applyInvoiceComment")).not.toContain("postSheet(");
+    expect(functionBody("onChange")).toContain('el.dataset.pick === "comment"');
+    expect(functionBody("onChange")).toContain("el.dataset.pickRoute");
+    expect(functionBody("onChange")).toContain('el.dataset.invoicePick === "1"');
+    expect(functionBody("onInput")).toContain('el.dataset.draft === "comment"');
+    expect(functionBody("onInput")).toContain('el.dataset.commentFor === "row"');
+    expect(functionBody("syncCommentChrome")).toContain("indeterminate");
+    const draft = functionBody("onInput");
+    const start = draft.indexOf('el.dataset.draft === "comment"');
+    const end = draft.indexOf('el.dataset.draft === "invoice-bulk"', start);
+    expect(draft.slice(start, end)).not.toContain("paint(");
+  });
 });
 
 describe("buildPage bundle", () => {

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { buildPage } from "../scripts/build-page.mjs";
 import { CONTRACTOR_LIST_LIMIT, emptyStats, renderApp, renderModes, type RangeViewModel } from "./rangeView.js";
 import type { StartedSearch } from "./range.js";
+import { emptyInvoiceComment } from "./invoiceComment.js";
 import { emptyStatement } from "./statement.js";
 
 function model(over: Partial<RangeViewModel> = {}): RangeViewModel {
@@ -27,6 +28,7 @@ function model(over: Partial<RangeViewModel> = {}): RangeViewModel {
     webappMissing: false,
     statement: emptyStatement(),
     invoices: [],
+    invoiceComment: emptyInvoiceComment(),
     invoiceFocus: null,
     workReturn: "range",
     addresses: [],

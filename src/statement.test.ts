@@ -358,6 +358,37 @@ describe("adoptRows", () => {
     expect(next.screenByRow["\t2\t2"]?.pickupAmount).toBe(0);
     expect(next.screenByRow["\t3\t3"]).toBeUndefined();
   });
+
+  it("test_adoptRows_keeps_invoice_comment_only_for_rows_that_stay", () => {
+    const prev = freshStatement(
+      [row({ sheetRow: 2, address: "Zostaje" }), row({ sheetRow: 3, address: "Znika" })],
+      [],
+    );
+    prev.invoiceComments = { "\t2\t2": "folia", "\t3\t3": "pet" };
+    prev.commentPicks = { "\t3\t3": true };
+    prev.commentDraft = "nowy";
+    const next = adoptRows(prev, [row({ sheetRow: 2, address: "Zostaje" })], []);
+    expect(next.invoiceComments).toEqual({ "\t2\t2": "folia" });
+    expect(next.commentPicks).toEqual({});
+    expect(next.commentDraft).toBe("nowy");
+  });
+});
+
+describe("freshStatement", () => {
+  it("test_freshStatement_preselects_route_shops_without_a_comment", () => {
+    const screen = freshStatement(
+      [
+        row({ sheetRow: 2, routeName: "Trasa", shopName: "A" }),
+        row({ sheetRow: 3, routeName: "Trasa", shopName: "B" }),
+        row({ sheetRow: 4, shopName: "Podjazd" }),
+      ],
+      [],
+    );
+    expect(screen.commentPicks["\t2\t2"]).toBe(true);
+    expect(screen.commentPicks["\t3\t3"]).toBe(true);
+    expect(screen.commentPicks["\t4\t4"]).toBeUndefined();
+    expect(screen.invoiceComments).toEqual({});
+  });
 });
 
 describe("readSettlement", () => {

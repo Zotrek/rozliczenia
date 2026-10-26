@@ -83,8 +83,12 @@ describe("renderInvoiceList", () => {
     expect(html).toContain("Sklep &lt;B&gt;");
     expect(html).toContain("trasa-1");
     expect(html).toContain("Podgląd.");
+    expect(html).toContain("nie da się tu zmienić ani cofnąć");
+    expect(html).toContain('data-comment-for="row"');
+    expect(html).toContain('data-invoice-pick="1"');
+    expect(html).toContain("Komentarz dla zaznaczonych pozycji");
     expect(html).not.toContain("data-action=\"approve\"");
-    expect(html).not.toContain("<input");
+    expect(html).not.toContain('data-edit=');
     expect(html).not.toContain("Zatwierdź");
   });
 

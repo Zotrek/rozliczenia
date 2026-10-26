@@ -1,4 +1,5 @@
 import { lineKey, rowKey, settle, sumSelected } from "./engine.js";
+import { commentTargets, openingCommentPicks } from "./invoiceComment.js";
 import { isoToSheetDate, type SettlementMode } from "./range.js";
 import { parseSheetDate } from "./sheetDate.js";
 import type {
@@ -102,6 +103,12 @@ export interface StatementScreen {
   leftRoute: Record<string, string>;
   routeDraft: Record<string, RouteDraft>;
   routeDraftError: Record<string, string>;
+  /** Komentarz do faktury. Klucz z `rowKey`. Zapis do rejestru jest osobnym krokiem. */
+  invoiceComments: Record<string, string>;
+  /** Sklepy i podjazdy zaznaczone do jednego komentarza na dole. */
+  commentPicks: Record<string, true>;
+  commentDraft: string;
+  commentNotice: string;
 }
 
 export interface ApproveShop {
@@ -134,11 +141,19 @@ export function emptyStatement(): StatementScreen {
     leftRoute: {},
     routeDraft: {},
     routeDraftError: {},
+    invoiceComments: {},
+    commentPicks: {},
+    commentDraft: "",
+    commentNotice: "",
   };
 }
 
 export function freshStatement(rows: RegisterRow[], rates: SettlementRateRow[]): StatementScreen {
-  return { ...emptyStatement(), rows, rates };
+  const screen = { ...emptyStatement(), rows, rates };
+  return {
+    ...screen,
+    commentPicks: openingCommentPicks(commentTargets(currentStatement(screen), screen.invoiceComments)),
+  };
 }
 
 export function currentStatement(screen: StatementScreen): Statement {
@@ -516,6 +531,10 @@ export function adoptRows(
     leftRoute: pick(prev.leftRoute, keys),
     routeDraft: pick(prev.routeDraft, keys),
     routeDraftError: pick(prev.routeDraftError, keys),
+    invoiceComments: pick(prev.invoiceComments, keys),
+    commentPicks: pick(prev.commentPicks, keys),
+    commentDraft: prev.commentDraft,
+    commentNotice: prev.commentNotice,
   };
 }
 

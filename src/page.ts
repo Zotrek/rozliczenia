@@ -24,6 +24,28 @@ import {
   type ContractorListItem,
 } from "./range.js";
 import { readSettledInvoices } from "./invoices.js";
+import {
+  COMMENT_NEEDS_TEXT,
+  allPicked,
+  applyButtonLabel,
+  applyComments,
+  applyIsDisabled,
+  chosenComments,
+  commentApplyNotice,
+  commentTargets,
+  commentsToOverwrite,
+  emptyInvoiceComment,
+  invoiceCommentTargets,
+  invoiceSelectionSummary,
+  overwriteHint,
+  picksForAll,
+  prunePicks,
+  retainInvoiceComment,
+  routePickNote,
+  selectionSummary,
+  setCommentPicks,
+  willOverwrite,
+} from "./invoiceComment.js";
 import { lineKey, rowKey, sumSelected } from "./engine.js";
 import {
   STATEMENT_ERROR,
@@ -109,6 +131,7 @@ const VIEW: RangeViewModel = {
   webappMissing: false,
   statement: emptyStatement(),
   invoices: [],
+  invoiceComment: emptyInvoiceComment(),
   invoiceFocus: null,
   workReturn: "range",
   loadKind: "logo",
@@ -241,6 +264,8 @@ function paint(keep?: string): void {
   if (focused instanceof HTMLElement) {
     focused.scrollIntoView({ block: "nearest" });
   }
+  syncCommentChrome();
+  syncInvoiceComment();
 }
 
 /** Zaznaczenie nie przebudowuje listy: zostaje przewinięcie i fokus na checkboxie. */
@@ -575,6 +600,7 @@ async function runInvoices(): Promise<void> {
     VIEW.applied = started;
     VIEW.screen = screenAfterInvoices();
     VIEW.invoices = read.rows;
+    VIEW.invoiceComment = retainInvoiceComment(VIEW.invoiceComment, read.rows);
     VIEW.status = "";
     VIEW.stats = { ...VIEW.stats, status: "" };
     VIEW.ratesOpen = false;
@@ -755,11 +781,48 @@ function onClick(event: MouseEvent): void {
     });
   } else if (action === "approve") {
     void runApprove();
+  } else if (action === "apply-comment") {
+    applyStatementComment();
+  } else if (action === "check-comment-all") {
+    toggleAllStatementComments();
+  } else if (action === "apply-invoice-comment") {
+    applyInvoiceComment();
+  } else if (action === "check-invoice-all") {
+    toggleAllInvoiceComments();
   }
 }
 
 function onInput(event: Event): void {
   const el = event.target;
+  if (el instanceof HTMLTextAreaElement) {
+    if (el.dataset.draft === "comment") {
+      VIEW.statement = { ...VIEW.statement, commentDraft: el.value, commentNotice: "" };
+      dropCommentNotice();
+      syncCommentChrome();
+      return;
+    }
+    if (el.dataset.draft === "invoice-bulk") {
+      VIEW.invoiceComment = { ...VIEW.invoiceComment, draft: el.value, notice: "" };
+      dropInvoiceCommentNotice();
+      syncInvoiceComment();
+      return;
+    }
+    if (el.dataset.commentFor === "row") {
+      const ref = sheetRef(el);
+      if (!ref) {
+        return;
+      }
+      const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+      VIEW.invoiceComment = {
+        ...VIEW.invoiceComment,
+        comments: { ...VIEW.invoiceComment.comments, [key]: el.value },
+        notice: "",
+      };
+      dropInvoiceCommentNotice();
+      syncInvoiceComment();
+    }
+    return;
+  }
   if (!(el instanceof HTMLInputElement)) {
     return;
   }
@@ -871,15 +934,67 @@ function onChange(event: Event): void {
     if (!ref) {
       return;
     }
-    VIEW.statement = setDidNotHappen(
+    const next = setDidNotHappen(
       VIEW.statement,
       ref.sheetRow,
       ref.transportNumber,
       el.checked,
       ref.sheetName,
     );
+    VIEW.statement = {
+      ...next,
+      commentPicks: prunePicks(next.commentPicks, commentTargets(currentStatement(next), next.invoiceComments)),
+      commentNotice: "",
+    };
     VIEW.status = "";
     paint();
+    return;
+  }
+  if (el.dataset.pick === "comment") {
+    const ref = sheetRef(el);
+    if (!ref) {
+      return;
+    }
+    const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+    VIEW.statement = {
+      ...VIEW.statement,
+      commentPicks: setCommentPicks(VIEW.statement.commentPicks, [key], el.checked),
+      commentNotice: "",
+    };
+    dropCommentNotice();
+    syncCommentChrome();
+    return;
+  }
+  if (el.dataset.pickRoute !== undefined) {
+    const shops = commentTargets(currentStatement(VIEW.statement), VIEW.statement.invoiceComments).filter(
+      (target) => target.routeName === el.dataset.pickRoute,
+    );
+    VIEW.statement = {
+      ...VIEW.statement,
+      commentPicks: setCommentPicks(
+        VIEW.statement.commentPicks,
+        shops.map((target) => target.key),
+        el.checked,
+      ),
+      commentNotice: "",
+    };
+    dropCommentNotice();
+    syncCommentChrome();
+    return;
+  }
+  if (el.dataset.invoicePick === "1") {
+    const ref = sheetRef(el);
+    if (!ref) {
+      return;
+    }
+    const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+    VIEW.invoiceComment = {
+      ...VIEW.invoiceComment,
+      picks: setCommentPicks(VIEW.invoiceComment.picks, [key], el.checked),
+      notice: "",
+    };
+    dropInvoiceCommentNotice();
+    syncInvoiceComment();
     return;
   }
   if (
@@ -1127,9 +1242,240 @@ function moveRateActive(field: RateField, delta: number): void {
   items[next].scrollIntoView({ block: "nearest" });
 }
 
+function statementCommentModel() {
+  const statement = currentStatement(VIEW.statement);
+  const targets = commentTargets(statement, VIEW.statement.invoiceComments);
+  const chosen = chosenComments(targets, VIEW.statement.commentPicks);
+  return { targets, chosen };
+}
+
+function invoiceCommentModel() {
+  const targets = invoiceCommentTargets(VIEW.invoices, VIEW.invoiceComment.comments);
+  const chosen = chosenComments(targets, VIEW.invoiceComment.picks);
+  return { targets, chosen };
+}
+
+function dropCommentNotice(): void {
+  document.querySelector("[data-out='comment-notice']")?.remove();
+}
+
+function dropInvoiceCommentNotice(): void {
+  document.querySelector("[data-out='invoice-comment-notice']")?.remove();
+}
+
+function clearStatementCommentPicks(): void {
+  if (VIEW.screen !== "statement" || Object.keys(VIEW.statement.commentPicks).length === 0) {
+    return;
+  }
+  VIEW.statement = { ...VIEW.statement, commentPicks: {}, commentNotice: "" };
+  dropCommentNotice();
+  syncCommentChrome();
+}
+
+function applyStatementComment(): void {
+  const { chosen } = statementCommentModel();
+  const next = applyComments(VIEW.statement.invoiceComments, chosen, VIEW.statement.commentDraft);
+  if (!next) {
+    VIEW.statement = { ...VIEW.statement, commentNotice: COMMENT_NEEDS_TEXT };
+    paint("comment");
+    return;
+  }
+  const draft = VIEW.statement.commentDraft;
+  const count = chosen.length;
+  VIEW.statement = {
+    ...VIEW.statement,
+    invoiceComments: next,
+    commentPicks: {},
+    commentDraft: "",
+    commentNotice: commentApplyNotice(count, draft, "statement"),
+  };
+  paint();
+  document.querySelector<HTMLTextAreaElement>('[data-draft="comment"]')?.focus({ preventScroll: true });
+}
+
+function applyInvoiceComment(): void {
+  const { chosen } = invoiceCommentModel();
+  const next = applyComments(VIEW.invoiceComment.comments, chosen, VIEW.invoiceComment.draft);
+  if (!next) {
+    VIEW.invoiceComment = { ...VIEW.invoiceComment, notice: COMMENT_NEEDS_TEXT };
+    paint("invoice-comment");
+    return;
+  }
+  const draft = VIEW.invoiceComment.draft;
+  const count = chosen.length;
+  VIEW.invoiceComment = {
+    comments: next,
+    picks: {},
+    draft: "",
+    notice: commentApplyNotice(count, draft, "invoice"),
+  };
+  paint();
+  document.querySelector<HTMLTextAreaElement>('[data-draft="invoice-bulk"]')?.focus({ preventScroll: true });
+}
+
+function toggleAllStatementComments(): void {
+  const { targets } = statementCommentModel();
+  const on = !allPicked(targets, VIEW.statement.commentPicks);
+  VIEW.statement = {
+    ...VIEW.statement,
+    commentPicks: picksForAll(targets, on),
+    commentNotice: "",
+  };
+  dropCommentNotice();
+  syncCommentChrome();
+}
+
+function toggleAllInvoiceComments(): void {
+  const { targets } = invoiceCommentModel();
+  const on = !allPicked(targets, VIEW.invoiceComment.picks);
+  VIEW.invoiceComment = {
+    ...VIEW.invoiceComment,
+    picks: picksForAll(targets, on),
+    notice: "",
+  };
+  dropInvoiceCommentNotice();
+  syncInvoiceComment();
+}
+
+function syncCommentChrome(): void {
+  const root = document.querySelector('.statement[data-screen="statement"]');
+  if (!(root instanceof HTMLElement)) {
+    return;
+  }
+  const { targets, chosen } = statementCommentModel();
+  const draft = VIEW.statement.commentDraft;
+  const picks = VIEW.statement.commentPicks;
+  for (const input of root.querySelectorAll<HTMLInputElement>('[data-pick="comment"]')) {
+    const ref = sheetRef(input);
+    const line = input.closest("tr");
+    if (!ref || !line) {
+      continue;
+    }
+    const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+    const target = targets.find((item) => item.key === key);
+    if (!target) {
+      continue;
+    }
+    const on = picks[key] === true;
+    input.checked = on;
+    const overwrite = willOverwrite(target.comment, on, draft);
+    line.classList.toggle("will-overwrite", overwrite);
+    line.classList.toggle("is-picked", on && !overwrite);
+  }
+  const names = new Set<string>();
+  for (const target of targets) {
+    if (target.routeName !== null) {
+      names.add(target.routeName);
+    }
+  }
+  for (const name of names) {
+    const shops = targets.filter((target) => target.routeName === name);
+    const count = shops.filter((target) => picks[target.key] === true).length;
+    const box = root.querySelector(`[data-pick-route="${CSS.escape(name)}"]`);
+    if (box instanceof HTMLInputElement) {
+      box.checked = shops.length > 0 && count === shops.length;
+      box.indeterminate = count > 0 && count < shops.length;
+      const line = box.closest("tr");
+      if (line) {
+        line.classList.toggle("is-picked", box.checked);
+        line.classList.toggle("is-partial", box.indeterminate);
+      }
+    }
+    const note = root.querySelector(`[data-route-note="${CSS.escape(name)}"]`);
+    if (note) {
+      note.textContent = routePickNote(shops.length, count);
+    }
+  }
+  const summary = root.querySelector('[data-out="comment-summary"]');
+  if (summary) {
+    summary.textContent = selectionSummary(targets, picks);
+    summary.classList.toggle("muted", chosen.length === 0);
+  }
+  const hint = root.querySelector('[data-out="overwrite-hint"]');
+  if (hint instanceof HTMLElement) {
+    const message = overwriteHint(commentsToOverwrite(chosen, draft), draft);
+    hint.hidden = message === "";
+    hint.textContent = message;
+  }
+  const apply = root.querySelector('[data-action="apply-comment"]');
+  if (apply instanceof HTMLButtonElement) {
+    apply.disabled = applyIsDisabled(draft, chosen);
+    apply.textContent = applyButtonLabel(draft, chosen);
+  }
+  const checkAll = root.querySelector('[data-action="check-comment-all"]');
+  if (checkAll) {
+    checkAll.textContent = allPicked(targets, picks) ? "odznacz" : "zaznacz wszystkie";
+  }
+}
+
+function syncInvoiceComment(): void {
+  const root = document.querySelector('.statement[data-screen="invoices"]');
+  if (!(root instanceof HTMLElement)) {
+    return;
+  }
+  const { targets, chosen } = invoiceCommentModel();
+  const draft = VIEW.invoiceComment.draft;
+  const picks = VIEW.invoiceComment.picks;
+  for (const input of root.querySelectorAll<HTMLInputElement>('[data-invoice-pick="1"]')) {
+    const ref = sheetRef(input);
+    const line = input.closest("tr");
+    if (!ref || !line) {
+      continue;
+    }
+    const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+    const target = targets.find((item) => item.key === key);
+    if (!target) {
+      continue;
+    }
+    const on = picks[key] === true;
+    input.checked = on;
+    const overwrite = willOverwrite(target.comment, on, draft);
+    line.classList.toggle("will-overwrite", overwrite);
+    line.classList.toggle("is-picked", on && !overwrite);
+  }
+  const summary = root.querySelector('[data-out="invoice-comment-summary"]');
+  if (summary) {
+    summary.textContent = invoiceSelectionSummary(chosen.length);
+    summary.classList.toggle("muted", chosen.length === 0);
+  }
+  const hint = root.querySelector('[data-out="invoice-overwrite-hint"]');
+  if (hint instanceof HTMLElement) {
+    const message = overwriteHint(commentsToOverwrite(chosen, draft), draft);
+    hint.hidden = message === "";
+    hint.textContent = message;
+  }
+  const apply = root.querySelector('[data-action="apply-invoice-comment"]');
+  if (apply instanceof HTMLButtonElement) {
+    apply.disabled = applyIsDisabled(draft, chosen);
+    apply.textContent = applyButtonLabel(draft, chosen);
+  }
+  const checkAll = root.querySelector('[data-action="check-invoice-all"]');
+  if (checkAll) {
+    checkAll.textContent = allPicked(targets, picks) ? "odznacz" : "zaznacz wszystkie";
+  }
+}
+
 function onKeyDown(event: KeyboardEvent): void {
   const el = event.target;
+  if (el instanceof HTMLTextAreaElement) {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      if (el.dataset.draft === "comment") {
+        applyStatementComment();
+      }
+      if (el.dataset.draft === "invoice-bulk") {
+        applyInvoiceComment();
+      }
+    }
+    if (event.key === "Escape") {
+      clearStatementCommentPicks();
+    }
+    return;
+  }
   if (!(el instanceof HTMLInputElement)) {
+    if (event.key === "Escape") {
+      clearStatementCommentPicks();
+    }
     return;
   }
   if (el.dataset.filter === "contractor") {
@@ -1155,6 +1501,9 @@ function onKeyDown(event: KeyboardEvent): void {
     return;
   }
   if (el.dataset.rate !== "shop" && el.dataset.rate !== "contractor") {
+    if (event.key === "Escape") {
+      clearStatementCommentPicks();
+    }
     return;
   }
   const field: RateField = el.dataset.rate === "shop" ? "shop" : "contractor";

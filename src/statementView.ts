@@ -1,5 +1,20 @@
 import { lineKey, rowKey, sumSelected } from "./engine.js";
 import { escapeHtml } from "./html.js";
+import {
+  allPicked,
+  applyButtonLabel,
+  applyIsDisabled,
+  chosenComments,
+  commentKey,
+  commentTargets,
+  commentsToOverwrite,
+  overwriteHint,
+  routeCommentFace,
+  routePickNote,
+  selectionSummary,
+  willOverwrite,
+  type CommentTarget,
+} from "./invoiceComment.js";
 import { calendarToIsoDate } from "./range.js";
 import { addressWithCommaAfterLocality } from "./rateWindow.js";
 import { parseSheetDate } from "./sheetDate.js";
@@ -15,7 +30,7 @@ import {
   selectedLineCount,
   type StatementScreen,
 } from "./statement.js";
-import type { Grosze, RateTie, ShopCost, StatementLine } from "./types.js";
+import type { Grosze, RateTie, ShopCost, Statement, StatementLine } from "./types.js";
 
 const DASH = '<span class="muted">—</span>';
 
@@ -29,49 +44,57 @@ export function renderStatement(
   const selectedSum = sumSelected(statement, selectedKeys(screen.selected));
   const count = selectedLineCount(statement, screen.selected);
   const note = status ? `<p class="err status-block">${escapeHtml(status)}</p>` : "";
+  const commentNote = screen.commentNotice
+    ? `<p class="notice" role="status" data-out="comment-notice">${escapeHtml(screen.commentNotice)}</p>`
+    : "";
   const emptyHint = allowApprove
     ? "Brak nierozliczonych odbiorów tego podwykonawcy w podanym zakresie."
     : "Brak dni podjazdu tego podwykonawcy w podanym zakresie (Baza cen harmonogram).";
   const body =
     statement.lines.length === 0
       ? `<div class="blank"><strong>Brak pozycji.</strong><p>${emptyHint}</p></div>`
-      : table(screen, statement.lines);
+      : table(screen, statement);
+  const composer = statement.lines.length === 0 ? "" : commentComposer(screen, statement);
   return (
     `<div class="center-h">${escapeHtml(positionLabel(statement.lines.length))}</div>` +
     note +
+    commentNote +
     body +
+    composer +
     footer(screen.invoice, statement.total, selectedSum, count, allowApprove)
   );
 }
 
-function table(screen: StatementScreen, lines: readonly StatementLine[]): string {
+function table(screen: StatementScreen, statement: Statement): string {
+  const targets = commentTargets(statement, screen.invoiceComments);
   const rows: string[] = [];
-  for (const line of lines) {
+  for (const line of statement.lines) {
     if (line.kind === "plain") {
-      rows.push(plainRow(screen, line.shop));
+      rows.push(plainRow(screen, line.shop, targets));
       continue;
     }
-    rows.push(routeRow(screen, line));
+    rows.push(routeRow(screen, line, targets));
     if (!screen.openRoutes[line.routeName]) {
       continue;
     }
     const shared = line.bagRate !== null;
     for (const shop of line.shops) {
-      rows.push(childRow(screen, shop, shared));
+      rows.push(childRow(screen, shop, shared, targets));
     }
   }
   return (
     '<div class="table-wrap"><table><thead><tr>' +
-    `<th class="c"><span class="col-check"><span>Rozliczone</span>${selectAllBox(lines, screen.selected)}</span></th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>` +
+    `<th class="c"><span class="col-check"><span>Rozliczone</span>${selectAllBox(statement.lines, screen.selected)}</span></th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>` +
     "<th>Podjazd/Trasa</th><th class=\"num\">Kwota podjazdu/trasy</th><th class=\"num\">Liczba worków</th><th class=\"num\">Kwota za worek</th>" +
     "<th class=\"num\">Suma za worki</th>" +
     "<th class=\"num\" title=\"Podjazd: kwota podjazdu plus worki. Trasa: stawka raz plus worki.\">Razem</th>" +
     "<th>transport się odbył</th>" +
+    '<th class="comment-col wrap">Komentarz do faktury</th>' +
     `</tr></thead><tbody>${rows.join("")}</tbody></table></div>`
   );
 }
 
-function plainRow(screen: StatementScreen, shop: ShopCost): string {
+function plainRow(screen: StatementScreen, shop: ShopCost, targets: readonly CommentTarget[]): string {
   const key = rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName);
   const line = encodeURIComponent(key);
   const dead = !shop.happened;
@@ -86,11 +109,12 @@ function plainRow(screen: StatementScreen, shop: ShopCost): string {
   const bagCell = shop.tie
     ? DASH
     : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
+  const target = targets.find((item) => item.key === commentKey(shop));
   return (
-    `<tr class="${rowClass(dead, checked, "plain")}" data-kind="plain">` +
+    `<tr class="${joinClass(rowClass(dead, checked, "plain"), shopCommentClass(target, screen))}" data-kind="plain">` +
     `<td class="c">${lineBox(line, checked)}</td>` +
     `<td>${text(shop.transportNumber, dead)}</td>` +
-    `<td class="adres">${text(addressWithCommaAfterLocality(shop.address), dead)}</td>` +
+    shopAddress(shop, dead, target, screen) +
     `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}${newRouteBox(screen, shop)}</div></td>` +
     `<td>${dateInput(shop, "pickup-date", shop.pickupDate, "Zapis od razu do Data odbioru.")}</td>` +
     `<td>${legKind}</td>` +
@@ -100,11 +124,16 @@ function plainRow(screen: StatementScreen, shop: ShopCost): string {
     `<td class="num">${money(shop.bagSum, dead)}</td>` +
     `<td class="num">${money(shop.receptionCost, dead)}</td>` +
     `<td>${tripBox(shop)}</td>` +
+    commentCell(shop, target) +
     "</tr>"
   );
 }
 
-function routeRow(screen: StatementScreen, line: Extract<StatementLine, { kind: "route" }>): string {
+function routeRow(
+  screen: StatementScreen,
+  line: Extract<StatementLine, { kind: "route" }>,
+  targets: readonly CommentTarget[],
+): string {
   const key = routeSelectionKey(line.routeName);
   const checked = screen.selected[key] === true;
   const open = screen.openRoutes[line.routeName] === true;
@@ -143,12 +172,14 @@ function routeRow(screen: StatementScreen, line: Extract<StatementLine, { kind: 
         line.routeName,
       )
     : DASH;
+  const shops = targets.filter((item) => item.routeName === line.routeName);
+  const pickedShops = shops.filter((item) => screen.commentPicks[item.key] === true).length;
   return (
-    `<tr class="${rowClass(false, checked, "route")}" data-kind="route">` +
+    `<tr class="${joinClass(rowClass(false, checked, "route"), routeCommentClass(shops.length, pickedShops))}" data-kind="route">` +
     `<td class="c">${lineBox(encodeURIComponent(key), checked)}</td>` +
     `<td>${DASH}</td>` +
     `<td class="adres"><div class="who-line"><button type="button" class="chev" data-action="expand" data-route="${escapeHtml(line.routeName)}" aria-expanded="${open ? "true" : "false"}" aria-label="Sklepy trasy">${open ? "▾" : "▸"}</button>` +
-    `<div><div>${escapeHtml(line.routeName)}</div><div class="sub">trasa · ${escapeHtml(sub)}</div>${none}${tie}</div></div></td>` +
+    `<div>${routePick(line.routeName, sub, shops.length, pickedShops)}${none}${tie}</div></div></td>` +
     `<td class="sklep">${DASH}</td>` +
     `<td data-out="route-date">${date}</td>` +
     `<td><span class="tag tag-route">trasa</span></td>` +
@@ -158,21 +189,28 @@ function routeRow(screen: StatementScreen, line: Extract<StatementLine, { kind: 
     `<td class="num">${money(line.bagSum, false)}</td>` +
     `<td class="num">${money(line.routeSum, false)}</td>` +
     `<td>${DASH}</td>` +
+    routeCommentCell(shops) +
     "</tr>"
   );
 }
 
-function childRow(screen: StatementScreen, shop: ShopCost, sharedBagRate: boolean): string {
+function childRow(
+  screen: StatementScreen,
+  shop: ShopCost,
+  sharedBagRate: boolean,
+  targets: readonly CommentTarget[],
+): string {
   const dead = !shop.happened;
   const state = screen.screenByRow[rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName)] ?? {};
   const bagCell = shop.tie || sharedBagRate
     ? DASH
     : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie zapisuje kolumn rejestru ani Bazy stawek.");
+  const target = targets.find((item) => item.key === commentKey(shop));
   return (
-    `<tr class="${rowClass(dead, false, "child")}" data-kind="child">` +
+    `<tr class="${joinClass(rowClass(dead, false, "child"), shopCommentClass(target, screen))}" data-kind="child">` +
     "<td></td>" +
     `<td>${text(shop.transportNumber, dead)}</td>` +
-    `<td class="adres">${text(addressWithCommaAfterLocality(shop.address), dead)}</td>` +
+    shopAddress(shop, dead, target, screen) +
     `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}</div></td>` +
     `<td>${dateInput(shop, "pickup-date", shop.pickupDate, "Zapis od razu do Data odbioru tego sklepu.")}</td>` +
     `<td>${DASH}</td>` +
@@ -182,8 +220,102 @@ function childRow(screen: StatementScreen, shop: ShopCost, sharedBagRate: boolea
     `<td class="num">${DASH}</td>` +
     `<td class="num">${DASH}</td>` +
     `<td><div class="trip-stack">${tripBox(shop)}${detachButton(shop)}</div></td>` +
+    commentCell(shop, target) +
     "</tr>"
   );
+}
+
+function commentComposer(screen: StatementScreen, statement: Statement): string {
+  const targets = commentTargets(statement, screen.invoiceComments);
+  const chosen = chosenComments(targets, screen.commentPicks);
+  const hint = overwriteHint(commentsToOverwrite(chosen, screen.commentDraft), screen.commentDraft);
+  const summary = selectionSummary(targets, screen.commentPicks);
+  const disabled = applyIsDisabled(screen.commentDraft, chosen);
+  return (
+    '<footer class="composer" data-composer="statement"><div class="composer-bar"><div class="composer-lead">' +
+    "<h2>Komentarz dla zaznaczonych</h2>" +
+    `<p class="selection-summary${chosen.length === 0 ? " muted" : ""}" data-out="comment-summary">${escapeHtml(summary)}</p></div>` +
+    `<textarea data-draft="comment" data-keep="comment" rows="2" placeholder="np. folia osobno, bez PET" aria-label="Komentarz dla zaznaczonych">${escapeHtml(screen.commentDraft)}</textarea>` +
+    `<button type="button" class="btn-teal" data-action="apply-comment"${disabled ? " disabled" : ""}>${escapeHtml(applyButtonLabel(screen.commentDraft, chosen))}</button></div>` +
+    '<div class="composer-actions">' +
+    `<button type="button" class="text-btn" data-action="check-comment-all">${allPicked(targets, screen.commentPicks) ? "odznacz" : "zaznacz wszystkie"}</button></div>` +
+    `<p class="note overwrite-hint" data-out="overwrite-hint"${hint ? "" : " hidden"}>${escapeHtml(hint)}</p>` +
+    '<p class="note composer-foot">Na tym ekranie. Numer i kwoty bez zmian. Do rejestru jeszcze nie schodzi.</p></footer>'
+  );
+}
+
+function routePick(routeName: string, sub: string, total: number, picked: number): string {
+  if (total === 0) {
+    return `<div>${escapeHtml(routeName)}</div><div class="sub">trasa · ${escapeHtml(sub)}</div>`;
+  }
+  const checked = picked === total ? " checked" : "";
+  return (
+    `<label class="pick-line"><input type="checkbox" data-pick-route="${escapeHtml(routeName)}" aria-label="${escapeHtml(`Zaznacz sklepy trasy ${routeName}`)}"${checked}>` +
+    `<span class="stack"><span>${escapeHtml(routeName)}</span>` +
+    `<span class="sub">trasa · ${escapeHtml(sub)} · <span data-route-note="${escapeHtml(routeName)}">${escapeHtml(routePickNote(total, picked))}</span></span></span></label>`
+  );
+}
+
+function shopAddress(shop: ShopCost, dead: boolean, target: CommentTarget | undefined, screen: StatementScreen): string {
+  const shown = text(addressWithCommaAfterLocality(shop.address), dead);
+  if (!target) {
+    return `<td class="adres">${shown}</td>`;
+  }
+  const picked = screen.commentPicks[target.key] === true;
+  const label = shop.shopName.trim() === "" ? shop.address : shop.shopName;
+  return (
+    `<td class="adres"><label class="pick-line"><input type="checkbox" data-pick="comment" ${ref(shop)}${picked ? " checked" : ""} aria-label="${escapeHtml(`Zaznacz ${label} do komentarza`)}">` +
+    `<span>${shown}</span></label></td>`
+  );
+}
+
+function commentCell(shop: ShopCost, target: CommentTarget | undefined): string {
+  if (!shop.happened || !target) {
+    return '<td class="comment-col"><span class="muted" title="Transport się nie odbył. Ten sklep nie wchodzi na fakturę.">—</span></td>';
+  }
+  return `<td class="comment-col">${commentPlain(target.comment)}</td>`;
+}
+
+function routeCommentCell(shops: readonly CommentTarget[]): string {
+  if (shops.length === 0) {
+    return '<td class="comment-col"><span class="muted">—</span></td>';
+  }
+  const face = routeCommentFace(shops);
+  if (!face.sharedByAll) {
+    return `<td class="comment-col"><span class="muted">${escapeHtml(face.sub)}</span></td>`;
+  }
+  return (
+    '<td class="comment-col"><span class="stack">' +
+    `<span class="comment-snip">${escapeHtml(face.snip)}</span>` +
+    `<span class="sub">${escapeHtml(face.sub)}</span></span></td>`
+  );
+}
+
+function commentPlain(value: string): string {
+  const trimmed = value.trim();
+  return trimmed === "" ? '<span class="muted">brak</span>' : `<span class="comment-snip">${escapeHtml(trimmed)}</span>`;
+}
+
+function shopCommentClass(target: CommentTarget | undefined, screen: StatementScreen): string {
+  if (!target) {
+    return "";
+  }
+  const picked = screen.commentPicks[target.key] === true;
+  if (willOverwrite(target.comment, picked, screen.commentDraft)) {
+    return "will-overwrite";
+  }
+  return picked ? "is-picked" : "";
+}
+
+function routeCommentClass(total: number, picked: number): string {
+  if (total === 0 || picked === 0) {
+    return "";
+  }
+  return picked === total ? "is-picked" : "is-partial";
+}
+
+function joinClass(base: string, extra: string): string {
+  return [base, extra].filter(Boolean).join(" ");
 }
 
 function footer(

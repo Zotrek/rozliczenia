@@ -13,6 +13,7 @@ import {
   type SettlementMode,
   type StartedSearch,
 } from "./range.js";
+import { emptyInvoiceComment, type InvoiceCommentDraft } from "./invoiceComment.js";
 import type { SettledInvoiceRow } from "./invoices.js";
 import { renderInvoiceList } from "./invoicesView.js";
 import type { StatementScreen } from "./statement.js";
@@ -40,6 +41,8 @@ export interface RangeViewModel {
   statement: StatementScreen;
   /** Ostatni odczyt podglądu rozliczonych faktur. */
   invoices: readonly SettledInvoiceRow[];
+  /** Komentarz na podglądzie faktury. Zostaje na ekranie, dopóki nie ma zapisu do rejestru. */
+  invoiceComment: InvoiceCommentDraft;
   /**
    * Numer faktury do podświetlenia na podglądzie.
    * `null` = bez podświetlenia. Pusty tekst = grupa „bez numeru”.
@@ -324,7 +327,7 @@ function renderInvoicesScreen(model: RangeViewModel): string {
     workBackButton(model) +
     "</div>" +
     status +
-    renderInvoiceList(model.invoices, model.invoiceFocus) +
+    renderInvoiceList(model.invoices, model.invoiceFocus, model.invoiceComment ?? emptyInvoiceComment()) +
     "</div>"
   );
 }

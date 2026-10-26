@@ -22,8 +22,9 @@ import {
   blocksOnOrder,
   defaultRangeDates,
   type ContractorListItem,
+  type StartedSearch,
 } from "./range.js";
-import { readSettledInvoices } from "./invoices.js";
+import { readSettledInvoices, rowsOfInvoice, type SettledInvoiceRow } from "./invoices.js";
 import {
   COMMENT_NEEDS_TEXT,
   allPicked,
@@ -138,6 +139,7 @@ const VIEW: RangeViewModel = {
   invoices: [],
   invoiceComment: emptyInvoiceComment(),
   invoiceFocus: null,
+  invoiceNotice: "",
   workReturn: "range",
   loadKind: "logo",
   addresses: [],
@@ -456,6 +458,29 @@ async function loadContractors(): Promise<void> {
   }
 }
 
+async function loadInvoiceRows(
+  started: StartedSearch,
+): Promise<
+  | { ok: true; rows: SettledInvoiceRow[] }
+  | { ok: false; silent: boolean; error: string; detail: { technical?: unknown; notJson?: boolean; error?: unknown } }
+> {
+  const response = await fetch(webAppUrl(webapp, invoiceParams(started)));
+  const parsed = await readRozJson(response);
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      silent: parsed.silent,
+      error: "Odczyt faktur nie doszedł.",
+      detail: parsed.silent ? {} : parsed,
+    };
+  }
+  const read = readSettledInvoices(parsed.body);
+  if (!read.ok) {
+    return { ok: false, silent: false, error: read.error, detail: { technical: read.error } };
+  }
+  return { ok: true, rows: read.rows };
+}
+
 async function runSearch(): Promise<void> {
   const started = startSearch(
     fieldsForSearch({
@@ -480,7 +505,10 @@ async function runSearch(): Promise<void> {
   VIEW.error = "";
   VIEW.loading = true;
   VIEW.loadKind = "logo";
-  VIEW.loadMessage = "Szukam nierozliczonych odbiorów…";
+  VIEW.loadMessage =
+    VIEW.workReturn === "stats" && VIEW.invoiceFocus !== null
+      ? "Szukam tej faktury i nierozliczonych odbiorów…"
+      : "Szukam nierozliczonych odbiorów…";
   paint();
   try {
     const response = await fetch(webAppUrl(webapp, searchParams(started)));
@@ -513,8 +541,38 @@ async function runSearch(): Promise<void> {
     VIEW.applied = started;
     VIEW.screen = screenAfterSearch();
     VIEW.statement = freshStatement(read.rows, read.rates);
-    if (VIEW.workReturn === "stats" && VIEW.invoiceFocus) {
+    VIEW.invoiceNotice = "";
+    if (VIEW.workReturn === "stats" && VIEW.invoiceFocus !== null) {
       VIEW.statement = { ...VIEW.statement, invoice: VIEW.invoiceFocus };
+      try {
+        const invoiceRead = await loadInvoiceRows(started);
+        if (invoiceRead.ok) {
+          VIEW.invoices = rowsOfInvoice(invoiceRead.rows, VIEW.invoiceFocus);
+          VIEW.invoiceComment = retainInvoiceComment(VIEW.invoiceComment, VIEW.invoices);
+        } else {
+          VIEW.invoices = [];
+          if (!invoiceRead.silent) {
+            VIEW.invoiceNotice = invoiceRead.error;
+            reportFailure(
+              "ROZ-E-INVOICES",
+              "page.ts runSearch",
+              "Odczyt pozycji tej faktury nie doszedł.",
+              "Zestawienie nierozliczonych jest. Pozycji tej faktury na górze nie ma.",
+              invoiceRead.detail,
+            );
+          }
+        }
+      } catch (err) {
+        VIEW.invoices = [];
+        VIEW.invoiceNotice = "Odczyt pozycji tej faktury nie doszedł.";
+        reportFailure(
+          "ROZ-E-INVOICES",
+          "page.ts runSearch",
+          "Odczyt pozycji tej faktury nie doszedł.",
+          "Zestawienie nierozliczonych jest. Pozycji tej faktury na górze nie ma.",
+          { technical: err },
+        );
+      }
     }
     VIEW.status = "";
     VIEW.stats = { ...VIEW.stats, status: "" };
@@ -574,6 +632,7 @@ function armPickupWork(el: HTMLElement): boolean {
   VIEW.workReturn = "stats";
   VIEW.error = "";
   VIEW.invoiceFocus = el.dataset.invoiceKnown === "1" ? (el.dataset.invoice ?? "") : null;
+  VIEW.invoiceNotice = "";
   return true;
 }
 
@@ -604,37 +663,26 @@ async function runInvoices(): Promise<void> {
   VIEW.loadMessage = "Szukam rozliczonych faktur…";
   paint();
   try {
-    const response = await fetch(webAppUrl(webapp, invoiceParams(started)));
-    const parsed = await readRozJson(response);
-    if (!parsed.ok) {
-      if (!parsed.silent) {
+    const read = await loadInvoiceRows(started);
+    if (!read.ok) {
+      if (!read.silent) {
         failOpen("Odczyt faktur nie doszedł.");
         reportFailure(
           "ROZ-E-INVOICES",
           "page.ts runInvoices",
           "Odczyt faktur nie doszedł.",
           "Podgląd się nie zmienił. Możesz poprawić zakres i otworzyć go jeszcze raz.",
-          parsed,
+          read.detail,
         );
       }
       return;
     }
-    const read = readSettledInvoices(parsed.body);
-    if (!read.ok) {
-      failOpen(read.error);
-      reportFailure(
-        "ROZ-E-INVOICES",
-        "page.ts runInvoices",
-        "Odczyt faktur nie doszedł.",
-        "Podgląd się nie zmienił. Możesz poprawić zakres i otworzyć go jeszcze raz.",
-        { technical: read.error },
-      );
-      return;
-    }
+    const rows = VIEW.invoiceFocus === null ? read.rows : rowsOfInvoice(read.rows, VIEW.invoiceFocus);
     VIEW.applied = started;
     VIEW.screen = screenAfterInvoices();
-    VIEW.invoices = read.rows;
-    VIEW.invoiceComment = retainInvoiceComment(VIEW.invoiceComment, read.rows);
+    VIEW.invoices = rows;
+    VIEW.invoiceNotice = "";
+    VIEW.invoiceComment = retainInvoiceComment(VIEW.invoiceComment, rows);
     VIEW.status = "";
     VIEW.stats = { ...VIEW.stats, status: "" };
     VIEW.ratesOpen = false;

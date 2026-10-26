@@ -32,6 +32,18 @@ export type SettledInvoicesResult =
   | { ok: true; rows: SettledInvoiceRow[] }
   | { ok: false; error: string };
 
+/** Podpis numeru. Pusty tekst czyta się „bez numeru”. */
+export function invoiceFocusLabel(invoice: string): string {
+  const trimmed = invoice.trim();
+  return trimmed === "" ? "bez numeru" : trimmed;
+}
+
+/** Wiersze jednego numeru. Porównanie jest po obciętych spacjach. */
+export function rowsOfInvoice(rows: readonly SettledInvoiceRow[], invoice: string): SettledInvoiceRow[] {
+  const key = invoice.trim();
+  return rows.filter((row) => row.invoice.trim() === key);
+}
+
 export function invoiceCountLabel(count: number): string {
   const n = Math.abs(count);
   const lastTwo = n % 100;

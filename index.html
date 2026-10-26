@@ -519,6 +519,8 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
   border-color: var(--teal);
   box-shadow: 0 0 0 2px var(--teal-soft);
 }
+.focused-invoice { padding-bottom: 4px; }
+.invoice-card .note { margin: 0; padding: 10px 14px 12px; }
 .invoice-head {
   display: flex;
   justify-content: space-between;
@@ -2135,6 +2137,16 @@ function sumLines(lines) {
 }
 
 
+/** Podpis numeru. Pusty tekst czyta się „bez numeru”. */
+function invoiceFocusLabel(invoice) {
+    const trimmed = invoice.trim();
+    return trimmed === "" ? "bez numeru" : trimmed;
+}
+/** Wiersze jednego numeru. Porównanie jest po obciętych spacjach. */
+function rowsOfInvoice(rows, invoice) {
+    const key = invoice.trim();
+    return rows.filter((row) => row.invoice.trim() === key);
+}
 function invoiceCountLabel(count) {
     const n = Math.abs(count);
     const lastTwo = n % 100;
@@ -3326,10 +3338,10 @@ function readRateRow(value) {
 
 const INVOICE_DASH = '<span class="muted">—</span>';
 function renderInvoiceList(rows, focus = null, comment = emptyInvoiceComment()) {
-    const groups = groupSettledInvoices(rows);
+    const visible = focus === null ? rows : rowsOfInvoice(rows, focus);
+    const groups = groupSettledInvoices(visible);
     if (groups.length === 0) {
-        return ('<div class="blank"><strong>Brak rozliczonych faktur.</strong>' +
-            "<p>Ten podwykonawca nie ma rozliczonych odbiorów w podanym zakresie.</p></div>");
+        return emptyInvoices(focus);
     }
     const note = '<p class="note invoice-note">Podgląd. Kwoty są z arkusza. Tych pozycji nie da się tu zmienić ani cofnąć. ' +
         "Komentarz przy pozycji zmieniasz w jej polu. Wspólny tekst dla kilku pozycji wpisujesz na dole.</p>";
@@ -3337,11 +3349,62 @@ function renderInvoiceList(rows, focus = null, comment = emptyInvoiceComment()) 
         ? `<p class="notice" role="status" data-out="invoice-comment-notice">${escapeHtml(comment.notice)}</p>`
         : "";
     return (`<div class="invoice-body">${note}${notice}${groups.map((group) => renderGroup(group, focus, comment)).join("")}</div>` +
-        invoiceComposer(rows, comment));
+        invoiceComposer(visible, comment));
+}
+/** Jedna faktura na zestawieniu: pozycje już rozliczone, bez komentarza i bez zaznaczania. */
+function renderFocusedInvoice(rows, focus, notice = "") {
+    const label = invoiceFocusLabel(focus);
+    const key = focus.trim();
+    if (notice !== "") {
+        return (`<section class="invoice-card is-focus" data-invoice="${escapeHtml(key)}">` +
+            `<header class="invoice-head"><strong>${escapeHtml(label)}</strong></header>` +
+            `<p class="note">${escapeHtml(notice)}</p></section>`);
+    }
+    const groups = groupSettledInvoices(rowsOfInvoice(rows, focus));
+    if (groups.length === 0) {
+        return (`<section class="invoice-card is-focus" data-invoice="${escapeHtml(key)}">` +
+            `<header class="invoice-head"><strong>${escapeHtml(label)}</strong><span>brak pozycji</span></header>` +
+            "<p class=\"note\">W tym zakresie nie ma rozliczonych odbiorów tej faktury.</p></section>");
+    }
+    const group = groups[0];
+    const total = group.total == null ? INVOICE_DASH : escapeHtml(formatPln(group.total));
+    return (`<section class="invoice-card is-focus" data-invoice="${escapeHtml(group.invoice)}">` +
+        '<header class="invoice-head">' +
+        `<strong>${escapeHtml(group.label)}</strong>` +
+        `<span>${escapeHtml(invoiceCountLabel(group.rows.length))} · ${total}</span>` +
+        "</header>" +
+        '<div class="table-wrap"><table><thead><tr>' +
+        "<th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th><th>Trasa</th>" +
+        '<th class="num">Liczba worków</th><th class="num">Koszt odbioru</th><th class="num">Koszt na worek</th>' +
+        `</tr></thead><tbody>${group.rows.map((row) => focusedLine(row)).join("")}</tbody></table></div></section>`);
+}
+function emptyInvoices(focus) {
+    if (focus !== null) {
+        const label = invoiceFocusLabel(focus);
+        const detail = focus.trim() === ""
+            ? "W tym zakresie nie ma rozliczonych odbiorów bez numeru faktury."
+            : `W tym zakresie nie ma rozliczonych odbiorów z numerem ${label}.`;
+        return ('<div class="blank"><strong>Brak pozycji tej faktury.</strong>' +
+            `<p>${escapeHtml(detail)}</p></div>`);
+    }
+    return ('<div class="blank"><strong>Brak rozliczonych faktur.</strong>' +
+        "<p>Ten podwykonawca nie ma rozliczonych odbiorów w podanym zakresie.</p></div>");
+}
+function focusedLine(row) {
+    return (`<tr${row.routeName.trim() === "" ? "" : ' class="is-child"'}>` +
+        `<td>${text(row.transportNumber)}</td>` +
+        `<td class="adres">${text(addressWithCommaAfterLocality(row.address))}</td>` +
+        `<td>${text(row.shopName)}</td>` +
+        `<td>${text(row.pickupDate)}</td>` +
+        `<td>${text(row.routeName)}</td>` +
+        `<td class="num">${row.bagCount == null ? INVOICE_DASH : escapeHtml(String(row.bagCount))}</td>` +
+        `<td class="num">${money(row.receptionCost)}</td>` +
+        `<td class="num">${money(row.costPerBag)}</td>` +
+        "</tr>");
 }
 function renderGroup(group, focus, comment) {
     const total = group.total == null ? INVOICE_DASH : escapeHtml(formatPln(group.total));
-    const on = focus !== null && group.invoice === focus;
+    const on = focus !== null && group.invoice === focus.trim();
     return (`<section class="invoice-card${on ? " is-focus" : ""}" data-invoice="${escapeHtml(group.invoice)}">` +
         '<header class="invoice-head">' +
         `<strong>${escapeHtml(group.label)}</strong>` +
@@ -5009,7 +5072,8 @@ function periodPickupsBlock(model) {
         pager("pickups", paged) +
         '<p class="note" style="margin: 10px 12px 12px;">' +
         "Wartość faktury to suma kosztów odbioru z arkusza dla tego numeru, u tego podwykonawcy i w tym okresie. " +
-        "Podgląd nic nie zapisuje. Edycja otwiera zestawienie nierozliczonych i wpisuje ten numer faktury. " +
+        "Podgląd pokazuje tylko tę fakturę i nic nie zapisuje. " +
+        "Edycja otwiera zestawienie nierozliczonych, wpisuje ten numer i na górze pokazuje pozycje tej faktury. " +
         "W Harmonogramie link jest też przy nierozliczonym wierszu. " +
         "Harmonogram: liczba worków = liczba wierszy w „odebrane z harmonogramu” dla sklepu i dnia. " +
         `Lista pokazuje po ${STATS_PAGE_SIZE} pozycji na stronę.</p>`);
@@ -5170,6 +5234,7 @@ function pickupBar(state) {
 function emptyRow(cols, message = "Brak danych w tym okresie.") {
     return `<tr><td colspan="${cols}" class="note" style="border:none;background:transparent">${escapeHtml(message)}</td></tr>`;
 }
+
 
 
 
@@ -5348,7 +5413,17 @@ function renderStatementScreen(model) {
         workBackButton(model) +
         ratesButton() +
         "</div>" +
+        focusedInvoiceBlock(model) +
         renderStatement(model.statement, model.status, { allowApprove: true }) +
+        "</div>");
+}
+function focusedInvoiceBlock(model) {
+    if (model.workReturn !== "stats" || model.invoiceFocus === null) {
+        return "";
+    }
+    return ('<div class="focused-invoice">' +
+        '<p class="note invoice-note">Pozycje tej faktury. Niżej są nierozliczone odbiory — możesz dopisać je tym samym numerem.</p>' +
+        renderFocusedInvoice(model.invoices, model.invoiceFocus, model.invoiceNotice) +
         "</div>");
 }
 function renderInvoicesScreen(model) {
@@ -5356,12 +5431,20 @@ function renderInvoicesScreen(model) {
     const status = model.status ? `<p class="err status-block">${escapeHtml(model.status)}</p>` : "";
     return ('<div class="statement" data-screen="invoices"><div class="top">' +
         brand(model.mode) +
-        `<div class="range"><span>Podgląd rozliczonych</span><strong>${escapeHtml(label)}</strong></div>` +
+        invoiceHeading(model.invoiceFocus, label) +
         workBackButton(model) +
         "</div>" +
         status +
         renderInvoiceList(model.invoices, model.invoiceFocus, model.invoiceComment ?? emptyInvoiceComment()) +
         "</div>");
+}
+function invoiceHeading(focus, label) {
+    if (focus === null) {
+        return `<div class="range"><span>Podgląd rozliczonych</span><strong>${escapeHtml(label)}</strong></div>`;
+    }
+    const name = invoiceFocusLabel(focus);
+    const range = label === "" ? name : `${name} · ${label}`;
+    return `<div class="range"><span>Podgląd faktury</span><strong>${escapeHtml(range)}</strong></div>`;
 }
 function renderRatesDialog(model) {
     const messageClass = model.ratesMessageOk ? "note" : "err";
@@ -5643,6 +5726,7 @@ const VIEW = {
     invoices: [],
     invoiceComment: emptyInvoiceComment(),
     invoiceFocus: null,
+    invoiceNotice: "",
     workReturn: "range",
     loadKind: "logo",
     addresses: [],
@@ -5900,6 +5984,23 @@ async function loadContractors() {
         paint();
     }
 }
+async function loadInvoiceRows(started) {
+    const response = await fetch(webAppUrl(webapp, invoiceParams(started)));
+    const parsed = await readRozJson(response);
+    if (!parsed.ok) {
+        return {
+            ok: false,
+            silent: parsed.silent,
+            error: "Odczyt faktur nie doszedł.",
+            detail: parsed.silent ? {} : parsed,
+        };
+    }
+    const read = readSettledInvoices(parsed.body);
+    if (!read.ok) {
+        return { ok: false, silent: false, error: read.error, detail: { technical: read.error } };
+    }
+    return { ok: true, rows: read.rows };
+}
 async function runSearch() {
     const started = startSearch(fieldsForSearch({
         contractor: VIEW.contractor,
@@ -5920,7 +6021,10 @@ async function runSearch() {
     VIEW.error = "";
     VIEW.loading = true;
     VIEW.loadKind = "logo";
-    VIEW.loadMessage = "Szukam nierozliczonych odbiorów…";
+    VIEW.loadMessage =
+        VIEW.workReturn === "stats" && VIEW.invoiceFocus !== null
+            ? "Szukam tej faktury i nierozliczonych odbiorów…"
+            : "Szukam nierozliczonych odbiorów…";
     paint();
     try {
         const response = await fetch(webAppUrl(webapp, searchParams(started)));
@@ -5941,8 +6045,28 @@ async function runSearch() {
         VIEW.applied = started;
         VIEW.screen = screenAfterSearch();
         VIEW.statement = freshStatement(read.rows, read.rates);
-        if (VIEW.workReturn === "stats" && VIEW.invoiceFocus) {
+        VIEW.invoiceNotice = "";
+        if (VIEW.workReturn === "stats" && VIEW.invoiceFocus !== null) {
             VIEW.statement = { ...VIEW.statement, invoice: VIEW.invoiceFocus };
+            try {
+                const invoiceRead = await loadInvoiceRows(started);
+                if (invoiceRead.ok) {
+                    VIEW.invoices = rowsOfInvoice(invoiceRead.rows, VIEW.invoiceFocus);
+                    VIEW.invoiceComment = retainInvoiceComment(VIEW.invoiceComment, VIEW.invoices);
+                }
+                else {
+                    VIEW.invoices = [];
+                    if (!invoiceRead.silent) {
+                        VIEW.invoiceNotice = invoiceRead.error;
+                        reportFailure("ROZ-E-INVOICES", "page.ts runSearch", "Odczyt pozycji tej faktury nie doszedł.", "Zestawienie nierozliczonych jest. Pozycji tej faktury na górze nie ma.", invoiceRead.detail);
+                    }
+                }
+            }
+            catch (err) {
+                VIEW.invoices = [];
+                VIEW.invoiceNotice = "Odczyt pozycji tej faktury nie doszedł.";
+                reportFailure("ROZ-E-INVOICES", "page.ts runSearch", "Odczyt pozycji tej faktury nie doszedł.", "Zestawienie nierozliczonych jest. Pozycji tej faktury na górze nie ma.", { technical: err });
+            }
         }
         VIEW.status = "";
         VIEW.stats = { ...VIEW.stats, status: "" };
@@ -5996,6 +6120,7 @@ function armPickupWork(el) {
     VIEW.workReturn = "stats";
     VIEW.error = "";
     VIEW.invoiceFocus = el.dataset.invoiceKnown === "1" ? (el.dataset.invoice ?? "") : null;
+    VIEW.invoiceNotice = "";
     return true;
 }
 async function runInvoices() {
@@ -6021,25 +6146,20 @@ async function runInvoices() {
     VIEW.loadMessage = "Szukam rozliczonych faktur…";
     paint();
     try {
-        const response = await fetch(webAppUrl(webapp, invoiceParams(started)));
-        const parsed = await readRozJson(response);
-        if (!parsed.ok) {
-            if (!parsed.silent) {
+        const read = await loadInvoiceRows(started);
+        if (!read.ok) {
+            if (!read.silent) {
                 failOpen("Odczyt faktur nie doszedł.");
-                reportFailure("ROZ-E-INVOICES", "page.ts runInvoices", "Odczyt faktur nie doszedł.", "Podgląd się nie zmienił. Możesz poprawić zakres i otworzyć go jeszcze raz.", parsed);
+                reportFailure("ROZ-E-INVOICES", "page.ts runInvoices", "Odczyt faktur nie doszedł.", "Podgląd się nie zmienił. Możesz poprawić zakres i otworzyć go jeszcze raz.", read.detail);
             }
             return;
         }
-        const read = readSettledInvoices(parsed.body);
-        if (!read.ok) {
-            failOpen(read.error);
-            reportFailure("ROZ-E-INVOICES", "page.ts runInvoices", "Odczyt faktur nie doszedł.", "Podgląd się nie zmienił. Możesz poprawić zakres i otworzyć go jeszcze raz.", { technical: read.error });
-            return;
-        }
+        const rows = VIEW.invoiceFocus === null ? read.rows : rowsOfInvoice(read.rows, VIEW.invoiceFocus);
         VIEW.applied = started;
         VIEW.screen = screenAfterInvoices();
-        VIEW.invoices = read.rows;
-        VIEW.invoiceComment = retainInvoiceComment(VIEW.invoiceComment, read.rows);
+        VIEW.invoices = rows;
+        VIEW.invoiceNotice = "";
+        VIEW.invoiceComment = retainInvoiceComment(VIEW.invoiceComment, rows);
         VIEW.status = "";
         VIEW.stats = { ...VIEW.stats, status: "" };
         VIEW.ratesOpen = false;

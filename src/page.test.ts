@@ -152,13 +152,19 @@ describe("page wiring", () => {
     expect(click).toContain("screenAfterWorkBack(");
     expect(click).not.toContain('action === "invoices"');
     const run = functionBody("runInvoices");
-    expect(run).toContain("invoiceParams(");
-    expect(run).toContain("readSettledInvoices(");
+    expect(run).toContain("loadInvoiceRows(");
+    expect(run).toContain("rowsOfInvoice(");
     expect(run).toContain("screenAfterInvoices()");
     expect(run).not.toContain("postSheet(");
     expect(run).not.toContain("buildApprove(");
+    const load = functionBody("loadInvoiceRows");
+    expect(load).toContain("invoiceParams(");
+    expect(load).toContain("readSettledInvoices(");
     expect(functionBody("armPickupWork")).toContain("sheetToIsoDate(");
-    expect(functionBody("runSearch")).toContain("invoice: VIEW.invoiceFocus");
+    const search = functionBody("runSearch");
+    expect(search).toContain("invoice: VIEW.invoiceFocus");
+    expect(search).toContain("loadInvoiceRows(");
+    expect(search).toContain("rowsOfInvoice(");
   });
 
   it("test_page_stats_helpers_persist_fold_and_reload_report", () => {

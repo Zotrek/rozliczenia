@@ -511,6 +511,8 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
   border-color: var(--teal);
   box-shadow: 0 0 0 2px var(--teal-soft);
 }
+.focused-invoice { padding-bottom: 4px; }
+.invoice-card .note { margin: 0; padding: 10px 14px 12px; }
 .invoice-head {
   display: flex;
   justify-content: space-between;

@@ -303,7 +303,7 @@ Cztery widoki aplikacji + okno Bazy stawek. Tabeli na Zakresie nie ma. Na Zestaw
 
 **Zestawienie.** Po Szukaj. W nagłówku ikona, zakres (podwykonawca i daty) oraz przycisk Zmień zakres, który wraca do ekranu Zakres. Obok jest Baza stawek. Przycisku Statystyki na Zestawieniu nie ma. Pod nagłówkiem liczba pozycji w zestawieniu, bez sklepów z rozwinięcia trasy. Potem tabela. Na dole Suma zestawienia, Suma zaznaczonych, numer faktury i Zatwierdź.
 
-**Podgląd rozliczonych.** Ze Statystyk, z wiersza odbioru w tabeli **Odbiory w okresie**. Ten podwykonawca, ten tryb wiersza i okres raportu. Grupy po numerze faktury, kwoty z arkusza, bez edycji. ← Statystyki wraca do raportu. Szczegóły: [Podgląd rozliczonych faktur](#podgląd-rozliczonych-faktur).
+**Podgląd rozliczonych.** Ze Statystyk, z wiersza odbioru w tabeli **Odbiory w okresie**. Ten podwykonawca, ten tryb wiersza i okres raportu. Gdy wiersz ma numer faktury, na ekranie jest tylko ta faktura. Kwoty z arkusza. ← Statystyki wraca do raportu. Szczegóły: [Podgląd rozliczonych faktur](#podgląd-rozliczonych-faktur).
 
 **Statystyki.** Z Zakresu. W nagłówku ikona, nazwa Rozliczenia / Statystyki oraz **← Powrót** (wraca do Zakresu). Filtry okresu i podwykonawcy, potem KPI i sekcje raportów. Szczegóły: [Statystyki](#statystyki).
 
@@ -347,11 +347,11 @@ Po wyszukaniu widać tylko odbiory nierozliczone tego podwykonawcy w tym zakresi
 
 ### Podgląd rozliczonych faktur
 
-W Statystykach, w tabeli **Odbiory w okresie**, rozliczony wiersz ma **Podgląd** i **Edycja**. Podgląd bierze podwykonawcę z wiersza, tryb wiersza i okres raportu. Otwiera wiersze z **Rozliczony** `tak`. Nic nie zapisuje i nie bierze locka. Edycja otwiera zestawienie nierozliczonych odbiorów tego samego podwykonawcy, trybu i okresu i wpisuje numer tej faktury. ← Statystyki wraca do raportu.
+W Statystykach, w tabeli **Odbiory w okresie**, rozliczony wiersz ma **Podgląd** i **Edycja**. Podgląd bierze podwykonawcę z wiersza, tryb wiersza i okres raportu. Otwiera wiersze z **Rozliczony** `tak` i zostawia tylko numer faktury z tego wiersza. Nic nie zapisuje i nie bierze locka. Edycja otwiera zestawienie nierozliczonych odbiorów tego samego podwykonawcy, trybu i okresu, wpisuje numer tej faktury i nad listą pokazuje pozycje tylko tej faktury. ← Statystyki wraca do raportu. Link bez numeru (nierozliczony wiersz Harmonogramu) dalej otwiera cały zakres.
 
 Ta sama tabela ma kolumnę **Wartość faktury**: suma kosztów odbioru z arkusza dla tego numeru, u tego podwykonawcy, w tym trybie i w tym okresie. Pusty numer jest jedną grupą. Nierozliczony wiersz nie ma linków ani kwoty.
 
-Pozycje podglądu są pogrupowane po **Numer faktury**. Pusty numer jest jedną grupą „bez numeru”, na końcu listy. W grupie widać numer protokołu, adres, sklep, datę, trasę, liczbę worków, koszt odbioru i koszt na worek. Kwoty są z arkusza, bez przeliczania. Nie ma pól edycji, checkboxów ani Zatwierdź.
+Pozycje podglądu są pogrupowane po **Numer faktury**. Wejście z wiersza, który ma numer, pokazuje tylko tę jedną grupę. Pusty numer jest jedną grupą „bez numeru”, na końcu listy, gdy podgląd nie jest zawężony do numeru. W grupie widać numer protokołu, adres, sklep, datę, trasę, liczbę worków, koszt odbioru i koszt na worek. Kwoty są z arkusza, bez przeliczania. Nie ma pól edycji, checkboxów ani Zatwierdź.
 
 W Harmonogramie podgląd czyta rejestr harmonogramu. Stawek przy tym odczycie nie przepisuje.
 

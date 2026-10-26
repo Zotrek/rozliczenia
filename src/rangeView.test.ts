@@ -30,6 +30,7 @@ function model(over: Partial<RangeViewModel> = {}): RangeViewModel {
     invoices: [],
     invoiceComment: emptyInvoiceComment(),
     invoiceFocus: null,
+    invoiceNotice: "",
     workReturn: "range",
     addresses: [],
     ratesShop: "",
@@ -189,13 +190,81 @@ describe("renderApp", () => {
             receptionCost: 15000,
             costPerBag: 5000,
           },
+          {
+            sheetName: "Arkusz1",
+            sheetRow: 3,
+            transportNumber: "11",
+            address: "Inna 2",
+            shopName: "Sklep Obcy",
+            pickupDate: "16.09.2026",
+            contractor: "GPW",
+            bagCount: 1,
+            routeName: "",
+            invoice: "FV/2",
+            receptionCost: 2000,
+            costPerBag: 2000,
+          },
         ],
       }),
     );
     expect(fromStats).toContain("← Statystyki");
+    expect(fromStats).toContain("Podgląd faktury");
+    expect(fromStats).toContain("FV/1 ·");
     expect(fromStats).toContain("is-focus");
+    expect(fromStats).not.toContain("FV/2");
+    expect(fromStats).not.toContain("Sklep Obcy");
     expect(html).not.toContain("Zatwierdź");
     expect(html).not.toContain('data-screen="range"');
+  });
+
+  it("test_renderApp_statement_from_stats_shows_only_the_chosen_invoice", () => {
+    const invoices = [
+      {
+        sheetName: "Arkusz1",
+        sheetRow: 2,
+        transportNumber: "10",
+        address: "Ul. Sklepowa 1",
+        shopName: "Sklep A",
+        pickupDate: "15.09.2026",
+        contractor: "GPW",
+        bagCount: 3,
+        routeName: "",
+        invoice: "FV/1",
+        receptionCost: 15000,
+        costPerBag: 5000,
+      },
+      {
+        sheetName: "Arkusz1",
+        sheetRow: 3,
+        transportNumber: "11",
+        address: "Inna 2",
+        shopName: "Sklep Obcy",
+        pickupDate: "16.09.2026",
+        contractor: "GPW",
+        bagCount: 1,
+        routeName: "",
+        invoice: "FV/2",
+        receptionCost: 2000,
+        costPerBag: 2000,
+      },
+    ];
+    const html = renderApp(
+      model({
+        screen: "statement",
+        applied: APPLIED,
+        workReturn: "stats",
+        invoiceFocus: "FV/1",
+        invoices,
+      }),
+    );
+    expect(html).toContain('data-screen="statement"');
+    expect(html).toContain("Pozycje tej faktury");
+    expect(html).toContain("Sklep A");
+    expect(html).not.toContain("Sklep Obcy");
+    const openSchedule = renderApp(
+      model({ screen: "statement", applied: APPLIED, workReturn: "stats", invoices }),
+    );
+    expect(openSchedule).not.toContain("Pozycje tej faktury");
   });
 
   it("test_renderApp_escapes_contractor_word_data", () => {

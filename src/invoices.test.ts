@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { groupSettledInvoices, invoiceCountLabel, readSettledInvoices, type SettledInvoiceRow } from "./invoices.js";
-import { renderInvoiceList } from "./invoicesView.js";
+import {
+  groupSettledInvoices,
+  invoiceCountLabel,
+  invoiceFocusLabel,
+  readSettledInvoices,
+  rowsOfInvoice,
+  type SettledInvoiceRow,
+} from "./invoices.js";
+import { renderFocusedInvoice, renderInvoiceList } from "./invoicesView.js";
 
 function row(over: Partial<SettledInvoiceRow> = {}): SettledInvoiceRow {
   return {
@@ -96,5 +103,67 @@ describe("renderInvoiceList", () => {
     const html = renderInvoiceList([]);
     expect(html).toContain("Brak rozliczonych faktur.");
     expect(html).not.toContain("<table>");
+  });
+
+  it("test_renderInvoiceList_focus_shows_only_that_invoice", () => {
+    const html = renderInvoiceList(
+      [
+        row(),
+        row({
+          sheetRow: 3,
+          transportNumber: "11",
+          invoice: "FV/2",
+          shopName: "Sklep Obcy",
+        }),
+      ],
+      "FV/1",
+    );
+    expect(html).toContain("FV/1");
+    expect(html).toContain("Sklep A");
+    expect(html).toContain("is-focus");
+    expect(html).not.toContain("FV/2");
+    expect(html).not.toContain("Sklep Obcy");
+  });
+
+  it("test_renderInvoiceList_missing_focus_hides_other_invoices", () => {
+    const html = renderInvoiceList([row({ invoice: "FV/2", shopName: "Sklep Obcy" })], "FV/9");
+    expect(html).toContain("Brak pozycji tej faktury.");
+    expect(html).toContain("FV/9");
+    expect(html).not.toContain("Sklep Obcy");
+    expect(html).not.toContain("<table>");
+  });
+});
+
+describe("rowsOfInvoice", () => {
+  it("test_rowsOfInvoice_keeps_one_number_after_trim", () => {
+    const rows = rowsOfInvoice(
+      [row(), row({ sheetRow: 3, invoice: " FV/2 ", transportNumber: "11" })],
+      "FV/2",
+    );
+    expect(rows.map((item) => item.transportNumber)).toEqual(["11"]);
+    expect(invoiceFocusLabel("")).toBe("bez numeru");
+    expect(invoiceFocusLabel(" FV/2 ")).toBe("FV/2");
+  });
+});
+
+describe("renderFocusedInvoice", () => {
+  it("test_renderFocusedInvoice_lists_only_the_chosen_number", () => {
+    const html = renderFocusedInvoice(
+      [row(), row({ sheetRow: 3, invoice: "FV/2", shopName: "Sklep Obcy", transportNumber: "11" })],
+      "FV/1",
+    );
+    expect(html).toContain("FV/1");
+    expect(html).toContain("Sklep A");
+    expect(html).toContain("150,00");
+    expect(html).not.toContain("Sklep Obcy");
+    expect(html).not.toContain("data-invoice-pick");
+    expect(html).not.toContain("data-comment-for");
+  });
+
+  it("test_renderFocusedInvoice_notice_replaces_the_table", () => {
+    const html = renderFocusedInvoice([row()], "FV/1", "Odczyt pozycji tej faktury nie doszedł.");
+    expect(html).toContain("Odczyt pozycji tej faktury nie doszedł.");
+    expect(html).not.toContain("<table>");
+    expect(html).not.toContain("Sklep A");
   });
 });

@@ -14,8 +14,8 @@ import {
   type StartedSearch,
 } from "./range.js";
 import { emptyInvoiceComment, type InvoiceCommentDraft } from "./invoiceComment.js";
-import type { SettledInvoiceRow } from "./invoices.js";
-import { renderInvoiceList } from "./invoicesView.js";
+import { invoiceFocusLabel, type SettledInvoiceRow } from "./invoices.js";
+import { renderFocusedInvoice, renderInvoiceList } from "./invoicesView.js";
 import type { StatementScreen } from "./statement.js";
 import { renderStatement } from "./statementView.js";
 import { defaultStatsView, renderStatsScreen, type StatsViewModel } from "./statsView.js";
@@ -44,10 +44,13 @@ export interface RangeViewModel {
   /** Komentarz na podglądzie faktury. Zostaje na ekranie, dopóki nie ma zapisu do rejestru. */
   invoiceComment: InvoiceCommentDraft;
   /**
-   * Numer faktury do podświetlenia na podglądzie.
-   * `null` = bez podświetlenia. Pusty tekst = grupa „bez numeru”.
+   * Numer faktury z wiersza, który otworzył podgląd albo edycję.
+   * `null` = cały zakres (link bez numeru). Pusty tekst = grupa „bez numeru”.
+   * Gdy jest numer, na ekranie zostaje tylko ta faktura.
    */
   invoiceFocus: string | null;
+  /** Odczyt pozycji wybranej faktury przy edycji nie doszedł. */
+  invoiceNotice: string;
   /** Dokąd wraca Zmień zakres / ← Statystyki. */
   workReturn: "range" | "stats";
   /** Od 10 000 zł przy Zatwierdź. Inaczej pulsujące logo. */
@@ -312,7 +315,20 @@ function renderStatementScreen(model: RangeViewModel): string {
     workBackButton(model) +
     ratesButton() +
     "</div>" +
+    focusedInvoiceBlock(model) +
     renderStatement(model.statement, model.status, { allowApprove: true }) +
+    "</div>"
+  );
+}
+
+function focusedInvoiceBlock(model: RangeViewModel): string {
+  if (model.workReturn !== "stats" || model.invoiceFocus === null) {
+    return "";
+  }
+  return (
+    '<div class="focused-invoice">' +
+    '<p class="note invoice-note">Pozycje tej faktury. Niżej są nierozliczone odbiory — możesz dopisać je tym samym numerem.</p>' +
+    renderFocusedInvoice(model.invoices, model.invoiceFocus, model.invoiceNotice) +
     "</div>"
   );
 }
@@ -323,13 +339,22 @@ function renderInvoicesScreen(model: RangeViewModel): string {
   return (
     '<div class="statement" data-screen="invoices"><div class="top">' +
     brand(model.mode) +
-    `<div class="range"><span>Podgląd rozliczonych</span><strong>${escapeHtml(label)}</strong></div>` +
+    invoiceHeading(model.invoiceFocus, label) +
     workBackButton(model) +
     "</div>" +
     status +
     renderInvoiceList(model.invoices, model.invoiceFocus, model.invoiceComment ?? emptyInvoiceComment()) +
     "</div>"
   );
+}
+
+function invoiceHeading(focus: string | null, label: string): string {
+  if (focus === null) {
+    return `<div class="range"><span>Podgląd rozliczonych</span><strong>${escapeHtml(label)}</strong></div>`;
+  }
+  const name = invoiceFocusLabel(focus);
+  const range = label === "" ? name : `${name} · ${label}`;
+  return `<div class="range"><span>Podgląd faktury</span><strong>${escapeHtml(range)}</strong></div>`;
 }
 
 export function renderRatesDialog(model: RangeViewModel): string {

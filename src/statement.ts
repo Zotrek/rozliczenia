@@ -1,5 +1,5 @@
 import { lineKey, rowKey, settle, sumSelected } from "./engine.js";
-import { commentTargets, openingCommentPicks } from "./invoiceComment.js";
+import { commentApplyNotice, commentTargets, openingCommentPicks } from "./invoiceComment.js";
 import { isoToSheetDate, type SettlementMode } from "./range.js";
 import { parseSheetDate } from "./sheetDate.js";
 import type {
@@ -550,6 +550,57 @@ export function adoptRows(
     commentPicks: pick(prev.commentPicks, keys),
     commentDraft: prev.commentDraft,
     commentNotice: prev.commentNotice,
+  };
+}
+
+export interface CommentSaveFace {
+  saved: string[];
+  allSaved: boolean;
+  picks: Record<string, true>;
+  draft: string;
+  notice: string;
+  status: string;
+}
+
+/** Klucze z `zapisane`. Brak listy oznacza, że arkusz przyjął wszystkie wysłane wiersze. */
+export function savedCommentKeys(zapisane: unknown, fallback: readonly string[]): string[] {
+  if (!Array.isArray(zapisane)) {
+    return [...fallback];
+  }
+  const keys: string[] = [];
+  for (const item of zapisane) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+    const row = item as { sheetName?: unknown; sheetRow?: unknown; transportNumber?: unknown };
+    if (typeof row.sheetRow !== "number") {
+      continue;
+    }
+    const sheetName = typeof row.sheetName === "string" ? row.sheetName : "";
+    const transportNumber = typeof row.transportNumber === "string" ? row.transportNumber : "";
+    keys.push(rowKey(row.sheetRow, transportNumber, sheetName));
+  }
+  return keys;
+}
+
+/** Pełny zapis czyści szkic. Pominięty wiersz zostawia zaznaczenie i tekst. */
+export function commentSaveFace(
+  zapisane: unknown,
+  keys: readonly string[],
+  picks: Readonly<Record<string, true>>,
+  draft: string,
+  where: "statement" | "invoice",
+): CommentSaveFace {
+  const saved = savedCommentKeys(zapisane, keys);
+  const savedSet = new Set(saved);
+  const allSaved = keys.every((key) => savedSet.has(key));
+  return {
+    saved,
+    allSaved,
+    picks: allSaved ? {} : { ...picks },
+    draft: allSaved ? "" : draft,
+    notice: allSaved ? commentApplyNotice(saved.length, draft, where) : "",
+    status: allSaved ? "" : STATEMENT_ERROR.partial,
   };
 }
 

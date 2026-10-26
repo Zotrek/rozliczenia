@@ -31,7 +31,6 @@ import {
   applyComments,
   applyIsDisabled,
   chosenComments,
-  commentApplyNotice,
   commentTargets,
   commentsToOverwrite,
   emptyInvoiceComment,
@@ -66,6 +65,7 @@ import {
   emptyStatement,
   findRow,
   formatPln,
+  commentSaveFace,
   freshStatement,
   invoiceCommentBody,
   parseAmountText,
@@ -101,6 +101,8 @@ import {
   loadSectionsCollapsed,
   loadTablesCollapsed,
   pickupColumnChoices,
+  pickupDraftAfterVisible,
+  pickupFiltersAfterApply,
   pickupQueryHits,
   writeStatsFold,
   type PickupColumnKey,
@@ -1404,26 +1406,6 @@ function invoiceCommentFromSheet(
   return retainInvoiceComment({ ...prev, comments, notice: "" }, rows);
 }
 
-function savedCommentKeys(zapisane: unknown, fallback: readonly string[]): string[] {
-  if (!Array.isArray(zapisane)) {
-    return [...fallback];
-  }
-  const keys: string[] = [];
-  for (const item of zapisane) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-    const row = item as { sheetName?: unknown; sheetRow?: unknown; transportNumber?: unknown };
-    if (typeof row.sheetRow !== "number") {
-      continue;
-    }
-    const sheetName = typeof row.sheetName === "string" ? row.sheetName : "";
-    const transportNumber = typeof row.transportNumber === "string" ? row.transportNumber : "";
-    keys.push(rowKey(row.sheetRow, transportNumber, sheetName));
-  }
-  return keys;
-}
-
 function rememberInvoiceComment(key: string, text: string): void {
   const statementComments = { ...VIEW.statement.invoiceComments };
   const invoiceComments = { ...VIEW.invoiceComment.comments };
@@ -1468,19 +1450,17 @@ async function applyStatementComment(): Promise<void> {
   }
   const draft = VIEW.statement.commentDraft;
   await writeNow("Zapisuję komentarz do faktury…", built.body, (result) => {
-    const saved = savedCommentKeys(result.zapisane, keys);
-    for (const key of saved) {
+    const face = commentSaveFace(result.zapisane, keys, VIEW.statement.commentPicks, draft, "statement");
+    for (const key of face.saved) {
       rememberInvoiceComment(key, built.text);
     }
-    const savedSet = new Set(saved);
-    const allSaved = keys.every((key) => savedSet.has(key));
     VIEW.statement = {
       ...VIEW.statement,
-      commentPicks: allSaved ? {} : VIEW.statement.commentPicks,
-      commentDraft: allSaved ? "" : draft,
-      commentNotice: allSaved ? commentApplyNotice(saved.length, draft, "statement") : "",
+      commentPicks: face.picks,
+      commentDraft: face.draft,
+      commentNotice: face.notice,
     };
-    VIEW.status = allSaved ? "" : STATEMENT_ERROR.partial;
+    VIEW.status = face.status;
   });
   document.querySelector<HTMLTextAreaElement>('[data-draft="comment"]')?.focus({ preventScroll: true });
 }
@@ -1504,19 +1484,17 @@ async function applyInvoiceComment(): Promise<void> {
   }
   const draft = VIEW.invoiceComment.draft;
   await writeNow("Zapisuję komentarz do faktury…", built.body, (result) => {
-    const saved = savedCommentKeys(result.zapisane, keys);
-    for (const key of saved) {
+    const face = commentSaveFace(result.zapisane, keys, VIEW.invoiceComment.picks, draft, "invoice");
+    for (const key of face.saved) {
       rememberInvoiceComment(key, built.text);
     }
-    const savedSet = new Set(saved);
-    const allSaved = keys.every((key) => savedSet.has(key));
     VIEW.invoiceComment = {
       ...VIEW.invoiceComment,
-      picks: allSaved ? {} : VIEW.invoiceComment.picks,
-      draft: allSaved ? "" : draft,
-      notice: allSaved ? commentApplyNotice(saved.length, draft, "invoice") : "",
+      picks: face.picks,
+      draft: face.draft,
+      notice: face.notice,
     };
-    VIEW.status = allSaved ? "" : STATEMENT_ERROR.partial;
+    VIEW.status = face.status;
   });
   document.querySelector<HTMLTextAreaElement>('[data-draft="invoice-bulk"]')?.focus({ preventScroll: true });
 }
@@ -1541,13 +1519,11 @@ async function commitInvoiceComment(el: HTMLTextAreaElement): Promise<void> {
   }
   const key = rowKey(row.sheetRow, row.transportNumber, row.sheetName);
   await writeNow("Zapisuję komentarz do faktury…", built.body, (result) => {
-    const saved = savedCommentKeys(result.zapisane, [key]);
-    if (saved.includes(key)) {
+    const face = commentSaveFace(result.zapisane, [key], {}, "", "invoice");
+    if (face.allSaved) {
       rememberInvoiceComment(key, built.text);
-      VIEW.status = "";
-      return;
     }
-    VIEW.status = STATEMENT_ERROR.partial;
+    VIEW.status = face.status;
   });
 }
 
@@ -2591,14 +2567,12 @@ function applyPickupFilter(): void {
     return;
   }
   const choices = pickupColumnChoices(report.periodPickups, VIEW.stats.pickups.filters, menu.column);
-  const selected = new Set(menu.draft);
-  const allOn = choices.length > 0 && choices.every((text) => selected.has(text));
-  const filters = { ...VIEW.stats.pickups.filters };
-  if (choices.length === 0 || allOn) {
-    delete filters[menu.column];
-  } else {
-    filters[menu.column] = [...menu.draft];
-  }
+  const filters = pickupFiltersAfterApply(
+    VIEW.stats.pickups.filters,
+    menu.column,
+    choices,
+    menu.draft,
+  );
   VIEW.stats = {
     ...VIEW.stats,
     pickupsPage: 1,
@@ -2653,17 +2627,9 @@ function setPickupDraftVisible(on: boolean): void {
   const visible = pickupColumnChoices(report.periodPickups, VIEW.stats.pickups.filters, menu.column).filter(
     (text) => pickupQueryHits(text, menu.query),
   );
-  const next = new Set(menu.draft);
-  for (const text of visible) {
-    if (on) {
-      next.add(text);
-    } else {
-      next.delete(text);
-    }
-  }
   VIEW.stats = {
     ...VIEW.stats,
-    pickups: { ...VIEW.stats.pickups, menu: { ...menu, draft: [...next] } },
+    pickups: { ...VIEW.stats.pickups, menu: { ...menu, draft: pickupDraftAfterVisible(menu.draft, visible, on) } },
   };
   paint(pickupDraftKeep());
 }

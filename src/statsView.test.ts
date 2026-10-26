@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   buildStatsReport,
@@ -17,6 +20,9 @@ import {
   loadTablesCollapsed,
   pickupCellText,
   pickupColumnChoices,
+  pickupDraftAfterVisible,
+  pickupFiltersAfterApply,
+  pickupQueryHits,
   readStatsFold,
   renderStatsScreen,
   sortPeriodPickups,
@@ -529,5 +535,57 @@ describe("period pickup filter and sort", () => {
     expect(pickups).toContain('class="xl-btn is-on"');
     expect(pickups).toContain("A 2");
     expect(pickups).not.toContain("B 2");
+    expect(pickups).toContain('data-mixed="1"');
+  });
+
+  it("test_pickupQueryHits_folds_polish_letters_and_blank_query_keeps_every_value", () => {
+    expect(pickupQueryHits("Łódź", "")).toBe(true);
+    expect(pickupQueryHits("Łódź", "   ")).toBe(true);
+    expect(pickupQueryHits("Łódź", "lodz")).toBe(true);
+    expect(pickupQueryHits("GPW", "gp")).toBe(true);
+    expect(pickupQueryHits("GPW", "blue")).toBe(false);
+  });
+
+  it("test_renderStats_pickup_menu_says_when_the_search_matches_nothing", () => {
+    const report = buildStatsReport(
+      [row({ sheetRow: 2, contractor: "gpw", address: "A 2", shopName: "Alfa" })],
+      [],
+      { range: { from: "01.09.2026", to: "23.09.2026" } },
+    );
+    const html = renderStatsScreen(
+      defaultStatsView(TODAY, {
+        report,
+        appliedFrom: "01.09.2026",
+        appliedTo: "23.09.2026",
+        pickups: {
+          ...emptyPickupTable(),
+          menu: { column: "contractor", draft: ["gpw"], query: "nie-ma" },
+        },
+      }),
+    );
+    expect(html).toContain("Brak pasujących wartości");
+    expect(html).not.toContain('data-pickup-value="gpw"');
+  });
+
+  it("test_pickupFiltersAfterApply_drops_the_filter_when_every_value_is_checked", () => {
+    expect(pickupFiltersAfterApply({ contractor: ["gpw"] }, "contractor", ["gpw", "blue"], ["gpw", "blue"])).toEqual(
+      {},
+    );
+    expect(pickupFiltersAfterApply({ contractor: ["gpw"] }, "contractor", [], ["gpw"])).toEqual({});
+    expect(pickupFiltersAfterApply({}, "contractor", ["gpw", "blue"], ["blue"])).toEqual({
+      contractor: ["blue"],
+    });
+  });
+
+  it("test_pickupDraftAfterVisible_changes_only_values_matching_the_search", () => {
+    expect(pickupDraftAfterVisible(["gpw"], ["blue", "GPW"], true)).toEqual(["gpw", "blue", "GPW"]);
+    expect(pickupDraftAfterVisible(["gpw", "blue"], ["blue"], false)).toEqual(["gpw"]);
+  });
+});
+
+describe("stats report layout", () => {
+  it("test_stats_sections_keep_their_height_in_the_report_column", () => {
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "app.css"), "utf8");
+    expect(css).toContain(".stats .body > * { flex-shrink: 0; }");
   });
 });

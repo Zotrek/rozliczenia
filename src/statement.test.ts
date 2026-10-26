@@ -10,7 +10,9 @@ import {
   approveShow,
   attachDecision,
   bagsBody,
+  commentSaveFace,
   invoiceCommentBody,
+  savedCommentKeys,
   pickupDateBody,
   buildApprove,
   canPressApprove,
@@ -430,6 +432,57 @@ describe("invoiceCommentBody", () => {
       },
     });
     expect(invoiceCommentBody([], "folia").ok).toBe(false);
+  });
+});
+
+describe("commentSaveFace", () => {
+  const keys = ["Arkusz1\t2\t15", "Arkusz1\t3\t16"];
+  const picks = { "Arkusz1\t2\t15": true as const, "Arkusz1\t3\t16": true as const };
+
+  it("test_commentSaveFace_clears_the_draft_when_every_row_is_saved", () => {
+    const face = commentSaveFace(
+      [
+        { sheetName: "Arkusz1", sheetRow: 2, transportNumber: "15" },
+        { sheetName: "Arkusz1", sheetRow: 3, transportNumber: "16" },
+      ],
+      keys,
+      picks,
+      "folia",
+      "statement",
+    );
+    expect(face.allSaved).toBe(true);
+    expect(face.saved).toEqual(keys);
+    expect(face.picks).toEqual({});
+    expect(face.draft).toBe("");
+    expect(face.notice).toBe("Wpisane przy 2 pozycjach.");
+    expect(face.status).toBe("");
+  });
+
+  it("test_commentSaveFace_keeps_the_draft_when_the_sheet_skips_a_row", () => {
+    const face = commentSaveFace(
+      [{ sheetName: "Arkusz1", sheetRow: 2, transportNumber: "15" }, { sheetRow: "x" }, null],
+      keys,
+      picks,
+      "folia",
+      "statement",
+    );
+    expect(face.saved).toEqual(["Arkusz1\t2\t15"]);
+    expect(face.allSaved).toBe(false);
+    expect(face.picks).toEqual(picks);
+    expect(face.draft).toBe("folia");
+    expect(face.notice).toBe("");
+    expect(face.status).toBe(STATEMENT_ERROR.partial);
+  });
+
+  it("test_savedCommentKeys_uses_requested_keys_when_the_sheet_omits_zapisane", () => {
+    expect(savedCommentKeys(undefined, keys)).toEqual(keys);
+    expect(savedCommentKeys("nie lista", keys)).toEqual(keys);
+    const face = commentSaveFace(undefined, ["\t2\t15"], { "\t2\t15": true }, "", "invoice");
+    expect(face.allSaved).toBe(true);
+    expect(face.draft).toBe("");
+    expect(face.picks).toEqual({});
+    expect(face.notice).toBe("Wyczyszczone przy 1 pozycji tej faktury.");
+    expect(face.status).toBe("");
   });
 });
 

@@ -884,6 +884,48 @@ describe("aggregateContractorRanks / listZeroBagPickups", () => {
     expect(byAddress.E).toMatchObject({ invoiceKnown: false, invoiceValue: null });
   });
 
+  it("test_listPeriodPickups_keeps_invoice_value_inside_one_contractor_and_mode", () => {
+    const list = listPeriodPickups(
+      [
+        statsRow({
+          sheetRow: 2,
+          settled: true,
+          invoice: "FV/1",
+          receptionCost: 4_000,
+          address: "A",
+          contractor: "gpw",
+          mode: "report",
+          pickupDate: "10.09.2026",
+        }),
+        statsRow({
+          sheetRow: 3,
+          settled: true,
+          invoice: "FV/1",
+          receptionCost: 1_500,
+          address: "B",
+          contractor: "blue",
+          mode: "report",
+          pickupDate: "11.09.2026",
+        }),
+        statsRow({
+          sheetRow: 4,
+          settled: true,
+          invoice: "FV/1",
+          receptionCost: 2_500,
+          address: "C",
+          contractor: "gpw",
+          mode: "schedule",
+          pickupDate: "12.09.2026",
+        }),
+      ],
+      { range },
+    );
+    const byAddress = Object.fromEntries(list.map((row) => [row.address, row]));
+    expect(byAddress.A.invoiceValue).toBe(4_000);
+    expect(byAddress.B.invoiceValue).toBe(1_500);
+    expect(byAddress.C).toMatchObject({ mode: "schedule", invoiceValue: 2_500 });
+  });
+
   it("test_aggregateBacklog_skips_schedule_rows", () => {
     expect(
       aggregateBacklog([

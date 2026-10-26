@@ -193,7 +193,9 @@ describe("commentTargets", () => {
 
   it("test_invoiceSelectionSummary_counts_positions_and_keeps_text_for_rows_that_stay", () => {
     expect(invoiceSelectionSummary(0)).toBe("Nic nie zaznaczono. Zaznacz pozycje w tabeli.");
+    expect(invoiceSelectionSummary(1)).toBe("Zaznaczone: 1 pozycja.");
     expect(invoiceSelectionSummary(2)).toBe("Zaznaczone: 2 pozycje.");
+    expect(invoiceSelectionSummary(5)).toBe("Zaznaczone: 5 pozycji.");
     const rows = [invoiceRow({ sheetRow: 2, shopName: "A" }), invoiceRow({ sheetRow: 3, shopName: "B" })];
     const comments = { [rowKey(2, "2")]: "folia", [rowKey(9, "9")]: "znika" };
     expect(invoiceCommentTargets(rows, comments).map((item) => item.comment)).toEqual(["folia", ""]);

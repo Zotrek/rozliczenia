@@ -106,8 +106,12 @@ describe("page wiring", () => {
     const htmlAt = paint.indexOf("root.innerHTML");
     expect(paint).toContain("readListScroll()");
     expect(paint).toContain("writeListScroll(scroll)");
+    expect(paint).toContain("readMenuScroll()");
+    expect(paint).toContain("writeMenuScroll(menuScroll)");
     expect(paint.indexOf("readListScroll()")).toBeLessThan(htmlAt);
+    expect(paint.indexOf("readMenuScroll()")).toBeLessThan(htmlAt);
     expect(paint.lastIndexOf("writeListScroll(scroll)")).toBeGreaterThan(htmlAt);
+    expect(paint.lastIndexOf("writeMenuScroll(menuScroll)")).toBeGreaterThan(htmlAt);
     expect(paint).toContain("preventScroll: true");
     const read = functionBody("readListScroll");
     const write = functionBody("writeListScroll");
@@ -117,6 +121,8 @@ describe("page wiring", () => {
     expect(write).toContain("scrollTop");
     expect(write).toContain("scrollLeft");
     expect(write).toContain("requestAnimationFrame");
+    expect(functionBody("readMenuScroll")).toContain(".xl-values");
+    expect(functionBody("writeMenuScroll")).toContain("scrollTop");
   });
 
   it("test_page_onChange_toggles_and_commits_edits", () => {
@@ -224,7 +230,12 @@ describe("page wiring", () => {
     expect(apply).toContain("applyComments(");
     expect(apply).toContain("invoiceCommentBody(");
     expect(apply).toContain("writeNow(");
+    expect(apply).toContain("commentSaveFace(");
     expect(apply).toContain("rememberInvoiceComment(");
+    expect(functionBody("applyInvoiceComment")).toContain("commentSaveFace(");
+    expect(functionBody("commitInvoiceComment")).toContain("commentSaveFace(");
+    expect(functionBody("applyPickupFilter")).toContain("pickupFiltersAfterApply(");
+    expect(functionBody("setPickupDraftVisible")).toContain("pickupDraftAfterVisible(");
     expect(functionBody("applyInvoiceComment")).toContain("writeNow(");
     expect(functionBody("applyInvoiceComment")).toContain("rememberInvoiceComment(");
     expect(functionBody("commitInvoiceComment")).toContain("invoiceCommentBody(");

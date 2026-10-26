@@ -170,6 +170,41 @@ export function visiblePeriodPickups(
   return sortPeriodPickups(filterPeriodPickups(rows, state.filters), state.sortKey, state.sortDir);
 }
 
+/** OK w menu kolumny. Zaznaczenie każdej wartości zdejmuje filtr. */
+export function pickupFiltersAfterApply(
+  filters: PickupTableState["filters"],
+  column: PickupColumnKey,
+  choices: readonly string[],
+  draft: readonly string[],
+): PickupTableState["filters"] {
+  const selected = new Set(draft);
+  const allOn = choices.length > 0 && choices.every((text) => selected.has(text));
+  const next: PickupTableState["filters"] = { ...filters };
+  if (choices.length === 0 || allOn) {
+    delete next[column];
+  } else {
+    next[column] = [...draft];
+  }
+  return next;
+}
+
+/** „Zaznacz wszystko” przy wpisanym szukaniu rusza tylko widoczne wartości. */
+export function pickupDraftAfterVisible(
+  draft: readonly string[],
+  visible: readonly string[],
+  on: boolean,
+): string[] {
+  const next = new Set(draft);
+  for (const text of visible) {
+    if (on) {
+      next.add(text);
+    } else {
+      next.delete(text);
+    }
+  }
+  return [...next];
+}
+
 function isBlankNumber(row: PeriodPickup, key: PickupColumnKey): boolean {
   if (key === "bags") {
     return row.bagCount === null;

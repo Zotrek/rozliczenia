@@ -19,7 +19,7 @@ import {
 import { compareSheetDate, type CalendarDate } from "./sheetDate.js";
 import type { Grosze } from "./types.js";
 
-const PICKUP_COLUMN_KEYS = ["date", "shop", "contractor", "mode", "bags", "settled", "invoice"] as const;
+const PICKUP_COLUMN_KEYS = ["date", "shop", "contractor", "mode", "bags", "settled", "invoiceNumber", "invoice"] as const;
 
 export type PickupColumnKey = (typeof PICKUP_COLUMN_KEYS)[number];
 
@@ -45,6 +45,7 @@ const PICKUP_COLUMNS: readonly { key: PickupColumnKey; label: string; numeric: b
   { key: "mode", label: "Tryb", numeric: false },
   { key: "bags", label: "Worki", numeric: true },
   { key: "settled", label: "Rozliczone", numeric: false },
+  { key: "invoiceNumber", label: "Numer faktury", numeric: false },
   { key: "invoice", label: "Wartość faktury", numeric: true },
 ];
 
@@ -82,6 +83,9 @@ export function pickupCellText(row: PeriodPickup, key: PickupColumnKey): string 
   }
   if (key === "settled") {
     return row.settled ? "Tak" : "Nie";
+  }
+  if (key === "invoiceNumber") {
+    return invoiceNumberText(row.invoice);
   }
   return row.invoiceValue === null ? "—" : formatPln(row.invoiceValue);
 }
@@ -172,6 +176,9 @@ function isBlankNumber(row: PeriodPickup, key: PickupColumnKey): boolean {
   }
   if (key === "invoice") {
     return row.invoiceValue === null;
+  }
+  if (key === "invoiceNumber") {
+    return row.invoice.trim() === "";
   }
   return false;
 }
@@ -762,7 +769,8 @@ function periodPickupsBlock(model: StatsViewModel): string {
         `<td>${escapeHtml(row.contractor)}</td>` +
         `<td>${escapeHtml(modeLabel(row.mode))}</td>` +
         `<td class="num">${escapeHtml(bags)}</td>` +
-        `<td>${row.settled ? "Tak" : "Nie"}${invoiceLinks(row)}</td>` +
+        `<td>${row.settled ? "Tak" : "Nie"}</td>` +
+        `${invoiceNumberCell(row)}` +
         `<td class="num">${escapeHtml(value)}</td></tr>`
       );
     })
@@ -775,7 +783,7 @@ function periodPickupsBlock(model: StatsViewModel): string {
     pickupBar(model.pickups) +
     "<table><thead><tr>" +
     pickupHead(model) +
-    `</tr></thead><tbody>${body || emptyRow(7, empty)}</tbody></table>` +
+    `</tr></thead><tbody>${body || emptyRow(PICKUP_COLUMNS.length, empty)}</tbody></table>` +
     pager("pickups", paged) +
     '<p class="note" style="margin: 10px 12px 12px;">' +
     "Wartość faktury to suma kosztów odbioru z arkusza dla tego numeru, u tego podwykonawcy i w tym okresie. " +
@@ -785,6 +793,20 @@ function periodPickupsBlock(model: StatsViewModel): string {
     "Harmonogram: liczba worków = liczba wierszy w „odebrane z harmonogramu” dla sklepu i dnia. " +
     `Lista pokazuje po ${STATS_PAGE_SIZE} pozycji na stronę.</p>`
   );
+}
+
+function invoiceNumberText(invoice: string): string {
+  const number = invoice.trim();
+  return number === "" ? "—" : number;
+}
+
+function invoiceNumberCell(row: StatsReport["periodPickups"][number]): string {
+  const label = escapeHtml(invoiceNumberText(row.invoice));
+  const links = invoiceLinks(row);
+  if (links === "") {
+    return `<td>${label}</td>`;
+  }
+  return `<td><span class="invoice-no">${label}</span>${links}</td>`;
 }
 
 function invoiceLinks(row: StatsReport["periodPickups"][number]): string {

@@ -303,7 +303,9 @@ describe("renderStatsScreen", () => {
       }),
     );
     expect(html).toContain("Wartość faktury");
+    expect(html).toContain("Numer faktury");
     expect(html).toContain("75,00");
+    expect(html).toContain('>Tak</td><td><span class="invoice-no">FV/9</span><div class="row-links">');
     expect(html.match(/data-action="invoice-preview"/g)).toHaveLength(3);
     expect(html.match(/data-action="invoice-edit"/g)).toHaveLength(3);
     expect(html).toContain('data-mode="schedule"');
@@ -312,6 +314,7 @@ describe("renderStatsScreen", () => {
     expect(html).toContain('data-contractor="gpw"');
     expect(html).toContain('data-mode="report"');
     const open = html.slice(html.indexOf("Otwarte 3"), html.indexOf("Harm 4"));
+    expect(open).toContain(">Nie</td><td>—</td>");
     expect(open).not.toContain("invoice-preview");
   });
 
@@ -472,6 +475,8 @@ describe("period pickup filter and sort", () => {
       "A 10 · Alfa",
     ]);
     expect(pickupCellText(rows[0], "settled")).toBe("Nie");
+    expect(pickupCellText(rows[0], "invoiceNumber")).toBe("FV/1");
+    expect(pickupCellText(pickup({ invoice: "" }), "invoiceNumber")).toBe("—");
   });
 
   it("test_visiblePeriodPickups_filters_before_sort", () => {

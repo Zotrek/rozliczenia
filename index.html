@@ -946,6 +946,10 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
   color: var(--ink);
 }
 .pager button:disabled { opacity: 0.45; }
+.invoice-no {
+  display: block;
+  font-weight: 700;
+}
 .row-links {
   display: flex;
   flex-wrap: wrap;
@@ -4575,7 +4579,7 @@ function chartShouldStack(series) {
 
 
 
-const PICKUP_COLUMN_KEYS = ["date", "shop", "contractor", "mode", "bags", "settled", "invoice"];
+const PICKUP_COLUMN_KEYS = ["date", "shop", "contractor", "mode", "bags", "settled", "invoiceNumber", "invoice"];
 const PICKUP_COLUMNS = [
     { key: "date", label: "Data", numeric: false },
     { key: "shop", label: "Sklep", numeric: false },
@@ -4583,6 +4587,7 @@ const PICKUP_COLUMNS = [
     { key: "mode", label: "Tryb", numeric: false },
     { key: "bags", label: "Worki", numeric: true },
     { key: "settled", label: "Rozliczone", numeric: false },
+    { key: "invoiceNumber", label: "Numer faktury", numeric: false },
     { key: "invoice", label: "Wartość faktury", numeric: true },
 ];
 const FUNNEL_ICON = '<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M1.5 2.5h13l-5 6.1V13l-3 1.1V8.6z"/></svg>';
@@ -4615,6 +4620,9 @@ function pickupCellText(row, key) {
     }
     if (key === "settled") {
         return row.settled ? "Tak" : "Nie";
+    }
+    if (key === "invoiceNumber") {
+        return invoiceNumberText(row.invoice);
     }
     return row.invoiceValue === null ? "—" : formatPln(row.invoiceValue);
 }
@@ -4685,6 +4693,9 @@ function isBlankNumber(row, key) {
     }
     if (key === "invoice") {
         return row.invoiceValue === null;
+    }
+    if (key === "invoiceNumber") {
+        return row.invoice.trim() === "";
     }
     return false;
 }
@@ -5058,7 +5069,8 @@ function periodPickupsBlock(model) {
             `<td>${escapeHtml(row.contractor)}</td>` +
             `<td>${escapeHtml(modeLabel(row.mode))}</td>` +
             `<td class="num">${escapeHtml(bags)}</td>` +
-            `<td>${row.settled ? "Tak" : "Nie"}${invoiceLinks(row)}</td>` +
+            `<td>${row.settled ? "Tak" : "Nie"}</td>` +
+            `${invoiceNumberCell(row)}` +
             `<td class="num">${escapeHtml(value)}</td></tr>`);
     })
         .join("");
@@ -5068,7 +5080,7 @@ function periodPickupsBlock(model) {
     return (pickupBar(model.pickups) +
         "<table><thead><tr>" +
         pickupHead(model) +
-        `</tr></thead><tbody>${body || emptyRow(7, empty)}</tbody></table>` +
+        `</tr></thead><tbody>${body || emptyRow(PICKUP_COLUMNS.length, empty)}</tbody></table>` +
         pager("pickups", paged) +
         '<p class="note" style="margin: 10px 12px 12px;">' +
         "Wartość faktury to suma kosztów odbioru z arkusza dla tego numeru, u tego podwykonawcy i w tym okresie. " +
@@ -5077,6 +5089,18 @@ function periodPickupsBlock(model) {
         "W Harmonogramie link jest też przy nierozliczonym wierszu. " +
         "Harmonogram: liczba worków = liczba wierszy w „odebrane z harmonogramu” dla sklepu i dnia. " +
         `Lista pokazuje po ${STATS_PAGE_SIZE} pozycji na stronę.</p>`);
+}
+function invoiceNumberText(invoice) {
+    const number = invoice.trim();
+    return number === "" ? "—" : number;
+}
+function invoiceNumberCell(row) {
+    const label = escapeHtml(invoiceNumberText(row.invoice));
+    const links = invoiceLinks(row);
+    if (links === "") {
+        return `<td>${label}</td>`;
+    }
+    return `<td><span class="invoice-no">${label}</span>${links}</td>`;
 }
 function invoiceLinks(row) {
     // Harmonogram w tej tabeli to worki z „odebrane”, bez numeru faktury.

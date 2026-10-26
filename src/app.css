@@ -938,6 +938,10 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
   color: var(--ink);
 }
 .pager button:disabled { opacity: 0.45; }
+.invoice-no {
+  display: block;
+  font-weight: 700;
+}
 .row-links {
   display: flex;
   flex-wrap: wrap;

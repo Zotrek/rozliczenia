@@ -1,6 +1,12 @@
 import { rowKey } from "./engine.js";
 import { escapeHtml } from "./html.js";
 import {
+  emptyInvoiceEdit,
+  invoiceEditFace,
+  type InvoiceEditDraft,
+  type InvoiceEditLine,
+} from "./invoiceEdit.js";
+import {
   allPicked,
   applyButtonLabel,
   applyIsDisabled,
@@ -52,6 +58,7 @@ export function renderFocusedInvoice(
   rows: readonly SettledInvoiceRow[],
   focus: string,
   notice = "",
+  edit: InvoiceEditDraft = emptyInvoiceEdit(),
 ): string {
   const label = invoiceFocusLabel(focus);
   const key = focus.trim();
@@ -71,17 +78,35 @@ export function renderFocusedInvoice(
     );
   }
   const group = groups[0];
-  const total = group.total == null ? INVOICE_DASH : escapeHtml(formatPln(group.total));
+  const face = invoiceEditFace(group.rows, edit);
+  const total = face.total == null ? INVOICE_DASH : escapeHtml(formatPln(face.total));
+  const leaving = face.leaving > 0 ? ` · ${face.leaving} do odpięcia` : "";
+  const status = edit.status || face.error;
+  const statusHtml = status
+    ? `<p class="err" data-out="invoice-edit-status">${escapeHtml(status)}</p>`
+    : "";
+  const noticeHtml = edit.notice
+    ? `<p class="notice" role="status">${escapeHtml(edit.notice)}</p>`
+    : "";
+  const saveDisabled = !face.dirty || face.invalid ? " disabled" : "";
   return (
     `<section class="invoice-card is-focus" data-invoice="${escapeHtml(group.invoice)}">` +
     '<header class="invoice-head">' +
     `<strong>${escapeHtml(group.label)}</strong>` +
-    `<span>${escapeHtml(invoiceCountLabel(group.rows.length))} · ${total}</span>` +
+    `<span>${escapeHtml(invoiceCountLabel(group.rows.length - face.leaving))}${escapeHtml(leaving)} · ${total}</span>` +
     "</header>" +
     '<div class="table-wrap"><table><thead><tr>' +
     "<th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th><th>Trasa</th>" +
-    '<th class="num">Liczba worków</th><th class="num">Koszt odbioru</th><th class="num">Koszt na worek</th>' +
-    `</tr></thead><tbody>${group.rows.map((row) => focusedLine(row)).join("")}</tbody></table></div></section>`
+    '<th class="num">Liczba worków</th><th class="num">Stawka podjazdu</th><th class="num">Stawka za worek</th>' +
+    '<th class="num">Stawka trasy</th><th class="num">Koszt odbioru</th><th class="num">Koszt na worek</th><th></th>' +
+    `</tr></thead><tbody>${group.rows.map((row) => focusedLine(row, face.lines[rowKey(row.sheetRow, row.transportNumber, row.sheetName)])).join("")}</tbody></table></div>` +
+    '<footer class="invoice-save">' +
+    '<p class="note">Odepnij sklep zdejmuje go z faktury. Worki i stawki zostają, sklep wraca do nierozliczonych. ' +
+    "Na trasie koszt bierze udział w stawce trasy. Do arkusza schodzi dopiero po Zapisz zmiany.</p>" +
+    statusHtml +
+    noticeHtml +
+    `<button type="button" class="btn-teal" data-action="save-invoice-edit"${saveDisabled}>Zapisz zmiany</button>` +
+    "</footer></section>"
   );
 }
 
@@ -103,19 +128,73 @@ function emptyInvoices(focus: string | null): string {
   );
 }
 
-function focusedLine(row: SettledInvoiceRow): string {
+function focusedLine(row: SettledInvoiceRow, line: InvoiceEditLine | undefined): string {
+  const shown = line ?? {
+    bagText: row.bagCount == null ? "" : String(row.bagCount),
+    pickupText: "",
+    bagRateText: "",
+    routeText: "",
+    bagBad: false,
+    pickupBad: false,
+    bagRateBad: false,
+    routeBad: false,
+    detached: false,
+    receptionCost: row.receptionCost,
+    costPerBag: row.costPerBag,
+  };
+  const label = row.shopName.trim() === "" ? row.address : row.shopName;
+  const off = shown.detached ? " disabled" : "";
+  const classes = [row.routeName.trim() === "" ? "" : "is-child", shown.detached ? "is-detached" : ""].filter(Boolean);
   return (
-    `<tr${row.routeName.trim() === "" ? "" : ' class="is-child"'}>` +
+    `<tr${classes.length ? ` class="${classes.join(" ")}"` : ""}>` +
     `<td>${text(row.transportNumber)}</td>` +
     `<td class="adres">${text(addressWithCommaAfterLocality(row.address))}</td>` +
     `<td>${text(row.shopName)}</td>` +
     `<td>${text(row.pickupDate)}</td>` +
     `<td>${text(row.routeName)}</td>` +
-    `<td class="num">${row.bagCount == null ? INVOICE_DASH : escapeHtml(String(row.bagCount))}</td>` +
-    `<td class="num">${money(row.receptionCost)}</td>` +
-    `<td class="num">${money(row.costPerBag)}</td>` +
+    `<td class="num">${rateField(row, "invoice-bags", "bags", shown.bagText, shown.bagBad, off, `Liczba worków, ${label}`)}</td>` +
+    `<td class="num">${rateField(row, "invoice-pickup", "pickup", shown.pickupText, shown.pickupBad, off, `Stawka podjazdu, ${label}`)}</td>` +
+    `<td class="num">${rateField(row, "invoice-bag-rate", "bag", shown.bagRateText, shown.bagRateBad, off, `Stawka za worek, ${label}`)}</td>` +
+    `<td class="num">${row.routeName.trim() === "" ? INVOICE_DASH : rateField(row, "invoice-route-rate", "route", shown.routeText, shown.routeBad, off, `Stawka trasy ${row.routeName}`, row.routeName)}</td>` +
+    `<td class="num">${money(shown.receptionCost)}</td>` +
+    `<td class="num">${money(shown.costPerBag)}</td>` +
+    `<td>${detachControl(row, shown.detached, label)}</td>` +
     "</tr>"
   );
+}
+
+function rateField(
+  row: SettledInvoiceRow,
+  edit: string,
+  keep: string,
+  value: string,
+  bad: boolean,
+  off: string,
+  label: string,
+  routeName = "",
+): string {
+  const route = routeName === "" ? "" : ` data-route="${escapeHtml(routeName)}"`;
+  const mode = edit === "invoice-bags" ? "numeric" : "decimal";
+  return (
+    `<input type="text" inputmode="${mode}" data-edit="${edit}" data-keep="${escapeHtml(invoiceKeep(keep, row))}" ` +
+    `${ref(row)}${route} value="${escapeHtml(value)}"${bad ? ' class="is-bad"' : ""}${off} ` +
+    `title="Zapis po Zapisz zmiany." aria-label="${escapeHtml(label)}" autocomplete="off">`
+  );
+}
+
+function detachControl(row: SettledInvoiceRow, detached: boolean, label: string): string {
+  const title = detached
+    ? "Sklep zostaje na fakturze. Zapis nadal po Zapisz zmiany."
+    : "Sklep schodzi z tej faktury po Zapisz zmiany. Worki i stawki zostają w arkuszu.";
+  return (
+    `<button type="button" class="btn-detach" data-action="invoice-detach" ${ref(row)} ` +
+    `title="${escapeHtml(title)}" aria-label="${escapeHtml(`${detached ? "Przywróć" : "Odepnij"} ${label}`)}">` +
+    `${detached ? "przywróć" : "odepnij sklep"}</button>`
+  );
+}
+
+function invoiceKeep(kind: string, row: SettledInvoiceRow): string {
+  return `inv-${kind}-${row.sheetRow}-${encodeURIComponent(row.transportNumber)}-${encodeURIComponent(row.sheetName)}`;
 }
 
 function renderGroup(

@@ -13,6 +13,7 @@ import {
   type SettlementMode,
   type StartedSearch,
 } from "./range.js";
+import { emptyInvoiceEdit, type InvoiceEditDraft } from "./invoiceEdit.js";
 import { emptyInvoiceComment, type InvoiceCommentDraft } from "./invoiceComment.js";
 import { invoiceFocusLabel, type SettledInvoiceRow } from "./invoices.js";
 import { renderFocusedInvoice, renderInvoiceList } from "./invoicesView.js";
@@ -51,6 +52,8 @@ export interface RangeViewModel {
   invoiceFocus: string | null;
   /** Odczyt pozycji wybranej faktury przy edycji nie doszedł. */
   invoiceNotice: string;
+  /** Worki, stawki i odpięcie sklepu na edycji faktury. Zapis po przycisku. */
+  invoiceEdit: InvoiceEditDraft;
   /** Dokąd wraca ← Statystyki z podglądu albo z zestawienia otwartego Edycją. */
   workReturn: "range" | "stats";
   /** Udane Szukaj. Dopiero wtedy Zestawienie w pasku prowadzi do ostatniego wyniku. */
@@ -362,8 +365,8 @@ function focusedInvoiceBlock(model: RangeViewModel): string {
   }
   return (
     '<div class="focused-invoice">' +
-    '<p class="note invoice-note">Pozycje tej faktury. Niżej są nierozliczone odbiory — możesz dopisać je tym samym numerem.</p>' +
-    renderFocusedInvoice(model.invoices, model.invoiceFocus, model.invoiceNotice) +
+    '<p class="note invoice-note">Pozycje tej faktury. Możesz odpiąć sklep, zmienić liczbę worków i stawki — zapis po Zapisz zmiany. Niżej są nierozliczone odbiory — możesz dopisać je tym samym numerem.</p>' +
+    renderFocusedInvoice(model.invoices, model.invoiceFocus, model.invoiceNotice, model.invoiceEdit) +
     "</div>"
   );
 }

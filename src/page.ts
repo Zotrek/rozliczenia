@@ -23,6 +23,7 @@ import {
   type ContractorListItem,
   type StartedSearch,
 } from "./range.js";
+import { emptyInvoiceEdit, invoiceEditBody } from "./invoiceEdit.js";
 import { readSettledInvoices, rowsOfInvoice, type SettledInvoiceRow } from "./invoices.js";
 import {
   COMMENT_NEEDS_TEXT,
@@ -142,6 +143,7 @@ const VIEW: RangeViewModel = {
   invoiceComment: emptyInvoiceComment(),
   invoiceFocus: null,
   invoiceNotice: "",
+  invoiceEdit: emptyInvoiceEdit(),
   workReturn: "range",
   searched: false,
   loadKind: "logo",
@@ -546,6 +548,7 @@ async function runSearch(): Promise<void> {
     VIEW.screen = screenAfterSearch();
     VIEW.statement = freshStatement(read.rows, read.rates);
     VIEW.invoiceNotice = "";
+    VIEW.invoiceEdit = emptyInvoiceEdit();
     if (VIEW.workReturn === "stats" && VIEW.invoiceFocus !== null) {
       VIEW.statement = { ...VIEW.statement, invoice: VIEW.invoiceFocus };
       try {
@@ -686,6 +689,7 @@ async function runInvoices(): Promise<void> {
     VIEW.screen = screenAfterInvoices();
     VIEW.invoices = rows;
     VIEW.invoiceNotice = "";
+    VIEW.invoiceEdit = emptyInvoiceEdit();
     VIEW.invoiceComment = invoiceCommentFromSheet(VIEW.invoiceComment, rows);
     VIEW.status = "";
     VIEW.stats = { ...VIEW.stats, status: "" };
@@ -893,6 +897,10 @@ function onClick(event: MouseEvent): void {
     void applyInvoiceComment();
   } else if (action === "check-invoice-all") {
     toggleAllInvoiceComments();
+  } else if (action === "invoice-detach") {
+    toggleInvoiceDetach(el);
+  } else if (action === "save-invoice-edit") {
+    void saveInvoiceEdit();
   }
 }
 
@@ -932,6 +940,15 @@ function onInput(event: Event): void {
   }
   if (el.dataset.keep === "pickup-query") {
     setPickupQuery(el.value);
+    return;
+  }
+  if (
+    el.dataset.edit === "invoice-bags" ||
+    el.dataset.edit === "invoice-pickup" ||
+    el.dataset.edit === "invoice-bag-rate" ||
+    el.dataset.edit === "invoice-route-rate"
+  ) {
+    typeInvoiceEdit(el);
     return;
   }
   if (el.dataset.edit === "invoice") {
@@ -2089,6 +2106,86 @@ async function postSheet(body: Record<string, unknown>): Promise<{
     pominiete?: unknown;
     zapisane?: unknown;
   };
+}
+
+function toggleInvoiceDetach(el: HTMLElement): void {
+  const ref = sheetRef(el);
+  if (!ref) {
+    return;
+  }
+  const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+  const detached = { ...VIEW.invoiceEdit.detached };
+  if (detached[key]) {
+    delete detached[key];
+  } else {
+    detached[key] = true;
+  }
+  VIEW.invoiceEdit = { ...VIEW.invoiceEdit, detached, status: "", notice: "" };
+  paint();
+}
+
+function typeInvoiceEdit(el: HTMLInputElement): void {
+  const ref = sheetRef(el);
+  if (!ref) {
+    return;
+  }
+  const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+  const next = { ...VIEW.invoiceEdit, status: "", notice: "" };
+  if (el.dataset.edit === "invoice-bags") {
+    next.bags = { ...next.bags, [key]: el.value };
+  } else if (el.dataset.edit === "invoice-pickup") {
+    next.pickup = { ...next.pickup, [key]: el.value };
+  } else if (el.dataset.edit === "invoice-bag-rate") {
+    next.bagRate = { ...next.bagRate, [key]: el.value };
+  } else {
+    const route = el.dataset.route ?? "";
+    if (route === "") {
+      return;
+    }
+    next.routeRate = { ...next.routeRate, [route]: el.value };
+  }
+  VIEW.invoiceEdit = next;
+  paint(el.dataset.keep);
+}
+
+async function saveInvoiceEdit(): Promise<void> {
+  const built = invoiceEditBody(VIEW.invoices, VIEW.invoiceEdit, VIEW.invoiceFocus ?? "", VIEW.mode);
+  if (!built.ok) {
+    VIEW.invoiceEdit = { ...VIEW.invoiceEdit, status: built.error, notice: "" };
+    paint();
+    return;
+  }
+  if (built.unchanged) {
+    return;
+  }
+  await writeNow("Zapisuję zmiany faktury…", built.body, async (result) => {
+    const skipped = skippedCount(result);
+    const saved = Array.isArray(result.zapisane) ? result.zapisane.length : 0;
+    const notice =
+      saved === 0
+        ? "Żadna pozycja nie weszła. Lista jest odświeżona."
+        : skipped > 0
+          ? "Część pozycji nie weszła. Lista jest odświeżona."
+          : "Zapisano zmiany faktury.";
+    if (VIEW.applied && VIEW.invoiceFocus !== null) {
+      const read = await loadInvoiceRows(VIEW.applied);
+      if (read.ok) {
+        VIEW.invoices = rowsOfInvoice(read.rows, VIEW.invoiceFocus);
+        VIEW.invoiceNotice = "";
+        VIEW.invoiceEdit = { ...emptyInvoiceEdit(), notice };
+        return;
+      }
+      if (!read.silent) {
+        VIEW.invoiceEdit = {
+          ...VIEW.invoiceEdit,
+          status: "",
+          notice: "Zapis zszedł, ale odczyt pozycji tej faktury nie doszedł.",
+        };
+      }
+      return;
+    }
+    VIEW.invoiceEdit = { ...emptyInvoiceEdit(), notice };
+  });
 }
 
 async function writeNow(

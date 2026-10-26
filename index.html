@@ -569,6 +569,21 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
 .invoice-head strong { font-size: 14px; }
 .invoice-head span { color: var(--muted); font-size: 12px; font-weight: 650; white-space: nowrap; }
 .invoice-card .table-wrap { flex: none; overflow: auto; }
+.invoice-card tr.is-detached td { color: var(--muted); }
+.invoice-card tr.is-detached td.adres { text-decoration: line-through; }
+.invoice-card td input.is-bad { border-color: var(--orange); background: #fff7ed; }
+.invoice-save {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--line);
+}
+.invoice-save .note { flex: 1 1 18rem; padding: 0; }
+.invoice-save .err, .invoice-save .notice { flex: 1 1 100%; margin: 0; }
+.invoice-save .btn-teal { width: auto; margin-top: 0; }
+.invoice-save .btn-teal:disabled { opacity: 0.45; }
 
 
 /* —— Statystyki —— */
@@ -2286,6 +2301,9 @@ function readSettledInvoiceRow(value) {
     const invoice = readText(value.invoice);
     const receptionCost = readGrosze(value.receptionCost);
     const costPerBag = readGrosze(value.costPerBag);
+    const routeRate = readOptionalGrosze(value.routeRate);
+    const pickupRate = readOptionalGrosze(value.pickupRate);
+    const bagRate = readOptionalGrosze(value.bagRate);
     if (typeof sheetRow !== "number" ||
         !Number.isInteger(sheetRow) ||
         sheetRow < 2 ||
@@ -2297,7 +2315,10 @@ function readSettledInvoiceRow(value) {
         routeName === null ||
         invoice === null ||
         receptionCost === undefined ||
-        costPerBag === undefined) {
+        costPerBag === undefined ||
+        routeRate === undefined ||
+        pickupRate === undefined ||
+        bagRate === undefined) {
         return null;
     }
     let bagCount;
@@ -2326,6 +2347,9 @@ function readSettledInvoiceRow(value) {
         contractor,
         bagCount,
         routeName,
+        routeRate,
+        pickupRate,
+        bagRate,
         invoice: invoice.trim(),
         receptionCost,
         costPerBag,
@@ -2343,6 +2367,13 @@ function readText(value) {
         return String(value);
     }
     return null;
+}
+/** Brak pola w starym odczycie zostaje pustą stawką. Zła kwota odrzuca wiersz. */
+function readOptionalGrosze(value) {
+    if (value === undefined) {
+        return null;
+    }
+    return readGrosze(value);
 }
 function readGrosze(value) {
     if (value === null) {
@@ -3442,6 +3473,221 @@ function readRateRow(value) {
 
 
 
+const BAG_ERROR = "Liczba worków jest niepoprawna.";
+const RATE_ERROR = "Stawka jest niepoprawna.";
+function emptyInvoiceEdit() {
+    return {
+        bags: {},
+        pickup: {},
+        bagRate: {},
+        routeRate: {},
+        detached: {},
+        notice: "",
+        status: "",
+    };
+}
+function invoiceEditFace(rows, draft) {
+    return assess(rows, draft).face;
+}
+function invoiceEditBody(rows, draft, invoice, mode) {
+    const assessed = assess(rows, draft);
+    if (assessed.face.invalid) {
+        return { ok: false, error: assessed.face.error };
+    }
+    if (!assessed.face.dirty || assessed.wiersze.length === 0) {
+        return { ok: true, unchanged: true };
+    }
+    return {
+        ok: true,
+        unchanged: false,
+        body: {
+            action: "patchInvoiceEdit",
+            numerFaktury: invoice.trim(),
+            wiersze: assessed.wiersze,
+            ...(mode === "schedule" ? { tryb: "harmonogram" } : {}),
+        },
+    };
+}
+function assess(rows, draft) {
+    const parsed = rows.map((row) => parseRow(row, draft));
+    const invalid = parsed.find((item) => item.bad);
+    const shareChanged = new Set();
+    for (const item of parsed) {
+        if (item.row.routeName !== "" && (item.detached || item.route.changed)) {
+            shareChanged.add(item.row.routeName);
+        }
+    }
+    const staying = parsed.filter((item) => !item.detached);
+    const costs = invalid
+        ? new Map()
+        : shopCosts(staying.map((item) => registerOf(item)));
+    const lines = {};
+    const wiersze = [];
+    let total = 0;
+    let anyCost = false;
+    let dirty = false;
+    for (const item of parsed) {
+        const key = rowKey(item.row.sheetRow, item.row.transportNumber, item.row.sheetName);
+        const shop = costs.get(key);
+        const write = !item.bad &&
+            (item.detached ||
+                item.bags.changed ||
+                item.pickup.changed ||
+                item.bag.changed ||
+                (item.row.routeName !== "" && (shareChanged.has(item.row.routeName) || item.route.changed)));
+        const receptionCost = !item.detached && write && shop ? shop.receptionCost : item.row.receptionCost;
+        const costPerBag = !item.detached && write && shop ? shop.costPerBag : item.row.costPerBag;
+        if (!item.detached && receptionCost != null) {
+            total += receptionCost;
+            anyCost = true;
+        }
+        if (write) {
+            dirty = true;
+            wiersze.push(item.detached ? detachItem(item.row) : editItem(item, receptionCost));
+        }
+        lines[key] = {
+            bagText: item.bags.text,
+            pickupText: item.pickup.text,
+            bagRateText: item.bag.text,
+            routeText: item.route.text,
+            bagBad: item.bags.bad,
+            pickupBad: item.pickup.bad,
+            bagRateBad: item.bag.bad,
+            routeBad: item.route.bad,
+            detached: item.detached,
+            receptionCost,
+            costPerBag,
+        };
+    }
+    return {
+        face: {
+            dirty: invalid ? false : dirty,
+            invalid: invalid != null,
+            error: invalid ? invalid.error : "",
+            total: anyCost ? total : null,
+            leaving: parsed.filter((item) => item.detached).length,
+            lines,
+        },
+        wiersze: invalid ? [] : wiersze,
+    };
+}
+function parseRow(row, draft) {
+    const key = rowKey(row.sheetRow, row.transportNumber, row.sheetName);
+    const bags = readBags(draft.bags[key], row.bagCount);
+    const pickup = readAmount(draft.pickup[key], row.pickupRate ?? null);
+    const bag = readAmount(draft.bagRate[key], row.bagRate ?? null);
+    const route = row.routeName === ""
+        ? { bad: false, text: "", value: null, changed: false }
+        : readAmount(draft.routeRate[row.routeName], row.routeRate ?? null);
+    const bad = bags.bad || pickup.bad || bag.bad || route.bad;
+    let error = "";
+    if (bags.bad) {
+        error = BAG_ERROR;
+    }
+    else if (pickup.bad || bag.bad || route.bad) {
+        error = RATE_ERROR;
+    }
+    return {
+        row,
+        detached: draft.detached[key] === true,
+        bad,
+        error,
+        bags,
+        pickup,
+        bag,
+        route,
+    };
+}
+function readBags(text, sheet) {
+    if (text === undefined) {
+        return {
+            bad: false,
+            text: sheet === null ? "" : String(sheet),
+            value: sheet,
+            changed: false,
+        };
+    }
+    const parsed = parseBagText(text);
+    if (parsed.kind === "bad") {
+        return { bad: true, text, value: sheet, changed: false };
+    }
+    const value = parsed.kind === "empty" ? null : parsed.value;
+    return { bad: false, text, value, changed: value !== sheet };
+}
+function readAmount(text, sheet) {
+    if (text === undefined) {
+        return {
+            bad: false,
+            text: sheet === null ? "" : formatAmountInput(sheet),
+            value: sheet,
+            changed: false,
+        };
+    }
+    const parsed = parseAmountText(text);
+    if (parsed.kind === "bad") {
+        return { bad: true, text, value: sheet, changed: false };
+    }
+    const value = parsed.kind === "empty" ? null : parsed.value;
+    return { bad: false, text, value, changed: value !== sheet };
+}
+function registerOf(item) {
+    return {
+        sheetName: item.row.sheetName,
+        sheetRow: item.row.sheetRow,
+        transportNumber: item.row.transportNumber,
+        address: item.row.address,
+        shopName: item.row.shopName,
+        pickupDate: item.row.pickupDate,
+        contractor: item.row.contractor,
+        bagCount: item.bags.value,
+        routeName: item.row.routeName,
+        routeRate: item.row.routeName === "" ? null : item.route.value,
+        pickupRate: item.pickup.value,
+        bagRate: item.bag.value,
+        invoiceComment: item.row.invoiceComment,
+    };
+}
+function shopCosts(rows) {
+    const statement = settle({ rows, rates: [], screenByRow: {} });
+    const costs = new Map();
+    for (const line of statement.lines) {
+        const shops = line.kind === "plain" ? [line.shop] : line.shops;
+        for (const shop of shops) {
+            costs.set(rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName), shop);
+        }
+    }
+    return costs;
+}
+function detachItem(row) {
+    return {
+        sheetName: row.sheetName,
+        sheetRow: row.sheetRow,
+        transportNumber: row.transportNumber,
+        odepnij: true,
+    };
+}
+function editItem(item, cost) {
+    const body = {
+        sheetName: item.row.sheetName,
+        sheetRow: item.row.sheetRow,
+        transportNumber: item.row.transportNumber,
+        iloscWorkow: item.bags.value === null ? "" : item.bags.value,
+        stawkaPodjazdu: moneyText(item.pickup.value),
+        stawkaWorka: moneyText(item.bag.value),
+        koszt: cost ?? 0,
+    };
+    if (item.row.routeName !== "") {
+        body.stawkaTrasy = moneyText(item.route.value);
+    }
+    return body;
+}
+function moneyText(grosze) {
+    return grosze === null ? "" : groszeToZlotyText(grosze);
+}
+
+
+
+
 
 
 
@@ -3462,7 +3708,7 @@ function renderInvoiceList(rows, focus = null, comment = emptyInvoiceComment()) 
         invoiceComposer(visible, comment));
 }
 /** Jedna faktura na zestawieniu: pozycje już rozliczone, bez komentarza i bez zaznaczania. */
-function renderFocusedInvoice(rows, focus, notice = "") {
+function renderFocusedInvoice(rows, focus, notice = "", edit = emptyInvoiceEdit()) {
     const label = invoiceFocusLabel(focus);
     const key = focus.trim();
     if (notice !== "") {
@@ -3477,16 +3723,34 @@ function renderFocusedInvoice(rows, focus, notice = "") {
             "<p class=\"note\">W tym zakresie nie ma rozliczonych odbiorów tej faktury.</p></section>");
     }
     const group = groups[0];
-    const total = group.total == null ? INVOICE_DASH : escapeHtml(formatPln(group.total));
+    const face = invoiceEditFace(group.rows, edit);
+    const total = face.total == null ? INVOICE_DASH : escapeHtml(formatPln(face.total));
+    const leaving = face.leaving > 0 ? ` · ${face.leaving} do odpięcia` : "";
+    const status = edit.status || face.error;
+    const statusHtml = status
+        ? `<p class="err" data-out="invoice-edit-status">${escapeHtml(status)}</p>`
+        : "";
+    const noticeHtml = edit.notice
+        ? `<p class="notice" role="status">${escapeHtml(edit.notice)}</p>`
+        : "";
+    const saveDisabled = !face.dirty || face.invalid ? " disabled" : "";
     return (`<section class="invoice-card is-focus" data-invoice="${escapeHtml(group.invoice)}">` +
         '<header class="invoice-head">' +
         `<strong>${escapeHtml(group.label)}</strong>` +
-        `<span>${escapeHtml(invoiceCountLabel(group.rows.length))} · ${total}</span>` +
+        `<span>${escapeHtml(invoiceCountLabel(group.rows.length - face.leaving))}${escapeHtml(leaving)} · ${total}</span>` +
         "</header>" +
         '<div class="table-wrap"><table><thead><tr>' +
         "<th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th><th>Trasa</th>" +
-        '<th class="num">Liczba worków</th><th class="num">Koszt odbioru</th><th class="num">Koszt na worek</th>' +
-        `</tr></thead><tbody>${group.rows.map((row) => focusedLine(row)).join("")}</tbody></table></div></section>`);
+        '<th class="num">Liczba worków</th><th class="num">Stawka podjazdu</th><th class="num">Stawka za worek</th>' +
+        '<th class="num">Stawka trasy</th><th class="num">Koszt odbioru</th><th class="num">Koszt na worek</th><th></th>' +
+        `</tr></thead><tbody>${group.rows.map((row) => focusedLine(row, face.lines[rowKey(row.sheetRow, row.transportNumber, row.sheetName)])).join("")}</tbody></table></div>` +
+        '<footer class="invoice-save">' +
+        '<p class="note">Odepnij sklep zdejmuje go z faktury. Worki i stawki zostają, sklep wraca do nierozliczonych. ' +
+        "Na trasie koszt bierze udział w stawce trasy. Do arkusza schodzi dopiero po Zapisz zmiany.</p>" +
+        statusHtml +
+        noticeHtml +
+        `<button type="button" class="btn-teal" data-action="save-invoice-edit"${saveDisabled}>Zapisz zmiany</button>` +
+        "</footer></section>");
 }
 function emptyInvoices(focus) {
     if (focus !== null) {
@@ -3500,17 +3764,55 @@ function emptyInvoices(focus) {
     return ('<div class="blank"><strong>Brak rozliczonych faktur.</strong>' +
         "<p>Ten podwykonawca nie ma rozliczonych odbiorów w podanym zakresie.</p></div>");
 }
-function focusedLine(row) {
-    return (`<tr${row.routeName.trim() === "" ? "" : ' class="is-child"'}>` +
+function focusedLine(row, line) {
+    const shown = line ?? {
+        bagText: row.bagCount == null ? "" : String(row.bagCount),
+        pickupText: "",
+        bagRateText: "",
+        routeText: "",
+        bagBad: false,
+        pickupBad: false,
+        bagRateBad: false,
+        routeBad: false,
+        detached: false,
+        receptionCost: row.receptionCost,
+        costPerBag: row.costPerBag,
+    };
+    const label = row.shopName.trim() === "" ? row.address : row.shopName;
+    const off = shown.detached ? " disabled" : "";
+    const classes = [row.routeName.trim() === "" ? "" : "is-child", shown.detached ? "is-detached" : ""].filter(Boolean);
+    return (`<tr${classes.length ? ` class="${classes.join(" ")}"` : ""}>` +
         `<td>${text(row.transportNumber)}</td>` +
         `<td class="adres">${text(addressWithCommaAfterLocality(row.address))}</td>` +
         `<td>${text(row.shopName)}</td>` +
         `<td>${text(row.pickupDate)}</td>` +
         `<td>${text(row.routeName)}</td>` +
-        `<td class="num">${row.bagCount == null ? INVOICE_DASH : escapeHtml(String(row.bagCount))}</td>` +
-        `<td class="num">${money(row.receptionCost)}</td>` +
-        `<td class="num">${money(row.costPerBag)}</td>` +
+        `<td class="num">${rateField(row, "invoice-bags", "bags", shown.bagText, shown.bagBad, off, `Liczba worków, ${label}`)}</td>` +
+        `<td class="num">${rateField(row, "invoice-pickup", "pickup", shown.pickupText, shown.pickupBad, off, `Stawka podjazdu, ${label}`)}</td>` +
+        `<td class="num">${rateField(row, "invoice-bag-rate", "bag", shown.bagRateText, shown.bagRateBad, off, `Stawka za worek, ${label}`)}</td>` +
+        `<td class="num">${row.routeName.trim() === "" ? INVOICE_DASH : rateField(row, "invoice-route-rate", "route", shown.routeText, shown.routeBad, off, `Stawka trasy ${row.routeName}`, row.routeName)}</td>` +
+        `<td class="num">${money(shown.receptionCost)}</td>` +
+        `<td class="num">${money(shown.costPerBag)}</td>` +
+        `<td>${detachControl(row, shown.detached, label)}</td>` +
         "</tr>");
+}
+function rateField(row, edit, keep, value, bad, off, label, routeName = "") {
+    const route = routeName === "" ? "" : ` data-route="${escapeHtml(routeName)}"`;
+    const mode = edit === "invoice-bags" ? "numeric" : "decimal";
+    return (`<input type="text" inputmode="${mode}" data-edit="${edit}" data-keep="${escapeHtml(invoiceKeep(keep, row))}" ` +
+        `${ref(row)}${route} value="${escapeHtml(value)}"${bad ? ' class="is-bad"' : ""}${off} ` +
+        `title="Zapis po Zapisz zmiany." aria-label="${escapeHtml(label)}" autocomplete="off">`);
+}
+function detachControl(row, detached, label) {
+    const title = detached
+        ? "Sklep zostaje na fakturze. Zapis nadal po Zapisz zmiany."
+        : "Sklep schodzi z tej faktury po Zapisz zmiany. Worki i stawki zostają w arkuszu.";
+    return (`<button type="button" class="btn-detach" data-action="invoice-detach" ${ref(row)} ` +
+        `title="${escapeHtml(title)}" aria-label="${escapeHtml(`${detached ? "Przywróć" : "Odepnij"} ${label}`)}">` +
+        `${detached ? "przywróć" : "odepnij sklep"}</button>`);
+}
+function invoiceKeep(kind, row) {
+    return `inv-${kind}-${row.sheetRow}-${encodeURIComponent(row.transportNumber)}-${encodeURIComponent(row.sheetName)}`;
 }
 function renderGroup(group, focus, comment) {
     const total = group.total == null ? INVOICE_DASH : escapeHtml(formatPln(group.total));
@@ -5595,8 +5897,8 @@ function focusedInvoiceBlock(model) {
         return "";
     }
     return ('<div class="focused-invoice">' +
-        '<p class="note invoice-note">Pozycje tej faktury. Niżej są nierozliczone odbiory — możesz dopisać je tym samym numerem.</p>' +
-        renderFocusedInvoice(model.invoices, model.invoiceFocus, model.invoiceNotice) +
+        '<p class="note invoice-note">Pozycje tej faktury. Możesz odpiąć sklep, zmienić liczbę worków i stawki — zapis po Zapisz zmiany. Niżej są nierozliczone odbiory — możesz dopisać je tym samym numerem.</p>' +
+        renderFocusedInvoice(model.invoices, model.invoiceFocus, model.invoiceNotice, model.invoiceEdit) +
         "</div>");
 }
 function renderInvoicesScreen(model) {
@@ -5870,6 +6172,7 @@ host.showRozErrorCard = showRozErrorCard;
 
 
 
+
 const STATS_SECTION_IDS = ["pickups", "bags", "costs", "q", "contractors", "empty-bags", "gaps"];
 function todayCalendar() {
     const now = new Date();
@@ -5899,6 +6202,7 @@ const VIEW = {
     invoiceComment: emptyInvoiceComment(),
     invoiceFocus: null,
     invoiceNotice: "",
+    invoiceEdit: emptyInvoiceEdit(),
     workReturn: "range",
     searched: false,
     loadKind: "logo",
@@ -6220,6 +6524,7 @@ async function runSearch() {
         VIEW.screen = screenAfterSearch();
         VIEW.statement = freshStatement(read.rows, read.rates);
         VIEW.invoiceNotice = "";
+        VIEW.invoiceEdit = emptyInvoiceEdit();
         if (VIEW.workReturn === "stats" && VIEW.invoiceFocus !== null) {
             VIEW.statement = { ...VIEW.statement, invoice: VIEW.invoiceFocus };
             try {
@@ -6333,6 +6638,7 @@ async function runInvoices() {
         VIEW.screen = screenAfterInvoices();
         VIEW.invoices = rows;
         VIEW.invoiceNotice = "";
+        VIEW.invoiceEdit = emptyInvoiceEdit();
         VIEW.invoiceComment = invoiceCommentFromSheet(VIEW.invoiceComment, rows);
         VIEW.status = "";
         VIEW.stats = { ...VIEW.stats, status: "" };
@@ -6544,6 +6850,12 @@ function onClick(event) {
     else if (action === "check-invoice-all") {
         toggleAllInvoiceComments();
     }
+    else if (action === "invoice-detach") {
+        toggleInvoiceDetach(el);
+    }
+    else if (action === "save-invoice-edit") {
+        void saveInvoiceEdit();
+    }
 }
 function onInput(event) {
     const el = event.target;
@@ -6581,6 +6893,13 @@ function onInput(event) {
     }
     if (el.dataset.keep === "pickup-query") {
         setPickupQuery(el.value);
+        return;
+    }
+    if (el.dataset.edit === "invoice-bags" ||
+        el.dataset.edit === "invoice-pickup" ||
+        el.dataset.edit === "invoice-bag-rate" ||
+        el.dataset.edit === "invoice-route-rate") {
+        typeInvoiceEdit(el);
         return;
     }
     if (el.dataset.edit === "invoice") {
@@ -7624,6 +7943,86 @@ async function postSheet(body) {
         return { ok: false, error: "not_json", notJson: true, technical: "pusta odpowiedź" };
     }
     return parsed.body;
+}
+function toggleInvoiceDetach(el) {
+    const ref = sheetRef(el);
+    if (!ref) {
+        return;
+    }
+    const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+    const detached = { ...VIEW.invoiceEdit.detached };
+    if (detached[key]) {
+        delete detached[key];
+    }
+    else {
+        detached[key] = true;
+    }
+    VIEW.invoiceEdit = { ...VIEW.invoiceEdit, detached, status: "", notice: "" };
+    paint();
+}
+function typeInvoiceEdit(el) {
+    const ref = sheetRef(el);
+    if (!ref) {
+        return;
+    }
+    const key = rowKey(ref.sheetRow, ref.transportNumber, ref.sheetName);
+    const next = { ...VIEW.invoiceEdit, status: "", notice: "" };
+    if (el.dataset.edit === "invoice-bags") {
+        next.bags = { ...next.bags, [key]: el.value };
+    }
+    else if (el.dataset.edit === "invoice-pickup") {
+        next.pickup = { ...next.pickup, [key]: el.value };
+    }
+    else if (el.dataset.edit === "invoice-bag-rate") {
+        next.bagRate = { ...next.bagRate, [key]: el.value };
+    }
+    else {
+        const route = el.dataset.route ?? "";
+        if (route === "") {
+            return;
+        }
+        next.routeRate = { ...next.routeRate, [route]: el.value };
+    }
+    VIEW.invoiceEdit = next;
+    paint(el.dataset.keep);
+}
+async function saveInvoiceEdit() {
+    const built = invoiceEditBody(VIEW.invoices, VIEW.invoiceEdit, VIEW.invoiceFocus ?? "", VIEW.mode);
+    if (!built.ok) {
+        VIEW.invoiceEdit = { ...VIEW.invoiceEdit, status: built.error, notice: "" };
+        paint();
+        return;
+    }
+    if (built.unchanged) {
+        return;
+    }
+    await writeNow("Zapisuję zmiany faktury…", built.body, async (result) => {
+        const skipped = skippedCount(result);
+        const saved = Array.isArray(result.zapisane) ? result.zapisane.length : 0;
+        const notice = saved === 0
+            ? "Żadna pozycja nie weszła. Lista jest odświeżona."
+            : skipped > 0
+                ? "Część pozycji nie weszła. Lista jest odświeżona."
+                : "Zapisano zmiany faktury.";
+        if (VIEW.applied && VIEW.invoiceFocus !== null) {
+            const read = await loadInvoiceRows(VIEW.applied);
+            if (read.ok) {
+                VIEW.invoices = rowsOfInvoice(read.rows, VIEW.invoiceFocus);
+                VIEW.invoiceNotice = "";
+                VIEW.invoiceEdit = { ...emptyInvoiceEdit(), notice };
+                return;
+            }
+            if (!read.silent) {
+                VIEW.invoiceEdit = {
+                    ...VIEW.invoiceEdit,
+                    status: "",
+                    notice: "Zapis zszedł, ale odczyt pozycji tej faktury nie doszedł.",
+                };
+            }
+            return;
+        }
+        VIEW.invoiceEdit = { ...emptyInvoiceEdit(), notice };
+    });
 }
 async function writeNow(message, body, apply) {
     if (webapp === "") {

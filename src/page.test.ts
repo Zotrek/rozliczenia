@@ -61,6 +61,8 @@ describe("page wiring", () => {
       "save-rates",
       "expand",
       "detach",
+      "invoice-detach",
+      "save-invoice-edit",
       "attach",
       "resolve-tie",
       "approve",

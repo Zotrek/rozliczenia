@@ -12,6 +12,12 @@ export interface SettledInvoiceRow {
   contractor: string;
   bagCount: number | null;
   routeName: string;
+  /** Grosze. Brak w starym odczycie = null. */
+  routeRate?: Grosze | null;
+  /** Grosze. Brak w starym odczycie = null. */
+  pickupRate?: Grosze | null;
+  /** Grosze. Brak w starym odczycie = null. */
+  bagRate?: Grosze | null;
   /** Pusty tekst = w arkuszu nie ma numeru. */
   invoice: string;
   receptionCost: Grosze | null;
@@ -147,6 +153,9 @@ function readSettledInvoiceRow(value: unknown): SettledInvoiceRow | null {
   const invoice = readText(value.invoice);
   const receptionCost = readGrosze(value.receptionCost);
   const costPerBag = readGrosze(value.costPerBag);
+  const routeRate = readOptionalGrosze(value.routeRate);
+  const pickupRate = readOptionalGrosze(value.pickupRate);
+  const bagRate = readOptionalGrosze(value.bagRate);
   if (
     typeof sheetRow !== "number" ||
     !Number.isInteger(sheetRow) ||
@@ -159,7 +168,10 @@ function readSettledInvoiceRow(value: unknown): SettledInvoiceRow | null {
     routeName === null ||
     invoice === null ||
     receptionCost === undefined ||
-    costPerBag === undefined
+    costPerBag === undefined ||
+    routeRate === undefined ||
+    pickupRate === undefined ||
+    bagRate === undefined
   ) {
     return null;
   }
@@ -186,6 +198,9 @@ function readSettledInvoiceRow(value: unknown): SettledInvoiceRow | null {
     contractor,
     bagCount,
     routeName,
+    routeRate,
+    pickupRate,
+    bagRate,
     invoice: invoice.trim(),
     receptionCost,
     costPerBag,
@@ -205,6 +220,14 @@ function readText(value: unknown): string | null {
     return String(value);
   }
   return null;
+}
+
+/** Brak pola w starym odczycie zostaje pustą stawką. Zła kwota odrzuca wiersz. */
+function readOptionalGrosze(value: unknown): Grosze | null | undefined {
+  if (value === undefined) {
+    return null;
+  }
+  return readGrosze(value);
 }
 
 function readGrosze(value: unknown): Grosze | null | undefined {

@@ -561,6 +561,21 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
 .invoice-head strong { font-size: 14px; }
 .invoice-head span { color: var(--muted); font-size: 12px; font-weight: 650; white-space: nowrap; }
 .invoice-card .table-wrap { flex: none; overflow: auto; }
+.invoice-card tr.is-detached td { color: var(--muted); }
+.invoice-card tr.is-detached td.adres { text-decoration: line-through; }
+.invoice-card td input.is-bad { border-color: var(--orange); background: #fff7ed; }
+.invoice-save {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--line);
+}
+.invoice-save .note { flex: 1 1 18rem; padding: 0; }
+.invoice-save .err, .invoice-save .notice { flex: 1 1 100%; margin: 0; }
+.invoice-save .btn-teal { width: auto; margin-top: 0; }
+.invoice-save .btn-teal:disabled { opacity: 0.45; }
 
 
 /* —— Statystyki —— */

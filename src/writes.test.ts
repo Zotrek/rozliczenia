@@ -1245,6 +1245,182 @@ describe("approve", () => {
   });
 });
 
+describe("patchInvoiceEdit", () => {
+  it("test_patchInvoiceEdit_writes_bags_rates_and_recalculated_cost_on_settled_row", () => {
+    const { register } = fresh();
+    seedRegister(register, 2, {
+      9: 3,
+      11: "",
+      12: "",
+      13: 100,
+      14: 5,
+      15: "tak",
+      16: "FV/1",
+      17: 115,
+      18: 38.33,
+    });
+    seedRegister(register, 3, { 1: 16, 11: "trasa-a", 12: 150 });
+
+    const result = postToSheet({
+      action: "patchInvoiceEdit",
+      numerFaktury: "FV/1",
+      wiersze: [
+        {
+          sheetRow: 2,
+          transportNumber: "15",
+          iloscWorkow: 4,
+          stawkaPodjazdu: "100.00",
+          stawkaWorka: "5.00",
+          koszt: 12000,
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      zapisane: [{ sheetName: "Arkusz1", sheetRow: 2, transportNumber: "15" }],
+      pominiete: [],
+    });
+    expect(register.cell(2, 9)).toBe(4);
+    expect(register.cell(2, 13)).toBe(100);
+    expect(register.cell(2, 14)).toBe(5);
+    expect(register.cell(2, 15)).toBe("tak");
+    expect(register.cell(2, 16)).toBe("FV/1");
+    expect(register.cell(2, 17)).toBe(120);
+    expect(register.cell(2, 18)).toBe(30);
+    expect(register.cell(3, 12)).toBe(150);
+    expect(register.cell(3, 9)).toBe(2);
+  });
+
+  it("test_patchInvoiceEdit_detach_clears_settlement_and_leaves_bags_and_rates", () => {
+    const { register } = fresh();
+    seedRegister(register, 2, {
+      11: "trasa-a",
+      12: 150,
+      13: 20,
+      14: 5,
+      15: "tak",
+      16: "FV/1",
+      17: 80,
+      18: 40,
+    });
+
+    const result = postToSheet({
+      action: "patchInvoiceEdit",
+      numerFaktury: "FV/1",
+      wiersze: [{ sheetRow: 2, transportNumber: "15", odepnij: true }],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.zapisane).toEqual([{ sheetName: "Arkusz1", sheetRow: 2, transportNumber: "15" }]);
+    expect(register.cell(2, 9)).toBe(2);
+    expect(register.cell(2, 11)).toBe("trasa-a");
+    expect(register.cell(2, 12)).toBe(150);
+    expect(register.cell(2, 13)).toBe(20);
+    expect(register.cell(2, 14)).toBe(5);
+    expect(register.cell(2, 15)).toBe("");
+    expect(register.cell(2, 16)).toBe("");
+    expect(register.cell(2, 17)).toBe("");
+    expect(register.cell(2, 18)).toBe("");
+  });
+
+  it("test_patchInvoiceEdit_skips_open_row_wrong_invoice_and_bad_key", () => {
+    const { register } = fresh();
+    seedRegister(register, 2, { 15: "tak", 16: "FV/1", 17: 10, 18: 5 });
+    seedRegister(register, 3, { 1: 16, 15: "", 16: "", 17: "", 18: "" });
+
+    const wrongInvoice = postToSheet({
+      action: "patchInvoiceEdit",
+      numerFaktury: "FV/9",
+      wiersze: [
+        {
+          sheetRow: 2,
+          transportNumber: "15",
+          iloscWorkow: 4,
+          stawkaPodjazdu: "1.00",
+          stawkaWorka: "1.00",
+          koszt: 100,
+        },
+      ],
+    });
+    expect(wrongInvoice.zapisane).toEqual([]);
+    expect(wrongInvoice.pominiete).toEqual([
+      { sheetName: "Arkusz1", sheetRow: 2, transportNumber: "15", reason: "invoice" },
+    ]);
+    expect(register.cell(2, 9)).toBe(2);
+
+    const open = postToSheet({
+      action: "patchInvoiceEdit",
+      numerFaktury: "",
+      wiersze: [
+        {
+          sheetRow: 3,
+          transportNumber: "16",
+          iloscWorkow: 9,
+          stawkaPodjazdu: "",
+          stawkaWorka: "",
+          koszt: 0,
+        },
+      ],
+    });
+    expect(open.pominiete).toEqual([
+      { sheetName: "Arkusz1", sheetRow: 3, transportNumber: "16", reason: "open" },
+    ]);
+    expect(register.cell(3, 9)).toBe(2);
+
+    const mismatch = postToSheet({
+      action: "patchInvoiceEdit",
+      numerFaktury: "FV/1",
+      wiersze: [
+        {
+          sheetRow: 2,
+          transportNumber: "99",
+          iloscWorkow: 1,
+          stawkaPodjazdu: "",
+          stawkaWorka: "",
+          koszt: 0,
+        },
+      ],
+    });
+    expect(mismatch.pominiete?.[0].reason).toBe("key");
+    expect(register.writes).toEqual([]);
+  });
+
+  it("test_patchInvoiceEdit_schedule_writes_schedule_columns", () => {
+    const { register } = fresh("zestawienie z harmonogramu");
+    seedSchedule(register, 2, { 14: "tak", 15: "FV/1", 16: 10, 17: 5 });
+
+    const result = postToSheet({
+      action: "patchInvoiceEdit",
+      tryb: "harmonogram",
+      numerFaktury: "FV/1",
+      sheetName: "zestawienie z harmonogramu",
+      wiersze: [
+        {
+          sheetRow: 2,
+          transportNumber: "",
+          iloscWorkow: 4,
+          stawkaPodjazdu: "10.00",
+          stawkaWorka: "2.50",
+          stawkaTrasy: "80.00",
+          koszt: 9000,
+        },
+      ],
+    });
+
+    expect(result.zapisane).toEqual([
+      { sheetName: "zestawienie z harmonogramu", sheetRow: 2, transportNumber: "" },
+    ]);
+    expect(register.cell(2, 8)).toBe(4);
+    expect(register.cell(2, 11)).toBe(80);
+    expect(register.cell(2, 12)).toBe(10);
+    expect(register.cell(2, 13)).toBe(2.5);
+    expect(register.cell(2, 14)).toBe("tak");
+    expect(register.cell(2, 16)).toBe(90);
+    expect(register.cell(2, 17)).toBe(22.5);
+  });
+});
+
 describe("zapis w transport-log.gs", () => {
   it("test_settlement_writes_stay_behind_lock_and_saveRate_is_not_copied", () => {
     const postFn = functionSource("doPost");
@@ -1266,6 +1442,8 @@ describe("zapis w transport-log.gs", () => {
       "attachRoute",
       "resolveRateTie",
       "approve",
+      "patchInvoiceComment",
+      "patchInvoiceEdit",
     ]) {
       expect(gate).toContain(action);
       expect(run).toContain(action);

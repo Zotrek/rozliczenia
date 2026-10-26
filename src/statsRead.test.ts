@@ -308,14 +308,44 @@ describe("akcja settlementStats w transport-log.gs", () => {
     expect(body).toContain("buildSettlementStats_");
     expect(body).toContain("getSheetByName(RATE_SHEET_NAME)");
     expect(body).toContain("ODEBRANE_Z_HARMONOGRAMU_SHEET_NAME");
-    expect(body).toContain("readOdebraneSheetRows_");
+    expect(body).toContain("readSettlementStatsOdebraneRows_");
+    expect(body).not.toContain("readOdebraneSheetRows_");
     expect(body).not.toMatch(WRITE_CALL);
+    expect(functionSource("readSettlementStatsOdebraneRows_")).toContain(
+      "settlementStatsOdebraneReadWidth_",
+    );
+    expect(functionSource("readSettlementStatsOdebraneRows_")).not.toMatch(WRITE_CALL);
+    const sync = functionSource("syncZestawienieHarmonogram_");
+    expect(sync).toContain("readOdebraneSheetRows_");
+    expect(sync).not.toContain("readSettlementStatsOdebraneRows_");
     expect(gs).toContain("action === 'settlementStats'");
     const getFn = functionSource("doGet");
     expect(getFn).toContain("settlementStats");
     const postFn = functionSource("doPost");
     expect(postFn).not.toContain("settlementStats");
     expect(postFn.indexOf("settlementSearch")).toBeLessThan(postFn.indexOf("waitLock"));
+  });
+
+  it("test_settlementStatsOdebraneReadWidth_cuts_only_columns_after_close_date", () => {
+    const block = pureBlock();
+    const norm = functionSource("normalizeRateShopKey_");
+    const load = new Function(
+      `${norm}\n${block}\nreturn settlementStatsOdebraneReadWidth_;`,
+    ) as () => (headers: string[]) => number;
+    const width = load();
+    const endingAtDate = [
+      "Kod pocztowy",
+      "Miasto",
+      "Ulica",
+      "Numer budynku",
+      "Firma transportowa",
+      "Sklep",
+      "Data zamknięcia worka",
+    ];
+    expect(width(endingAtDate)).toBe(endingAtDate.length);
+    const withTail = endingAtDate.concat(["Tryb zbiórki", "Waga", "Frakcja", "Typ worka"]);
+    expect(width(withTail)).toBe(endingAtDate.length);
+    expect(width(withTail.filter((header) => header !== "Firma transportowa"))).toBe(0);
   });
 
   it("test_settlementSearch_still_excludes_settled", () => {

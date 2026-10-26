@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Makieta — menu rozliczeń</title>
+  <style>
+    :root {
+      --bg: #e7eeee;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: rgba(148, 163, 184, 0.45);
+      --teal: #0d9488;
+      --teal-deep: #0f766e;
+      --teal-soft: rgba(13, 148, 136, 0.12);
+      --orange: #ea580c;
+      --orange-deep: #c2410c;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 0 1px 3px rgba(15, 23, 42, 0.06);
+      --font: system-ui, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: var(--font);
+      color: var(--ink);
+      background: var(--bg);
+    }
+    button, input, select { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 2px;
+    }
+    .chrome {
+      flex: none;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+      padding: 12px 18px 10px;
+    }
+    .kicker {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--teal-deep);
+    }
+    .chrome h1 { margin: 2px 0 4px; font-size: 18px; }
+    .chrome .lead { margin: 0 0 8px; max-width: 78rem; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .chrome-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+    .chrome-row span { font-size: 12px; font-weight: 700; color: var(--muted); min-width: 4.6rem; }
+    .chrome button {
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .chrome button.is-on { background: var(--teal); border-color: var(--teal); color: #fff; }
+    .chrome button:disabled { opacity: 0.45; }
+    #caption { margin: 4px 0 0; font-size: 13px; font-weight: 650; color: #334155; }
+    details { margin-top: 6px; font-size: 13px; color: #334155; }
+    details summary { cursor: pointer; color: var(--teal-deep); font-weight: 650; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 78rem; padding: 8px 0 2px; }
+    .split h2 { margin: 0 0 4px; font-size: 13px; }
+    .split ul { margin: 0; padding-left: 18px; }
+    .stage { flex: 1; min-height: 0; padding: 12px 16px 16px; }
+    .app {
+      position: relative;
+      height: 100%;
+      min-height: 420px;
+      background: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .menu {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 18px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand img { width: 36px; height: 36px; border-radius: 8px; }
+    .brand strong { display: block; font-size: 15px; }
+    .brand em { display: block; font-style: normal; font-size: 12px; color: var(--muted); font-weight: 600; }
+    .nav { display: flex; gap: 4px; }
+    .nav button {
+      border: none;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      background: transparent;
+      padding: 8px 8px 6px;
+      font-size: 14px;
+      font-weight: 750;
+      color: #475569;
+    }
+    .nav button:hover:not(:disabled) { color: var(--ink); }
+    .nav button.is-on { color: var(--teal-deep); border-bottom-color: var(--teal); }
+    .nav button:disabled { opacity: 0.4; }
+    .menu-side { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .modes {
+      display: flex;
+      padding: 3px;
+      border-radius: 10px;
+      background: rgba(148, 163, 184, 0.16);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+    .mode {
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+    }
+    .mode.is-on { background: var(--teal); color: #fff; }
+    .btn, .btn-teal, .btn-ghost {
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .btn-ghost.is-on { background: var(--teal-soft); border-color: transparent; color: var(--teal-deep); }
+    .btn-teal { border: none; background: var(--teal); color: #fff; padding: 9px 14px; }
+    .btn-teal:hover { background: var(--teal-deep); }
+    .context, .notice {
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+      font-weight: 650;
+    }
+    .context { background: #f8fafc; color: #334155; }
+    .context span { color: var(--muted); font-weight: 700; letter-spacing: 0.04em; font-size: 11px; text-transform: uppercase; margin-right: 8px; }
+    .notice { background: #fff7ed; color: var(--orange-deep); }
+    .body { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+    .body > .setup { flex: 1; }
+    .top {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .top .brand { margin-right: auto; }
+    .range { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin-right: auto; }
+    .range span { font-size: 11px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+    .range strong { font-size: 14px; }
+    .setup {
+      min-height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 16px;
+      background: #f4f7f6;
+    }
+    .setup-card {
+      width: min(440px, 100%);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 22px 22px 18px;
+      box-shadow: var(--shadow);
+    }
+    .setup-card h2 { margin: 14px 0 4px; font-size: 18px; }
+    .setup-lead, .note { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.45; }
+    .setup-card .modes { width: 100%; margin: 14px 0; }
+    .setup-card .mode { flex: 1; }
+    .fields { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
+    .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted); }
+    .field input, .field select {
+      font-weight: 550;
+      color: var(--ink);
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.55);
+      background: #fff;
+    }
+    .setup .btn-teal { width: 100%; }
+    .setup-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+    .sheet { padding: 0 0 12px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 12px; border-bottom: 1px solid var(--line); text-align: left; }
+    th { font-size: 11px; letter-spacing: 0.02em; color: var(--muted); background: #f8fafc; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+    .chip {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+    }
+    .chip.is-on { background: var(--teal); border-color: var(--teal); color: #fff; }
+    .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 14px 16px; }
+    .kpi {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fff;
+    }
+    .kpi span {
+      display: block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .kpi b { font-size: 22px; font-variant-numeric: tabular-nums; }
+    .fake-link {
+      border: none;
+      background: transparent;
+      padding: 0;
+      color: var(--teal-deep);
+      font-weight: 750;
+      text-decoration: underline;
+    }
+    .invoice {
+      margin: 16px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .invoice h2 {
+      margin: 0;
+      padding: 10px 12px;
+      font-size: 14px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--line);
+    }
+    .foot {
+      display: flex;
+      justify-content: flex-end;
+      gap: 16px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--line);
+      font-size: 13px;
+    }
+    .foot b { font-variant-numeric: tabular-nums; }
+    .modal {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.35);
+      z-index: 4;
+    }
+    .modal-panel {
+      width: min(440px, calc(100% - 32px));
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 18px 22px;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+    }
+    .modal-panel h2 { margin: 0; font-size: 16px; }
+    .rates-tabs { display: flex; gap: 6px; }
+    .rates-tab { border-radius: 999px; }
+    .rates-tab.is-on { background: var(--teal); border-color: var(--teal); color: #fff; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+    @media (max-width: 800px) {
+      .split, .kpis { grid-template-columns: 1fr; }
+      .menu-side { margin-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header class="chrome">
+    <div class="kicker">Makieta, nie część aplikacji</div>
+    <h1>Menu rozliczeń</h1>
+    <p class="lead">
+      Jeden pasek na każdym ekranie: Zakres, Zestawienie, Statystyki i Baza stawek.
+      Zestawienie czeka, aż będzie Szukaj. Podgląd faktury zostaje przy Statystykach.
+      <strong>Teraz</strong> pokazuje dzisiejsze przyciski. Tryb można zostawić na karcie zakresu albo wstawić w pasek.
+      Obok: <a href="makiety-tabeli.html">tabela</a>, <a href="makiety-statystyki.html">statystyki</a>, <a href="makiety-komentarz-faktury.html">komentarz do faktury</a>.
+    </p>
+    <div class="chrome-row">
+      <span>Wariant</span>
+      <button type="button" data-variant="next">Propozycja</button>
+      <button type="button" data-variant="now">Teraz</button>
+    </div>
+    <div class="chrome-row">
+      <span>Ekran</span>
+      <button type="button" data-screen="range">Zakres</button>
+      <button type="button" data-screen="statement">Zestawienie</button>
+      <button type="button" data-screen="stats">Statystyki</button>
+      <button type="button" data-screen="preview">Podgląd faktury</button>
+    </div>
+    <div class="chrome-row">
+      <span>Tryb</span>
+      <button type="button" data-mode-place="card">Przy zakresie</button>
+      <button type="button" data-mode-place="bar">W pasku</button>
+    </div>
+    <div class="chrome-row">
+      <span>Szukaj</span>
+      <button type="button" data-searched="yes">Było</button>
+      <button type="button" data-searched="no">Jeszcze nie</button>
+    </div>
+    <p id="caption"></p>
+    <details>
+      <summary>Co zmienia pasek, a co zostaje</summary>
+      <div class="split">
+        <div>
+          <h2>Propozycja</h2>
+          <ul>
+            <li>Zakres, Zestawienie i Statystyki są w pasku na każdym ekranie.</li>
+            <li>Baza stawek jest w tym samym pasku i dalej otwiera okno, także ze Statystyk i z podglądu faktury.</li>
+            <li>Zestawienie jest nieaktywne, dopóki na Zakresie nie było Szukaj.</li>
+            <li>Ze Zestawienia wchodzi się w Statystyki od razu. Podwykonawca i daty zostają.</li>
+            <li>Podgląd faktury nie dostaje własnej pozycji. W pasku świeci się Statystyki, a na ekranie zostaje ← Statystyki.</li>
+            <li>Przy ustawieniu „Przy zakresie” tryb zostaje na karcie. Na Statystykach raport i tak liczy oba tryby.</li>
+            <li>Przy ustawieniu „W pasku” tryb jest na Zakresie i na Zestawieniu. Zmiana trybu na Zestawieniu wraca do Zakresu.</li>
+          </ul>
+        </div>
+        <div>
+          <h2>Tak jest teraz</h2>
+          <ul>
+            <li>Statystyki i Baza stawek są na dole karty Zakresu.</li>
+            <li>Na Zestawieniu są Zmień zakres i Baza stawek. Statystyk stamtąd nie ma.</li>
+            <li>Na Statystykach jest ← Powrót. Bazy stawek tam nie ma.</li>
+            <li>Podgląd faktury ma ← Statystyki i nic więcej w nagłówku.</li>
+            <li>Tryb wybiera się na karcie Zakresu. Na pozostałych ekranach widać go w podpisie przy logo.</li>
+          </ul>
+        </div>
+      </div>
+    </details>
+  </header>
+  <main class="stage">
+    <div class="app" id="app"></div>
+  </main>
+  <script>
+    const RANGE = "GPW, od 01.09.2026 do 18.09.2026";
+    const state = {
+      variant: "next",
+      screen: "range",
+      mode: "report",
+      modePlace: "card",
+      searched: true,
+      rates: false,
+      ratesTab: "stawki",
+      notice: ""
+    };
+
+    function modeLabel(mode) {
+      return mode === "schedule" ? "Harmonogram" : "Na zgłoszenie";
+    }
+
+    function esc(value) {
+      return String(value).replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[ch]));
+    }
+
+    function brand(subtitle) {
+      return (
+        '<div class="brand"><img src="../logo.png" alt="" width="36" height="36">' +
+        `<div><strong>Rozliczenia</strong><em>${esc(subtitle)}</em></div></div>`
+      );
+    }
+
+    function modes(extraClass) {
+      const reportOn = state.mode === "report";
+      return (
+        `<div class="modes${extraClass ? " " + extraClass : ""}" role="group" aria-label="Tryb">` +
+        `<button type="button" class="mode${reportOn ? " is-on" : ""}" data-mode="report">Na zgłoszenie</button>` +
+        `<button type="button" class="mode${reportOn ? "" : " is-on"}" data-mode="schedule">Harmonogram</button>` +
+        "</div>"
+      );
+    }
+
+    function ratesButton() {
+      const on = state.rates ? " is-on" : "";
+      const expanded = state.rates ? "true" : "false";
+      return `<button type="button" class="btn-ghost${on}" data-go="rates" aria-expanded="${expanded}">Baza stawek</button>`;
+    }
+
+    function menuBar() {
+      const place = (id) => {
+        const on = (id === "stats" ? state.screen === "stats" || state.screen === "preview" : state.screen === id) ? " is-on" : "";
+        const disabled = id === "statement" && !state.searched ? " disabled" : "";
+        const title = disabled ? ' title="Najpierw Szukaj na Zakresie"' : "";
+        const label = id === "range" ? "Zakres" : id === "statement" ? "Zestawienie" : "Statystyki";
+        return `<button type="button" class="${on.trim()}" data-go="${id}"${disabled}${title}>${label}</button>`;
+      };
+      const showMode = state.modePlace === "bar" && (state.screen === "range" || state.screen === "statement");
+      const onReport = state.screen === "stats" || state.screen === "preview";
+      const sideMode = showMode
+        ? modes()
+        : (onReport && state.modePlace === "bar" ? '<span class="note">Raport liczy oba tryby.</span>' : "");
+      return (
+        '<header class="menu">' +
+        brand("podwykonawcy") +
+        `<nav class="nav" aria-label="Miejsca">${place("range")}${place("statement")}${place("stats")}</nav>` +
+        `<div class="menu-side">${sideMode}${ratesButton()}</div>` +
+        "</header>"
+      );
+    }
+
+    function contextStrip() {
+      if (state.screen === "range") return "";
+      if (!state.searched) {
+        return '<p class="context"><span>Zakres</span>Jeszcze go nie ma. Zestawienie włączy się po Szukaj.</p>';
+      }
+      return `<p class="context"><span>Zakres</span>${esc(RANGE)} · ${esc(modeLabel(state.mode))}</p>`;
+    }
+
+    function noticeStrip() {
+      return state.notice ? `<p class="notice">${esc(state.notice)}</p>` : "";
+    }
+
+    function rangeCard(now) {
+      const modeBlock = now || state.modePlace === "card" ? modes() : "";
+      const foot = now
+        ? `<div class="setup-foot"><button type="button" class="btn-ghost" data-go="stats">Statystyki</button>${ratesButton()}</div>`
+        : "";
+      return (
+        '<div class="setup"><div class="setup-card">' +
+        (now ? brand(modeLabel(state.mode)) : "") +
+        "<h2>Zakres rozliczenia</h2>" +
+        '<p class="setup-lead">Ustal, czego dotyczy to rozliczenie. Pozycje pojawią się na następnym ekranie.</p>' +
+        modeBlock +
+        '<div class="fields">' +
+        '<label class="field"><span>Podwykonawca</span><input value="GPW" readonly></label>' +
+        '<label class="field"><span>Data początkowa</span><input type="date" value="2026-09-01" readonly></label>' +
+        '<label class="field"><span>Data końcowa</span><input type="date" value="2026-09-18" readonly></label>' +
+        "</div>" +
+        '<button type="button" class="btn-teal" data-go="search">Szukaj</button>' +
+        foot +
+        "</div></div>"
+      );
+    }
+
+    function rowsTable() {
+      return (
+        '<div class="sheet"><table><thead><tr>' +
+        "<th>Sklep</th><th>Data</th><th class=\"num\">Worki</th><th class=\"num\">Koszt</th>" +
+        "</tr></thead><tbody>" +
+        "<tr><td>Biedronka, ul. Głogowska 12</td><td>12.09.2026</td><td class=\"num\">4</td><td class=\"num\">30,00 zł</td></tr>" +
+        "<tr><td>Lidl, ul. Hetmańska 90</td><td>14.09.2026</td><td class=\"num\">8</td><td class=\"num\">55,00 zł</td></tr>" +
+        "<tr><td>Trasa gpw-18.09.26-01</td><td>18.09.2026</td><td class=\"num\">25</td><td class=\"num\">200,00 zł</td></tr>" +
+        "</tbody></table>" +
+        '<div class="foot"><span>Suma zestawienia <b>285,00 zł</b></span></div></div>'
+      );
+    }
+
+    function statementScreen(now) {
+      const back = now
+        ? '<button type="button" class="btn-ghost" data-go="range">Zmień zakres</button>' + ratesButton()
+        : "";
+      const head = now
+        ? '<div class="top">' + brand(modeLabel(state.mode)) +
+          `<div class="range"><span>${esc(modeLabel(state.mode))}</span><strong>${esc(RANGE)}</strong></div>` +
+          back + "</div>"
+        : "";
+      return head + rowsTable();
+    }
+
+    function statsScreen(now) {
+      const head = now
+        ? '<div class="top">' + brand("Statystyki") +
+          '<button type="button" class="btn-ghost" data-go="range">← Powrót</button></div>'
+        : "";
+      return (
+        head +
+        '<div class="filters">' +
+        '<button type="button" class="chip is-on">Bieżący miesiąc</button>' +
+        '<button type="button" class="chip">Poprzednie miesiące</button>' +
+        '<button type="button" class="chip">Bieżący kwartał</button>' +
+        '<button type="button" class="chip">Dokładny zakres</button>' +
+        '<label class="field"><span>Podwykonawca</span><select><option>Wszyscy</option><option selected>GPW</option></select></label>' +
+        '<button type="button" class="btn-teal">Pokaż raport</button>' +
+        "</div>" +
+        '<div class="kpis">' +
+        '<div class="kpi"><span>Odbiory</span><b>128</b></div>' +
+        '<div class="kpi"><span>Worki</span><b>640</b></div>' +
+        '<div class="kpi"><span>Koszt</span><b>18 400 zł</b></div>' +
+        "</div>" +
+        '<div class="sheet"><table><thead><tr><th>Odbiór</th><th>Tryb</th><th class="num">Koszt</th><th></th></tr></thead><tbody>' +
+        '<tr><td>Biedronka · 12.09.2026</td><td>Na zgłoszenie</td><td class="num">30,00 zł</td>' +
+        '<td><button type="button" class="fake-link" data-go="preview">Podgląd</button></td></tr>' +
+        "<tr><td>Lidl · 14.09.2026</td><td>Harmonogram</td><td class=\"num\">55,00 zł</td><td></td></tr>" +
+        "</tbody></table></div>"
+      );
+    }
+
+    function previewScreen(now) {
+      const head = '<div class="top">' +
+        (now ? brand(modeLabel(state.mode)) : "") +
+        `<div class="range"><span>Podgląd rozliczonych</span><strong>FV 12/09/2026 · ${esc(RANGE)}</strong></div>` +
+        '<button type="button" class="btn-ghost" data-go="stats">← Statystyki</button></div>';
+      return (
+        head +
+        '<article class="invoice"><h2>FV 12/09/2026 · 85,00 zł</h2>' +
+        "<table><tbody>" +
+        '<tr><td>Biedronka, ul. Głogowska 12</td><td class="num">30,00 zł</td></tr>' +
+        '<tr><td>Lidl, ul. Hetmańska 90</td><td class="num">55,00 zł</td></tr>' +
+        "</tbody></table></article>"
+      );
+    }
+
+    function ratesModal() {
+      if (!state.rates) return "";
+      const stawki = state.ratesTab === "stawki";
+      const title = stawki ? "Baza stawek" : "Baza cen harmonogram";
+      return (
+        '<div class="modal" data-close="rates">' +
+        '<div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="rates-title">' +
+        `<h2 id="rates-title">${title}</h2>` +
+        '<div class="rates-tabs" role="tablist">' +
+        `<button type="button" class="btn rates-tab${stawki ? " is-on" : ""}" data-rates-tab="stawki">Baza stawek</button>` +
+        `<button type="button" class="btn rates-tab${stawki ? "" : " is-on"}" data-rates-tab="harmonogram">Baza cen harmonogram</button>` +
+        "</div>" +
+        '<label class="field"><span>Sklep</span><input value="ul. Głogowska 12, Poznań" readonly></label>' +
+        '<label class="field"><span>Podwykonawca</span><input value="GPW" readonly></label>' +
+        '<p class="note">To samo okno co dziś. W propozycji wchodzi się do niego z paska, na każdym ekranie.</p>' +
+        '<div class="modal-actions"><button type="button" class="btn-ghost" data-close="rates">Zamknij</button></div>' +
+        "</div></div>"
+      );
+    }
+
+    function caption() {
+      const where = {
+        range: "Zakres",
+        statement: "Zestawienie",
+        stats: "Statystyki",
+        preview: "Podgląd faktury"
+      }[state.screen];
+      if (state.variant === "now") {
+        const text = {
+          range: "Statystyki i Baza stawek są na dole karty.",
+          statement: "Stąd nie ma wejścia w Statystyki. Najpierw Zmień zakres.",
+          stats: "Dalej jest tylko ← Powrót. Bazy stawek na tym ekranie nie ma.",
+          preview: "W nagłówku zostaje ← Statystyki."
+        }[state.screen];
+        return `${where}. ${text}`;
+      }
+      const place = state.modePlace === "bar"
+        ? "Tryb siedzi w pasku na Zakresie i Zestawieniu."
+        : "Tryb zostaje na karcie Zakresu.";
+      const text = {
+        range: "Miejsca są w pasku. Karta służy do Szukaj.",
+        statement: "Statystyki są w pasku. Ten zakres zostaje.",
+        stats: "Zestawienie i Baza stawek są w pasku. Raport liczy oba tryby.",
+        preview: "W pasku świeci się Statystyki. ← Statystyki zostaje na ekranie."
+      }[state.screen];
+      const search = state.searched ? "" : " Zestawienie w pasku jest wyłączone.";
+      return `${where}. ${text} ${place}${search}`;
+    }
+
+    function render() {
+      const now = state.variant === "now";
+      let screen = "";
+      if (state.screen === "range") screen = rangeCard(now);
+      else if (state.screen === "statement") screen = statementScreen(now);
+      else if (state.screen === "stats") screen = statsScreen(now);
+      else screen = previewScreen(now);
+      const shell = now
+        ? screen
+        : menuBar() + contextStrip() + noticeStrip() + `<div class="body">${screen}</div>`;
+      document.getElementById("app").innerHTML = shell + ratesModal();
+      document.getElementById("caption").textContent = caption();
+      document.querySelectorAll("[data-variant]").forEach((btn) => {
+        btn.classList.toggle("is-on", btn.dataset.variant === state.variant);
+      });
+      document.querySelectorAll(".chrome [data-screen]").forEach((btn) => {
+        btn.classList.toggle("is-on", btn.dataset.screen === state.screen);
+        btn.disabled = btn.dataset.screen === "statement" && !state.searched;
+      });
+      document.querySelectorAll("[data-mode-place]").forEach((btn) => {
+        btn.classList.toggle("is-on", btn.dataset.modePlace === state.modePlace);
+        btn.disabled = state.variant === "now";
+      });
+      document.querySelectorAll("[data-searched]").forEach((btn) => {
+        const on = (btn.dataset.searched === "yes") === state.searched;
+        btn.classList.toggle("is-on", on);
+      });
+    }
+
+    function go(screen) {
+      if (screen === "statement" && !state.searched) {
+        state.notice = "Zestawienie włączy się po Szukaj na Zakresie.";
+        render();
+        return;
+      }
+      state.screen = screen;
+      state.rates = false;
+      state.notice = "";
+      render();
+    }
+
+    document.addEventListener("click", (event) => {
+      const tab = event.target.closest("[data-rates-tab]");
+      if (tab) {
+        state.ratesTab = tab.dataset.ratesTab;
+        render();
+        return;
+      }
+      const closer = event.target.closest("[data-close]");
+      if (closer && event.target === closer) {
+        state.rates = false;
+        render();
+        return;
+      }
+      const btn = event.target.closest("button");
+      if (!btn) return;
+      if (btn.closest(".chrome")) {
+        if (btn.dataset.variant) {
+          state.variant = btn.dataset.variant;
+          state.notice = "";
+        } else if (btn.dataset.screen) {
+          go(btn.dataset.screen);
+          return;
+        } else if (btn.dataset.modePlace) {
+          state.modePlace = btn.dataset.modePlace;
+        } else if (btn.dataset.searched) {
+          state.searched = btn.dataset.searched === "yes";
+          state.notice = "";
+          if (!state.searched && state.screen === "statement") {
+            state.screen = "range";
+            state.notice = "Bez Szukaj zestawienia nie ma.";
+          }
+        }
+        render();
+        return;
+      }
+      if (!btn.closest("#app")) return;
+      if (btn.dataset.mode) {
+        if (btn.dataset.mode === state.mode) return;
+        const leaveStatement = state.variant === "next" && state.modePlace === "bar" && state.screen === "statement";
+        state.mode = btn.dataset.mode;
+        if (leaveStatement) {
+          state.screen = "range";
+          state.rates = false;
+          state.notice = `Tryb: ${modeLabel(state.mode)}. Wiersze poprzedniego trybu tu nie pasują, więc wracam do Zakresu.`;
+        }
+        render();
+        return;
+      }
+      if (btn.dataset.go === "rates") {
+        state.rates = !state.rates;
+        render();
+        return;
+      }
+      if (btn.dataset.go === "search") {
+        state.searched = true;
+        state.screen = "statement";
+        state.rates = false;
+        state.notice = "";
+        render();
+        return;
+      }
+      if (btn.dataset.go) go(btn.dataset.go);
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && state.rates) {
+        state.rates = false;
+        render();
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

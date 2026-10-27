@@ -6532,6 +6532,22 @@ function readStatsScroll() {
     return body.scrollTop;
 }
 let statsScrollGen = 0;
+/**
+ * scrollTop z przywracania przewinięcia woła zdarzenie scroll dopiero po paint,
+ * gdy flaga painting jest już zdjęta. To zdarzenie zamykało menu filtra.
+ * Numer zostaje do następnej klatki, żeby złapać też zdarzenie z requestAnimationFrame.
+ */
+let scrollRestoreGen = 0;
+function armScrollRestore() {
+    const gen = ++scrollRestoreGen;
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            if (gen === scrollRestoreGen) {
+                scrollRestoreGen = 0;
+            }
+        });
+    });
+}
 function writeStatsScroll(top) {
     if (top == null) {
         return;
@@ -6543,6 +6559,7 @@ function writeStatsScroll(top) {
         }
         body.scrollTop = top;
     };
+    armScrollRestore();
     apply();
     const gen = ++statsScrollGen;
     requestAnimationFrame(() => {
@@ -6556,6 +6573,7 @@ function writeListScroll(scroll) {
     if (!scroll) {
         return;
     }
+    armScrollRestore();
     const apply = () => {
         const wrap = document.querySelector(".table-wrap");
         if (!(wrap instanceof HTMLElement)) {
@@ -8648,7 +8666,7 @@ function toggleStatsTable(id) {
     paint();
 }
 function onCaptureScroll(event) {
-    if (painting || (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu)) {
+    if (painting || scrollRestoreGen !== 0 || (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu)) {
         return;
     }
     const target = event.target;

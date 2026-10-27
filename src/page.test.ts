@@ -147,6 +147,12 @@ describe("page wiring", () => {
     expect(write).toContain(".stats .body");
     expect(write).toContain("scrollTop");
     expect(write).toContain("requestAnimationFrame");
+    expect(write).toContain("armScrollRestore(");
+    expect(functionBody("writeListScroll")).toContain("armScrollRestore(");
+    expect(functionBody("onCaptureScroll")).toContain("scrollRestoreGen");
+    const arm = functionBody("armScrollRestore");
+    expect(arm).toContain("scrollRestoreGen");
+    expect(arm).toContain("requestAnimationFrame");
   });
 
   it("test_page_onChange_toggles_and_commits_edits", () => {

@@ -93,6 +93,47 @@ export interface RouteDraft {
   rate: string;
 }
 
+export const STATEMENT_COLUMN_KEYS = [
+  "settled",
+  "protocol",
+  "address",
+  "shop",
+  "date",
+  "kind",
+  "leg",
+  "bags",
+  "bagRate",
+  "bagSum",
+  "total",
+  "happened",
+  "comment",
+] as const;
+
+export type StatementColumnKey = (typeof STATEMENT_COLUMN_KEYS)[number];
+
+export interface StatementColumnMenu {
+  column: StatementColumnKey;
+  /** Zaznaczone wartości zanim użytkownik naciśnie OK. */
+  draft: readonly string[];
+  query: string;
+}
+
+export interface StatementTableState {
+  sortKey: StatementColumnKey | null;
+  sortDir: "asc" | "desc";
+  /** Brak klucza = kolumna bez filtra. Pusta lista = nic nie przechodzi. */
+  filters: Partial<Record<StatementColumnKey, readonly string[]>>;
+  menu: StatementColumnMenu | null;
+}
+
+export function emptyStatementTable(): StatementTableState {
+  return { sortKey: null, sortDir: "asc", filters: {}, menu: null };
+}
+
+export function isStatementColumnKey(value: string): value is StatementColumnKey {
+  return (STATEMENT_COLUMN_KEYS as readonly string[]).includes(value);
+}
+
 export interface StatementScreen {
   rows: RegisterRow[];
   rates: SettlementRateRow[];
@@ -109,6 +150,8 @@ export interface StatementScreen {
   commentPicks: Record<string, true>;
   commentDraft: string;
   commentNotice: string;
+  /** Sortowanie i filtr kolumn zestawienia. Nie schodzi do arkusza. */
+  table: StatementTableState;
 }
 
 export interface ApproveShop {
@@ -145,6 +188,7 @@ export function emptyStatement(): StatementScreen {
     commentPicks: {},
     commentDraft: "",
     commentNotice: "",
+    table: emptyStatementTable(),
   };
 }
 
@@ -370,6 +414,23 @@ export function setAllSelected(screen: StatementScreen, on: boolean): StatementS
   return { ...screen, selected };
 }
 
+/** Zaznacza albo czyści tylko podane pozycje. Reszta zaznaczenia zostaje. */
+export function setLinesSelected(
+  screen: StatementScreen,
+  keys: readonly string[],
+  on: boolean,
+): StatementScreen {
+  const selected = { ...screen.selected };
+  for (const key of keys) {
+    if (on) {
+      selected[key] = true;
+    } else {
+      delete selected[key];
+    }
+  }
+  return { ...screen, selected };
+}
+
 export function toggleOpen(screen: StatementScreen, routeName: string): StatementScreen {
   const openRoutes = { ...screen.openRoutes };
   if (openRoutes[routeName]) {
@@ -560,6 +621,7 @@ export function adoptRows(
     commentPicks: pick(prev.commentPicks, keys),
     commentDraft: prev.commentDraft,
     commentNotice: prev.commentNotice,
+    table: prev.table,
   };
 }
 

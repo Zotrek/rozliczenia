@@ -1053,6 +1053,7 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
   gap: 4px;
 }
 th.num .xl-head { justify-content: flex-end; }
+th.c .xl-head { justify-content: center; }
 th.xl-th.is-open { z-index: 6; }
 .xl-btn {
   display: inline-grid;
@@ -2707,6 +2708,27 @@ function formatPartialApprove(body) {
 function scheduleTrybFields(mode) {
     return mode === "schedule" ? { tryb: "harmonogram" } : {};
 }
+const STATEMENT_COLUMN_KEYS = [
+    "settled",
+    "protocol",
+    "address",
+    "shop",
+    "date",
+    "kind",
+    "leg",
+    "bags",
+    "bagRate",
+    "bagSum",
+    "total",
+    "happened",
+    "comment",
+];
+function emptyStatementTable() {
+    return { sortKey: null, sortDir: "asc", filters: {}, menu: null };
+}
+function isStatementColumnKey(value) {
+    return STATEMENT_COLUMN_KEYS.includes(value);
+}
 function emptyStatement() {
     return {
         rows: [],
@@ -2722,6 +2744,7 @@ function emptyStatement() {
         commentPicks: {},
         commentDraft: "",
         commentNotice: "",
+        table: emptyStatementTable(),
     };
 }
 /** Niepuste komentarze z odczytu rejestru. Klucz jak w `rowKey`. */
@@ -2914,6 +2937,19 @@ function setAllSelected(screen, on) {
     }
     return { ...screen, selected };
 }
+/** Zaznacza albo czyści tylko podane pozycje. Reszta zaznaczenia zostaje. */
+function setLinesSelected(screen, keys, on) {
+    const selected = { ...screen.selected };
+    for (const key of keys) {
+        if (on) {
+            selected[key] = true;
+        }
+        else {
+            delete selected[key];
+        }
+    }
+    return { ...screen, selected };
+}
 function toggleOpen(screen, routeName) {
     const openRoutes = { ...screen.openRoutes };
     if (openRoutes[routeName]) {
@@ -3038,6 +3074,7 @@ function adoptRows(prev, rows, rates) {
         commentPicks: pick(prev.commentPicks, keys),
         commentDraft: prev.commentDraft,
         commentNotice: prev.commentNotice,
+        table: prev.table,
     };
 }
 /** Klucze z `zapisane`. Brak listy oznacza, że arkusz przyjął wszystkie wysłane wiersze. */
@@ -3902,352 +3939,6 @@ function money(grosze) {
 }
 
 
-
-
-
-
-
-
-const DASH = '<span class="muted">—</span>';
-function renderStatement(screen, status = "", options = {}) {
-    const allowApprove = options.allowApprove !== false;
-    const statement = currentStatement(screen);
-    const selectedSum = sumSelected(statement, selectedKeys(screen.selected));
-    const count = selectedLineCount(statement, screen.selected);
-    const note = status ? `<p class="err status-block">${escapeHtml(status)}</p>` : "";
-    const commentNote = screen.commentNotice
-        ? `<p class="notice" role="status" data-out="comment-notice">${escapeHtml(screen.commentNotice)}</p>`
-        : "";
-    const emptyHint = allowApprove
-        ? "Brak nierozliczonych odbiorów tego podwykonawcy w podanym zakresie."
-        : "Brak dni podjazdu tego podwykonawcy w podanym zakresie (Baza cen harmonogram).";
-    const body = statement.lines.length === 0
-        ? `<div class="blank"><strong>Brak pozycji.</strong><p>${emptyHint}</p></div>`
-        : table(screen, statement);
-    const composer = statement.lines.length === 0 ? "" : commentComposer(screen, statement);
-    return (`<div class="center-h">${escapeHtml(positionLabel(statement.lines.length))}</div>` +
-        note +
-        commentNote +
-        body +
-        composer +
-        footer(screen.invoice, statement.total, selectedSum, count, allowApprove));
-}
-function table(screen, statement) {
-    const targets = commentTargets(statement, screen.invoiceComments);
-    const rows = [];
-    for (const line of statement.lines) {
-        if (line.kind === "plain") {
-            rows.push(plainRow(screen, line.shop, targets));
-            continue;
-        }
-        rows.push(routeRow(screen, line, targets));
-        if (!screen.openRoutes[line.routeName]) {
-            continue;
-        }
-        const shared = line.bagRate !== null;
-        for (const shop of line.shops) {
-            rows.push(childRow(screen, shop, shared, targets));
-        }
-    }
-    return ('<div class="table-wrap"><table><thead><tr>' +
-        `<th class="c"><span class="col-check"><span>Rozliczone</span>${selectAllBox(statement.lines, screen.selected)}</span></th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>` +
-        "<th>Podjazd/Trasa</th><th class=\"num\">Kwota podjazdu/trasy</th><th class=\"num\">Liczba worków</th><th class=\"num\">Kwota za worek</th>" +
-        "<th class=\"num\">Suma za worki</th>" +
-        "<th class=\"num\" title=\"Podjazd: kwota podjazdu plus worki. Trasa: stawka raz plus worki.\">Razem</th>" +
-        "<th>transport się odbył</th>" +
-        '<th class="comment-col wrap">Komentarz do faktury</th>' +
-        `</tr></thead><tbody>${rows.join("")}</tbody></table></div>`);
-}
-function plainRow(screen, shop, targets) {
-    const key = rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName);
-    const line = encodeURIComponent(key);
-    const dead = !shop.happened;
-    const checked = screen.selected[key] === true;
-    const state = screen.screenByRow[key] ?? {};
-    const legKind = shop.tie || dead ? DASH : `<span class="tag">podjazd</span>`;
-    const legAmount = shop.tie
-        ? DASH
-        : dead
-            ? money(shop.legAmount, true)
-            : amountInput(shop, "pickup", state.pickupAmount, shop.legAmount, "Zmiana kwoty za podjazd tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
-    const bagCell = shop.tie
-        ? DASH
-        : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
-    const target = targets.find((item) => item.key === commentKey(shop));
-    return (`<tr class="${joinClass(rowClass(dead, checked, "plain"), shopCommentClass(target, screen))}" data-kind="plain">` +
-        `<td class="c">${lineBox(line, checked)}</td>` +
-        `<td>${text(shop.transportNumber, dead)}</td>` +
-        shopAddress(shop, dead, target, screen) +
-        `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}${newRouteBox(screen, shop)}</div></td>` +
-        `<td>${dateInput(shop, "pickup-date", shop.pickupDate, "Zapis od razu do Data odbioru.")}</td>` +
-        `<td>${legKind}</td>` +
-        `<td class="num">${legAmount}</td>` +
-        `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków")}</td>` +
-        `<td class="num">${bagCell}</td>` +
-        `<td class="num">${money(shop.bagSum, dead)}</td>` +
-        `<td class="num">${money(shop.receptionCost, dead)}</td>` +
-        `<td>${tripBox(shop)}</td>` +
-        commentCell(shop, target) +
-        "</tr>");
-}
-function routeRow(screen, line, targets) {
-    const key = routeSelectionKey(line.routeName);
-    const checked = screen.selected[key] === true;
-    const open = screen.openRoutes[line.routeName] === true;
-    const anchor = line.shops[0];
-    const happened = line.shops.filter((shop) => shop.happened).length;
-    const sub = happened === line.shops.length ? shopsWord(line.shops.length) : `${happened} z ${line.shops.length} w koszcie`;
-    const none = happened === 0 ? '<div class="sub">Żaden sklep się nie odbył — kosztu trasy nie ma.</div>' : "";
-    const tie = line.shops.some((shop) => shop.tie) ? '<div class="err">Remis stawek. Rozwiń i wskaż wiersz.</div>' : "";
-    const date = anchor
-        ? dateInput(anchor, "route-date", line.date ?? "", "Zapis od razu. Ta data wchodzi na każdy sklep tej trasy w zestawieniu.", line.routeName)
-        : DASH;
-    const bagRate = line.bagRate === null || !anchor
-        ? DASH
-        : amountInput(anchor, "bag-rate-route", undefined, line.bagRate, "Jedna kwota, bo każdy adres, który się odbył, ma tę samą. Zmiana tylko na tym ekranie.", line.routeName);
-    const rateInput = anchor
-        ? amountInput(anchor, "route-rate", undefined, line.routeRate, "Zapis od razu do Stawka za trasę. Kolumny 16 i 17 dopiero przy Zatwierdź", line.routeName)
-        : DASH;
-    const shops = targets.filter((item) => item.routeName === line.routeName);
-    const pickedShops = shops.filter((item) => screen.commentPicks[item.key] === true).length;
-    return (`<tr class="${joinClass(rowClass(false, checked, "route"), routeCommentClass(shops.length, pickedShops))}" data-kind="route">` +
-        `<td class="c">${lineBox(encodeURIComponent(key), checked)}</td>` +
-        `<td>${DASH}</td>` +
-        `<td class="adres"><div class="who-line"><button type="button" class="chev" data-action="expand" data-route="${escapeHtml(line.routeName)}" aria-expanded="${open ? "true" : "false"}" aria-label="Sklepy trasy">${open ? "▾" : "▸"}</button>` +
-        `<div>${routePick(line.routeName, sub, shops.length, pickedShops)}${none}${tie}</div></div></td>` +
-        `<td class="sklep">${DASH}</td>` +
-        `<td data-out="route-date">${date}</td>` +
-        `<td><span class="tag tag-route">trasa</span></td>` +
-        `<td class="num">${rateInput}</td>` +
-        `<td class="num"><span>${line.bagCount}</span></td>` +
-        `<td class="num">${bagRate}</td>` +
-        `<td class="num">${money(line.bagSum, false)}</td>` +
-        `<td class="num">${money(line.routeSum, false)}</td>` +
-        `<td>${DASH}</td>` +
-        routeCommentCell(shops) +
-        "</tr>");
-}
-function childRow(screen, shop, sharedBagRate, targets) {
-    const dead = !shop.happened;
-    const state = screen.screenByRow[rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName)] ?? {};
-    const bagCell = shop.tie || sharedBagRate
-        ? DASH
-        : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie zapisuje kolumn rejestru ani Bazy stawek.");
-    const target = targets.find((item) => item.key === commentKey(shop));
-    return (`<tr class="${joinClass(rowClass(dead, false, "child"), shopCommentClass(target, screen))}" data-kind="child">` +
-        "<td></td>" +
-        `<td>${text(shop.transportNumber, dead)}</td>` +
-        shopAddress(shop, dead, target, screen) +
-        `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}</div></td>` +
-        `<td>${dateInput(shop, "pickup-date", shop.pickupDate, "Zapis od razu do Data odbioru tego sklepu.")}</td>` +
-        `<td>${DASH}</td>` +
-        `<td class="num">${DASH}</td>` +
-        `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków tego adresu")}</td>` +
-        `<td class="num">${bagCell}</td>` +
-        `<td class="num">${DASH}</td>` +
-        `<td class="num">${DASH}</td>` +
-        `<td><div class="trip-stack">${tripBox(shop)}${detachButton(shop)}</div></td>` +
-        commentCell(shop, target) +
-        "</tr>");
-}
-function commentComposer(screen, statement) {
-    const targets = commentTargets(statement, screen.invoiceComments);
-    const chosen = chosenComments(targets, screen.commentPicks);
-    const hint = overwriteHint(commentsToOverwrite(chosen, screen.commentDraft), screen.commentDraft);
-    const summary = selectionSummary(targets, screen.commentPicks);
-    const disabled = applyIsDisabled(screen.commentDraft, chosen);
-    return ('<footer class="composer" data-composer="statement"><div class="composer-bar"><div class="composer-lead">' +
-        "<h2>Komentarz dla zaznaczonych</h2>" +
-        `<p class="selection-summary${chosen.length === 0 ? " muted" : ""}" data-out="comment-summary">${escapeHtml(summary)}</p></div>` +
-        `<textarea data-draft="comment" data-keep="comment" rows="2" placeholder="np. folia osobno, bez PET" aria-label="Komentarz dla zaznaczonych">${escapeHtml(screen.commentDraft)}</textarea>` +
-        `<button type="button" class="btn-teal" data-action="apply-comment"${disabled ? " disabled" : ""}>${escapeHtml(applyButtonLabel(screen.commentDraft, chosen))}</button></div>` +
-        '<div class="composer-actions">' +
-        `<button type="button" class="text-btn" data-action="check-comment-all">${allPicked(targets, screen.commentPicks) ? "odznacz" : "zaznacz wszystkie"}</button></div>` +
-        `<p class="note overwrite-hint" data-out="overwrite-hint"${hint ? "" : " hidden"}>${escapeHtml(hint)}</p>` +
-        '<p class="note composer-foot">Na tym ekranie. Numer i kwoty bez zmian. Do rejestru jeszcze nie schodzi.</p></footer>');
-}
-function routePick(routeName, sub, total, picked) {
-    if (total === 0) {
-        return `<div>${escapeHtml(routeName)}</div><div class="sub">trasa · ${escapeHtml(sub)}</div>`;
-    }
-    const checked = picked === total ? " checked" : "";
-    return (`<label class="pick-line"><input type="checkbox" data-pick-route="${escapeHtml(routeName)}" aria-label="${escapeHtml(`Zaznacz sklepy trasy ${routeName}`)}"${checked}>` +
-        `<span class="stack"><span>${escapeHtml(routeName)}</span>` +
-        `<span class="sub">trasa · ${escapeHtml(sub)} · <span data-route-note="${escapeHtml(routeName)}">${escapeHtml(routePickNote(total, picked))}</span></span></span></label>`);
-}
-function shopAddress(shop, dead, target, screen) {
-    const shown = text(addressWithCommaAfterLocality(shop.address), dead);
-    if (!target) {
-        return `<td class="adres">${shown}</td>`;
-    }
-    const picked = screen.commentPicks[target.key] === true;
-    const label = shop.shopName.trim() === "" ? shop.address : shop.shopName;
-    return (`<td class="adres"><label class="pick-line"><input type="checkbox" data-pick="comment" ${ref(shop)}${picked ? " checked" : ""} aria-label="${escapeHtml(`Zaznacz ${label} do komentarza`)}">` +
-        `<span>${shown}</span></label></td>`);
-}
-function commentCell(shop, target) {
-    if (!shop.happened || !target) {
-        return '<td class="comment-col"><span class="muted" title="Transport się nie odbył. Ten sklep nie wchodzi na fakturę.">—</span></td>';
-    }
-    return `<td class="comment-col">${commentPlain(target.comment)}</td>`;
-}
-function routeCommentCell(shops) {
-    if (shops.length === 0) {
-        return '<td class="comment-col"><span class="muted">—</span></td>';
-    }
-    const face = routeCommentFace(shops);
-    if (!face.sharedByAll) {
-        return `<td class="comment-col"><span class="muted">${escapeHtml(face.sub)}</span></td>`;
-    }
-    return ('<td class="comment-col"><span class="stack">' +
-        `<span class="comment-snip">${escapeHtml(face.snip)}</span>` +
-        `<span class="sub">${escapeHtml(face.sub)}</span></span></td>`);
-}
-function commentPlain(value) {
-    const trimmed = value.trim();
-    return trimmed === "" ? '<span class="muted">brak</span>' : `<span class="comment-snip">${escapeHtml(trimmed)}</span>`;
-}
-function shopCommentClass(target, screen) {
-    if (!target) {
-        return "";
-    }
-    const picked = screen.commentPicks[target.key] === true;
-    if (willOverwrite(target.comment, picked, screen.commentDraft)) {
-        return "will-overwrite";
-    }
-    return picked ? "is-picked" : "";
-}
-function routeCommentClass(total, picked) {
-    if (total === 0 || picked === 0) {
-        return "";
-    }
-    return picked === total ? "is-picked" : "is-partial";
-}
-function joinClass(base, extra) {
-    return [base, extra].filter(Boolean).join(" ");
-}
-function footer(invoice, total, selected, count, allowApprove) {
-    if (!allowApprove) {
-        return ('<footer class="footer">' +
-            `<div class="stat"><span>Suma zestawienia</span><b data-out="sum-all">${formatPln(total)}</b></div>` +
-            '<p class="note">Tryb Harmonogram: podgląd kosztów. Zatwierdzenie faktury w tej wersji niedostępne.</p>' +
-            "</footer>");
-    }
-    const enabled = canPressApprove(invoice, count);
-    return ('<footer class="footer">' +
-        `<div class="stat"><span>Suma zestawienia</span><b data-out="sum-all">${formatPln(total)}</b></div>` +
-        `<div class="stat sel"><span>Suma zaznaczonych · <span data-out="sel-count">${count}</span></span><b data-out="sum-sel">${formatPln(selected)}</b></div>` +
-        '<div class="grow"><label class="field"><span>Numer faktury</span>' +
-        `<input class="invoice" id="invoice" data-edit="invoice" data-keep="invoice" value="${escapeHtml(invoice)}" placeholder="FV/123/09/2026" autocomplete="off"></label>` +
-        `<button type="button" class="btn-go" data-action="approve"${enabled ? "" : " disabled"}>Zatwierdź</button></div></footer>`);
-}
-function rowClass(dead, checked, kind) {
-    return [
-        kind === "route" ? "is-route" : "",
-        kind === "child" ? "is-child" : "",
-        dead ? "is-dead" : "",
-        checked ? "is-checked" : "",
-    ]
-        .filter(Boolean)
-        .join(" ");
-}
-function selectAllBox(lines, selected) {
-    const on = lines.length > 0 && lines.every((line) => selected[lineKey(line)] === true);
-    return `<input type="checkbox" data-toggle="checked-all"${on ? " checked" : ""} aria-label="Zaznacz wszystkie jako rozliczone" title="Zaznacz wszystkie jako rozliczone">`;
-}
-function lineBox(line, checked) {
-    return `<input type="checkbox" data-toggle="checked" data-line="${escapeHtml(line)}"${checked ? " checked" : ""} aria-label="Rozliczone">`;
-}
-function tripBox(shop) {
-    const on = !shop.happened;
-    return `<label class="trip"><input type="checkbox" data-toggle="notrip" ${ref(shop)}${on ? " checked" : ""}> nie odbył się</label>`;
-}
-function detachButton(shop) {
-    return `<button type="button" class="btn-detach" data-action="detach" ${ref(shop)} title="Zapis od razu. Sklep schodzi z trasy i zostaje odbiorem za podjazd.">odepnij od trasy</button>`;
-}
-function newRouteBox(screen, shop) {
-    const key = rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName);
-    const left = screen.leftRoute[key];
-    if (!left) {
-        return "";
-    }
-    const draft = screen.routeDraft[key] ?? { name: "", rate: "" };
-    const error = screen.routeDraftError[key];
-    return ('<div class="new-route">' +
-        `<span class="sub">odpięty od ${escapeHtml(left)}</span>` +
-        `<input type="text" data-draft="route-name" data-keep="draft-name-${shop.sheetRow}" ${ref(shop)} value="${escapeHtml(draft.name)}" placeholder="nazwa nowej trasy" autocomplete="off" title="Inna nazwa niż trasa, z której sklep zszedł.">` +
-        `<input type="text" inputmode="decimal" data-draft="route-rate" data-keep="draft-rate-${shop.sheetRow}" ${ref(shop)} value="${escapeHtml(draft.rate)}" placeholder="stawka" title="Pusta nie zapisuje trasy. Kwota 0 jest wpisana.">` +
-        `<button type="button" class="btn-mini" data-action="attach" ${ref(shop)}>Osobna trasa</button>` +
-        (error ? `<span class="err">${escapeHtml(error)}</span>` : "") +
-        "</div>");
-}
-function tieBox(tie, rates) {
-    if (!tie) {
-        return "";
-    }
-    const buttons = tie.candidates
-        .map((candidate) => {
-        const rate = rates[candidate.index];
-        if (!rate) {
-            return "";
-        }
-        const from = candidate.validFrom === "" ? "od zawsze" : candidate.validFrom;
-        const pickup = candidate.pickupAmount === null ? "—" : formatPln(candidate.pickupAmount);
-        const bag = candidate.bagAmount === null ? "—" : formatPln(candidate.bagAmount);
-        return `<button type="button" class="btn-mini" data-action="resolve-tie" data-rate-row="${rate.sheetRow}">${escapeHtml(from)} · podjazd ${pickup} · worek ${bag}</button>`;
-    })
-        .join("");
-    return `<div class="tie"><span class="err">Dwie stawki na ten dzień. Wskaż, która obowiązuje.</span>${buttons}</div>`;
-}
-function dateInput(shop, edit, shown, title, routeName) {
-    const route = routeName ? ` data-route="${escapeHtml(routeName)}"` : "";
-    return `<input type="date" data-edit="${edit}" ${ref(shop)}${route} value="${escapeHtml(sheetDateInputValue(shown))}" title="${escapeHtml(title)}" aria-label="Data odbioru">`;
-}
-function sheetDateInputValue(text) {
-    if (text === "") {
-        return "";
-    }
-    return calendarToIsoDate(parseSheetDate(text));
-}
-function bagCountInput(shop, title) {
-    const shown = shop.bagCount === null ? "" : String(shop.bagCount);
-    return `<input type="text" inputmode="numeric" data-edit="bags" ${ref(shop)} value="${escapeHtml(shown)}" title="${escapeHtml(title)}" autocomplete="off">`;
-}
-function amountInput(shop, edit, override, shown, title, routeName) {
-    const value = override === null ? "" : override !== undefined ? formatAmountInput(override) : shown === null ? "" : formatAmountInput(shown);
-    const route = routeName ? ` data-route="${escapeHtml(routeName)}"` : "";
-    return `<input type="text" inputmode="decimal" data-edit="${edit}" ${ref(shop)}${route} value="${escapeHtml(value)}" title="${escapeHtml(title)}" autocomplete="off">`;
-}
-function money(value, dead) {
-    if (value === null) {
-        return DASH;
-    }
-    const text = formatPln(value);
-    return dead ? `<span class="strike">${text}</span>` : `<span class="money">${text}</span>`;
-}
-function text(value, dead) {
-    if (value === "") {
-        return DASH;
-    }
-    const safe = escapeHtml(value);
-    return dead ? `<span class="strike">${safe}</span>` : safe;
-}
-function ref(shop) {
-    return `data-sheet-name="${escapeHtml(shop.sheetName)}" data-sheet-row="${shop.sheetRow}" data-transport="${escapeHtml(shop.transportNumber)}"`;
-}
-function shopsWord(count) {
-    if (count === 1) {
-        return "1 sklep";
-    }
-    const last = count % 10;
-    const lastTwo = count % 100;
-    if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) {
-        return `${count} sklepy`;
-    }
-    return `${count} sklepów`;
-}
-
-
 /**
  * Który wiersz Bazy stawek obowiązuje w dniu odbioru.
  * Pusta data jest starsza niż każda wpisana. Wygrywa najpóźniejsza data nie późniejsza niż odbiór.
@@ -5084,21 +4775,6 @@ function pageSlice(items, page, size = STATS_PAGE_SIZE) {
 }
 function chartShouldStack(series) {
     return series.buckets.length >= STATS_STACK_MIN_BUCKETS;
-}
-
-
-/** Numer (fragment) i sposób odbioru. Zakres dat i podwykonawca są już w odczycie. */
-function filterLedgerInvoices(rows, query, mode) {
-    const needle = foldPl(query);
-    return rows.filter((row) => {
-        if (mode !== "all" && row.mode !== mode) {
-            return false;
-        }
-        if (needle === "") {
-            return true;
-        }
-        return foldPl(row.invoice).includes(needle);
-    });
 }
 
 
@@ -6002,6 +5678,9 @@ function columnBar(columns, state, action, phrase) {
         `<span>${escapeHtml(bits.join(" · "))}</span>` +
         `<button type="button" data-action="${action}-clear-all">Wyczyść</button></div>`);
 }
+function renderColumnFilterMenu(args) {
+    return xlColumnMenu(args);
+}
 function renderLedgerColumnMenu(args) {
     return xlColumnMenu({
         action: "ledger",
@@ -6018,6 +5697,755 @@ function renderLedgerColumnMenu(args) {
 }
 function emptyRow(cols, message = "Brak danych w tym okresie.") {
     return `<tr><td colspan="${cols}" class="note" style="border:none;background:transparent">${escapeHtml(message)}</td></tr>`;
+}
+
+
+
+
+
+
+
+const CELL_DASH = "—";
+const STATEMENT_COLUMNS = [
+    { key: "settled", label: "Rozliczone", numeric: false },
+    { key: "protocol", label: "Numer protokołu", numeric: false },
+    { key: "address", label: "Adres", numeric: false },
+    { key: "shop", label: "Sklep", numeric: false },
+    { key: "date", label: "Data", numeric: false },
+    { key: "kind", label: "Podjazd/Trasa", numeric: false },
+    { key: "leg", label: "Kwota podjazdu/trasy", numeric: true },
+    { key: "bags", label: "Liczba worków", numeric: true },
+    { key: "bagRate", label: "Kwota za worek", numeric: true },
+    { key: "bagSum", label: "Suma za worki", numeric: true },
+    { key: "total", label: "Razem", numeric: true },
+    { key: "happened", label: "transport się odbył", numeric: false },
+    { key: "comment", label: "Komentarz do faktury", numeric: false },
+];
+const NUMERIC_KEYS = new Set(["leg", "bags", "bagRate", "bagSum", "total"]);
+function statementQueryHits(text, query) {
+    const folded = foldPl(query);
+    if (folded === "") {
+        return true;
+    }
+    return foldPl(text).includes(folded);
+}
+function statementSortPhrase(key, dir) {
+    if (key === "date") {
+        return dir === "asc" ? "Sortuj od najstarszych" : "Sortuj od najnowszych";
+    }
+    if (NUMERIC_KEYS.has(key)) {
+        return dir === "asc" ? "Sortuj od najmniejszych" : "Sortuj od największych";
+    }
+    return dir === "asc" ? "Sortuj od A do Z" : "Sortuj od Z do A";
+}
+function statementCountLabel(visible, total) {
+    if (visible === total) {
+        return positionLabel(total);
+    }
+    return `${visible} z ${total} pozycji w zestawieniu`;
+}
+/** Tekst komórki, ten sam w tabeli i na liście filtra. Kwoty z „zł”, jak w kolumnach sum. */
+function statementCellText(screen, face, key) {
+    if (key === "settled") {
+        if (face.role === "child") {
+            return CELL_DASH;
+        }
+        return screen.selected[lineKey(face.line)] === true ? "tak" : "nie";
+    }
+    const shop = shopOf(face);
+    if (key === "protocol") {
+        return shop ? textOrDash(shop.transportNumber) : CELL_DASH;
+    }
+    if (key === "address") {
+        if (face.role === "route") {
+            return textOrDash(face.line.routeName);
+        }
+        return shop ? textOrDash(addressWithCommaAfterLocality(shop.address)) : CELL_DASH;
+    }
+    if (key === "shop") {
+        return shop ? textOrDash(shop.shopName) : CELL_DASH;
+    }
+    if (key === "date") {
+        if (face.role === "route") {
+            return textOrDash(face.line.date ?? "");
+        }
+        return shop ? textOrDash(shop.pickupDate) : CELL_DASH;
+    }
+    if (key === "kind") {
+        if (face.role === "route") {
+            return "trasa";
+        }
+        if (!shop || face.role === "child" || shop.tie || !shop.happened) {
+            return CELL_DASH;
+        }
+        return "podjazd";
+    }
+    if (key === "leg") {
+        if (face.role === "child") {
+            return CELL_DASH;
+        }
+        if (face.role === "route") {
+            return statementMoneyText(face.line.routeRate);
+        }
+        return !shop || shop.tie ? CELL_DASH : statementMoneyText(shop.legAmount);
+    }
+    if (key === "bags") {
+        if (face.role === "route") {
+            return String(face.line.bagCount);
+        }
+        return !shop || shop.bagCount === null ? CELL_DASH : String(shop.bagCount);
+    }
+    if (key === "bagRate") {
+        if (face.role === "route") {
+            return statementMoneyText(face.line.bagRate);
+        }
+        if (!shop || shop.tie || (face.role === "child" && face.line.bagRate !== null)) {
+            return CELL_DASH;
+        }
+        return statementMoneyText(shop.bagRate);
+    }
+    if (key === "bagSum") {
+        if (face.role === "child" || !shop) {
+            return face.role === "route" ? statementMoneyText(face.line.bagSum) : CELL_DASH;
+        }
+        return statementMoneyText(shop.bagSum);
+    }
+    if (key === "total") {
+        if (face.role === "route") {
+            return statementMoneyText(face.line.routeSum);
+        }
+        if (face.role === "child" || !shop) {
+            return CELL_DASH;
+        }
+        return statementMoneyText(shop.receptionCost);
+    }
+    if (key === "happened") {
+        if (!shop) {
+            return CELL_DASH;
+        }
+        return shop.happened ? "odbył się" : "nie odbył się";
+    }
+    if (face.role === "route") {
+        return routeCommentLabel(screen, face.line);
+    }
+    return shop ? shopCommentLabel(screen, shop) : CELL_DASH;
+}
+function statementColumnChoices(screen, statement, column) {
+    const rest = { ...screen.table.filters };
+    delete rest[column];
+    const first = new Map();
+    for (const line of statement.lines) {
+        for (const face of lineFaces(line)) {
+            if (!faceMatches(screen, face, rest)) {
+                continue;
+            }
+            const label = statementCellText(screen, face, column);
+            if (!first.has(label)) {
+                first.set(label, face);
+            }
+        }
+    }
+    return [...first.entries()]
+        .sort((a, b) => {
+        const aBlank = isBlank(statementCellText(screen, a[1], column));
+        const bBlank = isBlank(statementCellText(screen, b[1], column));
+        if (aBlank !== bBlank) {
+            return aBlank ? 1 : -1;
+        }
+        return compareFaces(screen, a[1], b[1], column) || a[0].localeCompare(b[0], "pl");
+    })
+        .map(([label]) => label);
+}
+function visibleStatementLines(screen, statement) {
+    const filters = screen.table.filters;
+    const matched = statement.lines.filter((line) => lineVisible(screen, line, filters));
+    const sorted = sortLines(screen, matched, screen.table.sortKey, screen.table.sortDir);
+    return sorted.map((line) => {
+        if (line.kind === "plain") {
+            return { kind: "plain", line };
+        }
+        return { kind: "route", line, shops: shownShops(screen, line, filters) };
+    });
+}
+function lineVisible(screen, line, filters) {
+    if (!hasFilter(filters)) {
+        return true;
+    }
+    return lineFaces(line).some((face) => faceMatches(screen, face, filters));
+}
+function shownShops(screen, line, filters) {
+    if (!hasFilter(filters) || faceMatches(screen, { role: "route", line }, filters)) {
+        return [...line.shops];
+    }
+    return line.shops.filter((shop) => faceMatches(screen, { role: "child", line, shop }, filters));
+}
+function sortLines(screen, lines, sortKey, sortDir) {
+    if (sortKey === null) {
+        return [...lines];
+    }
+    const key = sortKey;
+    return lines
+        .map((line, index) => ({ line, index }))
+        .sort((a, b) => {
+        const aFace = primaryFace(a.line);
+        const bFace = primaryFace(b.line);
+        const aBlank = isBlank(statementCellText(screen, aFace, key));
+        const bBlank = isBlank(statementCellText(screen, bFace, key));
+        if (aBlank !== bBlank) {
+            return aBlank ? 1 : -1;
+        }
+        const cmp = compareFaces(screen, aFace, bFace, key);
+        if (cmp === 0) {
+            return a.index - b.index;
+        }
+        return sortDir === "asc" ? cmp : -cmp;
+    })
+        .map((item) => item.line);
+}
+function faceMatches(screen, face, filters) {
+    const active = Object.keys(filters).filter((key) => filters[key] != null);
+    if (active.length === 0) {
+        return true;
+    }
+    return active.every((key) => {
+        const allowed = filters[key];
+        return allowed != null && allowed.includes(statementCellText(screen, face, key));
+    });
+}
+function lineFaces(line) {
+    if (line.kind === "plain") {
+        return [{ role: "plain", line }];
+    }
+    return [{ role: "route", line }, ...line.shops.map((shop) => ({ role: "child", line, shop }))];
+}
+function primaryFace(line) {
+    return line.kind === "plain" ? { role: "plain", line } : { role: "route", line };
+}
+function hasFilter(filters) {
+    return Object.keys(filters).some((key) => filters[key] != null);
+}
+function compareFaces(screen, a, b, key) {
+    if (key === "date") {
+        return compareSheetDate(dateValue(screen, a), dateValue(screen, b));
+    }
+    if (NUMERIC_KEYS.has(key)) {
+        return (faceNumber(a, key) ?? 0) - (faceNumber(b, key) ?? 0);
+    }
+    return statementCellText(screen, a, key).localeCompare(statementCellText(screen, b, key), "pl", {
+        numeric: true,
+        sensitivity: "base",
+    });
+}
+function dateValue(screen, face) {
+    const text = statementCellText(screen, face, "date");
+    return hasSheetDateShape(text) ? text : "";
+}
+function shopOf(face) {
+    if (face.role === "child") {
+        return face.shop;
+    }
+    if (face.role === "plain") {
+        return face.line.shop;
+    }
+    return null;
+}
+function faceNumber(face, key) {
+    const shop = shopOf(face);
+    if (key === "bags") {
+        if (face.role === "route") {
+            return face.line.bagCount;
+        }
+        return shop ? shop.bagCount : null;
+    }
+    if (key === "leg") {
+        if (face.role === "route") {
+            return face.line.routeRate;
+        }
+        if (!shop || face.role === "child" || shop.tie) {
+            return null;
+        }
+        return shop.legAmount;
+    }
+    if (key === "bagRate") {
+        if (face.role === "route") {
+            return face.line.bagRate;
+        }
+        if (!shop || shop.tie || (face.role === "child" && face.line.bagRate !== null)) {
+            return null;
+        }
+        return shop.bagRate;
+    }
+    if (key === "bagSum") {
+        if (face.role === "route") {
+            return face.line.bagSum;
+        }
+        return shop && face.role === "plain" ? shop.bagSum : null;
+    }
+    if (key === "total") {
+        if (face.role === "route") {
+            return face.line.routeSum;
+        }
+        return shop && face.role === "plain" ? shop.receptionCost : null;
+    }
+    return null;
+}
+function routeCommentLabel(screen, line) {
+    const shops = line.shops.filter((shop) => shop.happened);
+    if (shops.length === 0) {
+        return CELL_DASH;
+    }
+    const face = routeCommentFace(shops.map((shop) => ({
+        key: commentKey(shop),
+        shopName: shop.shopName,
+        comment: screen.invoiceComments[commentKey(shop)] ?? "",
+    })));
+    return face.sharedByAll ? face.snip : face.sub;
+}
+function shopCommentLabel(screen, shop) {
+    if (!shop.happened) {
+        return CELL_DASH;
+    }
+    const text = (screen.invoiceComments[commentKey(shop)] ?? "").trim();
+    return text === "" ? "brak" : text;
+}
+function statementMoneyText(value) {
+    return value === null ? CELL_DASH : formatPln(value);
+}
+function textOrDash(value) {
+    const trimmed = value.trim();
+    return trimmed === "" ? CELL_DASH : trimmed;
+}
+function isBlank(text) {
+    return text === CELL_DASH;
+}
+
+
+
+
+
+
+
+
+
+
+const DASH = '<span class="muted">—</span>';
+const STATEMENT_FUNNEL = '<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M1.5 2.5h13l-5 6.1V13l-3 1.1V8.6z"/></svg>';
+function renderStatement(screen, status = "", options = {}) {
+    const allowApprove = options.allowApprove !== false;
+    const statement = currentStatement(screen);
+    const visible = visibleStatementLines(screen, statement);
+    const shown = {
+        ...statement,
+        lines: visible.map((item) => item.kind === "plain" ? item.line : { ...item.line, shops: item.shops }),
+    };
+    const selectedSum = sumSelected(statement, selectedKeys(screen.selected));
+    const count = selectedLineCount(statement, screen.selected);
+    const note = status ? `<p class="err status-block">${escapeHtml(status)}</p>` : "";
+    const commentNote = screen.commentNotice
+        ? `<p class="notice" role="status" data-out="comment-notice">${escapeHtml(screen.commentNotice)}</p>`
+        : "";
+    const emptyHint = allowApprove
+        ? "Brak nierozliczonych odbiorów tego podwykonawcy w podanym zakresie."
+        : "Brak dni podjazdu tego podwykonawcy w podanym zakresie (Baza cen harmonogram).";
+    const body = statement.lines.length === 0
+        ? `<div class="blank"><strong>Brak pozycji.</strong><p>${emptyHint}</p></div>`
+        : table(screen, shown);
+    const composer = shown.lines.length === 0 ? "" : commentComposer(screen, shown);
+    return (`<div class="center-h">${escapeHtml(statementCountLabel(shown.lines.length, statement.lines.length))}</div>` +
+        note +
+        commentNote +
+        body +
+        composer +
+        footer(screen.invoice, statement.total, selectedSum, count, allowApprove));
+}
+function table(screen, statement) {
+    const targets = commentTargets(statement, screen.invoiceComments);
+    const rows = [];
+    for (const line of statement.lines) {
+        if (line.kind === "plain") {
+            rows.push(plainRow(screen, line.shop, targets));
+            continue;
+        }
+        rows.push(routeRow(screen, line, targets));
+        if (!screen.openRoutes[line.routeName]) {
+            continue;
+        }
+        const shared = line.bagRate !== null;
+        for (const shop of line.shops) {
+            rows.push(childRow(screen, shop, shared, targets));
+        }
+    }
+    const body = rows.length === 0
+        ? `<tr><td class="note" colspan="${STATEMENT_COLUMNS.length}">Brak pozycji dla tego filtra.</td></tr>`
+        : rows.join("");
+    return (columnBar(STATEMENT_COLUMNS, screen.table, "statement", statementSortPhrase) +
+        '<div class="table-wrap"><table><thead><tr>' +
+        statementHead(screen, statement.lines) +
+        `</tr></thead><tbody>${body}</tbody></table></div>`);
+}
+function statementHead(screen, lines) {
+    const state = screen.table;
+    const filtered = Object.keys(state.filters).some((key) => state.filters[key] != null);
+    return STATEMENT_COLUMNS.map((col) => {
+        const open = state.menu?.column === col.key;
+        const on = state.filters[col.key] != null;
+        const sort = state.sortKey === col.key ? state.sortDir : null;
+        const mark = sort === "asc" ? "▲" : sort === "desc" ? "▼" : STATEMENT_FUNNEL;
+        const extra = col.key === "settled" ? "c " : col.key === "comment" ? "comment-col wrap " : "";
+        const numeric = col.numeric ? "num " : "";
+        const title = col.key === "total"
+            ? ' title="Podjazd: kwota podjazdu plus worki. Trasa: stawka raz plus worki."'
+            : "";
+        const label = col.key === "settled"
+            ? `<span class="col-check"><span>Rozliczone</span>${selectAllBox(lines, screen.selected, filtered)}</span>`
+            : `<span>${escapeHtml(col.label)}</span>`;
+        return (`<th class="${numeric}${extra}xl-th${open ? " is-open" : ""}"${title}>` +
+            `<div class="xl-head">${label}` +
+            `<button type="button" class="xl-btn${on ? " is-on" : ""}" data-action="statement-menu" data-col="${col.key}"` +
+            ` aria-expanded="${open ? "true" : "false"}" aria-label="${escapeHtml(statementFilterButtonLabel(col.label, on, sort))}">${mark}</button>` +
+            "</div>" +
+            (open ? statementMenu(screen, col.key) : "") +
+            "</th>");
+    }).join("");
+}
+function statementMenu(screen, column) {
+    const menu = screen.table.menu;
+    if (!menu || menu.column !== column) {
+        return "";
+    }
+    const choices = statementColumnChoices(screen, currentStatement(screen), column);
+    const visible = choices.filter((text) => statementQueryHits(text, menu.query));
+    const label = STATEMENT_COLUMNS.find((item) => item.key === column)?.label ?? column;
+    return renderColumnFilterMenu({
+        action: "statement",
+        column,
+        label,
+        sortAscLabel: statementSortPhrase(column, "asc"),
+        sortDescLabel: statementSortPhrase(column, "desc"),
+        sortDir: screen.table.sortKey === column ? screen.table.sortDir : null,
+        hasFilter: screen.table.filters[column] != null,
+        query: menu.query,
+        visible,
+        picked: new Set(menu.draft),
+    });
+}
+function statementFilterButtonLabel(label, filtered, sort) {
+    const bits = [`Sortuj i filtruj kolumnę ${label}`];
+    if (filtered) {
+        bits.push("filtr włączony");
+    }
+    if (sort === "asc") {
+        bits.push("sortowanie rosnąco");
+    }
+    if (sort === "desc") {
+        bits.push("sortowanie malejąco");
+    }
+    return bits.join(", ");
+}
+function plainRow(screen, shop, targets) {
+    const key = rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName);
+    const line = encodeURIComponent(key);
+    const dead = !shop.happened;
+    const checked = screen.selected[key] === true;
+    const state = screen.screenByRow[key] ?? {};
+    const legKind = shop.tie || dead ? DASH : `<span class="tag">podjazd</span>`;
+    const legAmount = shop.tie
+        ? DASH
+        : dead
+            ? money(shop.legAmount, true)
+            : amountInput(shop, "pickup", state.pickupAmount, shop.legAmount, "Zmiana kwoty za podjazd tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
+    const bagCell = shop.tie
+        ? DASH
+        : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
+    const target = targets.find((item) => item.key === commentKey(shop));
+    return (`<tr class="${joinClass(rowClass(dead, checked, "plain"), shopCommentClass(target, screen))}" data-kind="plain">` +
+        `<td class="c">${lineBox(line, checked)}</td>` +
+        `<td>${text(shop.transportNumber, dead)}</td>` +
+        shopAddress(shop, dead, target, screen) +
+        `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}${newRouteBox(screen, shop)}</div></td>` +
+        `<td>${dateInput(shop, "pickup-date", shop.pickupDate, "Zapis od razu do Data odbioru.")}</td>` +
+        `<td>${legKind}</td>` +
+        `<td class="num">${legAmount}</td>` +
+        `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków")}</td>` +
+        `<td class="num">${bagCell}</td>` +
+        `<td class="num">${money(shop.bagSum, dead)}</td>` +
+        `<td class="num">${money(shop.receptionCost, dead)}</td>` +
+        `<td>${tripBox(shop)}</td>` +
+        commentCell(shop, target) +
+        "</tr>");
+}
+function routeRow(screen, line, targets) {
+    const key = routeSelectionKey(line.routeName);
+    const checked = screen.selected[key] === true;
+    const open = screen.openRoutes[line.routeName] === true;
+    const anchor = line.shops[0];
+    const happened = line.shops.filter((shop) => shop.happened).length;
+    const sub = happened === line.shops.length ? shopsWord(line.shops.length) : `${happened} z ${line.shops.length} w koszcie`;
+    const none = happened === 0 ? '<div class="sub">Żaden sklep się nie odbył — kosztu trasy nie ma.</div>' : "";
+    const tie = line.shops.some((shop) => shop.tie) ? '<div class="err">Remis stawek. Rozwiń i wskaż wiersz.</div>' : "";
+    const date = anchor
+        ? dateInput(anchor, "route-date", line.date ?? "", "Zapis od razu. Ta data wchodzi na każdy sklep tej trasy w zestawieniu.", line.routeName)
+        : DASH;
+    const bagRate = line.bagRate === null || !anchor
+        ? DASH
+        : amountInput(anchor, "bag-rate-route", undefined, line.bagRate, "Jedna kwota, bo każdy adres, który się odbył, ma tę samą. Zmiana tylko na tym ekranie.", line.routeName);
+    const rateInput = anchor
+        ? amountInput(anchor, "route-rate", undefined, line.routeRate, "Zapis od razu do Stawka za trasę. Kolumny 16 i 17 dopiero przy Zatwierdź", line.routeName)
+        : DASH;
+    const shops = targets.filter((item) => item.routeName === line.routeName);
+    const pickedShops = shops.filter((item) => screen.commentPicks[item.key] === true).length;
+    return (`<tr class="${joinClass(rowClass(false, checked, "route"), routeCommentClass(shops.length, pickedShops))}" data-kind="route">` +
+        `<td class="c">${lineBox(encodeURIComponent(key), checked)}</td>` +
+        `<td>${DASH}</td>` +
+        `<td class="adres"><div class="who-line"><button type="button" class="chev" data-action="expand" data-route="${escapeHtml(line.routeName)}" aria-expanded="${open ? "true" : "false"}" aria-label="Sklepy trasy">${open ? "▾" : "▸"}</button>` +
+        `<div>${routePick(line.routeName, sub, shops.length, pickedShops)}${none}${tie}</div></div></td>` +
+        `<td class="sklep">${DASH}</td>` +
+        `<td data-out="route-date">${date}</td>` +
+        `<td><span class="tag tag-route">trasa</span></td>` +
+        `<td class="num">${rateInput}</td>` +
+        `<td class="num"><span>${line.bagCount}</span></td>` +
+        `<td class="num">${bagRate}</td>` +
+        `<td class="num">${money(line.bagSum, false)}</td>` +
+        `<td class="num">${money(line.routeSum, false)}</td>` +
+        `<td>${DASH}</td>` +
+        routeCommentCell(shops) +
+        "</tr>");
+}
+function childRow(screen, shop, sharedBagRate, targets) {
+    const dead = !shop.happened;
+    const state = screen.screenByRow[rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName)] ?? {};
+    const bagCell = shop.tie || sharedBagRate
+        ? DASH
+        : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie zapisuje kolumn rejestru ani Bazy stawek.");
+    const target = targets.find((item) => item.key === commentKey(shop));
+    return (`<tr class="${joinClass(rowClass(dead, false, "child"), shopCommentClass(target, screen))}" data-kind="child">` +
+        "<td></td>" +
+        `<td>${text(shop.transportNumber, dead)}</td>` +
+        shopAddress(shop, dead, target, screen) +
+        `<td class="sklep"><div>${text(shop.shopName, dead)}${tieBox(shop.tie, screen.rates)}</div></td>` +
+        `<td>${dateInput(shop, "pickup-date", shop.pickupDate, "Zapis od razu do Data odbioru tego sklepu.")}</td>` +
+        `<td>${DASH}</td>` +
+        `<td class="num">${DASH}</td>` +
+        `<td class="num">${bagCountInput(shop, "Zapis od razu do Ilość worków tego adresu")}</td>` +
+        `<td class="num">${bagCell}</td>` +
+        `<td class="num">${DASH}</td>` +
+        `<td class="num">${DASH}</td>` +
+        `<td><div class="trip-stack">${tripBox(shop)}${detachButton(shop)}</div></td>` +
+        commentCell(shop, target) +
+        "</tr>");
+}
+function commentComposer(screen, statement) {
+    const targets = commentTargets(statement, screen.invoiceComments);
+    const chosen = chosenComments(targets, screen.commentPicks);
+    const hint = overwriteHint(commentsToOverwrite(chosen, screen.commentDraft), screen.commentDraft);
+    const summary = selectionSummary(targets, screen.commentPicks);
+    const disabled = applyIsDisabled(screen.commentDraft, chosen);
+    return ('<footer class="composer" data-composer="statement"><div class="composer-bar"><div class="composer-lead">' +
+        "<h2>Komentarz dla zaznaczonych</h2>" +
+        `<p class="selection-summary${chosen.length === 0 ? " muted" : ""}" data-out="comment-summary">${escapeHtml(summary)}</p></div>` +
+        `<textarea data-draft="comment" data-keep="comment" rows="2" placeholder="np. folia osobno, bez PET" aria-label="Komentarz dla zaznaczonych">${escapeHtml(screen.commentDraft)}</textarea>` +
+        `<button type="button" class="btn-teal" data-action="apply-comment"${disabled ? " disabled" : ""}>${escapeHtml(applyButtonLabel(screen.commentDraft, chosen))}</button></div>` +
+        '<div class="composer-actions">' +
+        `<button type="button" class="text-btn" data-action="check-comment-all">${allPicked(targets, screen.commentPicks) ? "odznacz" : "zaznacz wszystkie"}</button></div>` +
+        `<p class="note overwrite-hint" data-out="overwrite-hint"${hint ? "" : " hidden"}>${escapeHtml(hint)}</p>` +
+        '<p class="note composer-foot">Na tym ekranie. Numer i kwoty bez zmian. Do rejestru jeszcze nie schodzi.</p></footer>');
+}
+function routePick(routeName, sub, total, picked) {
+    if (total === 0) {
+        return `<div>${escapeHtml(routeName)}</div><div class="sub">trasa · ${escapeHtml(sub)}</div>`;
+    }
+    const checked = picked === total ? " checked" : "";
+    return (`<label class="pick-line"><input type="checkbox" data-pick-route="${escapeHtml(routeName)}" aria-label="${escapeHtml(`Zaznacz sklepy trasy ${routeName}`)}"${checked}>` +
+        `<span class="stack"><span>${escapeHtml(routeName)}</span>` +
+        `<span class="sub">trasa · ${escapeHtml(sub)} · <span data-route-note="${escapeHtml(routeName)}">${escapeHtml(routePickNote(total, picked))}</span></span></span></label>`);
+}
+function shopAddress(shop, dead, target, screen) {
+    const shown = text(addressWithCommaAfterLocality(shop.address), dead);
+    if (!target) {
+        return `<td class="adres">${shown}</td>`;
+    }
+    const picked = screen.commentPicks[target.key] === true;
+    const label = shop.shopName.trim() === "" ? shop.address : shop.shopName;
+    return (`<td class="adres"><label class="pick-line"><input type="checkbox" data-pick="comment" ${ref(shop)}${picked ? " checked" : ""} aria-label="${escapeHtml(`Zaznacz ${label} do komentarza`)}">` +
+        `<span>${shown}</span></label></td>`);
+}
+function commentCell(shop, target) {
+    if (!shop.happened || !target) {
+        return '<td class="comment-col"><span class="muted" title="Transport się nie odbył. Ten sklep nie wchodzi na fakturę.">—</span></td>';
+    }
+    return `<td class="comment-col">${commentPlain(target.comment)}</td>`;
+}
+function routeCommentCell(shops) {
+    if (shops.length === 0) {
+        return '<td class="comment-col"><span class="muted">—</span></td>';
+    }
+    const face = routeCommentFace(shops);
+    if (!face.sharedByAll) {
+        return `<td class="comment-col"><span class="muted">${escapeHtml(face.sub)}</span></td>`;
+    }
+    return ('<td class="comment-col"><span class="stack">' +
+        `<span class="comment-snip">${escapeHtml(face.snip)}</span>` +
+        `<span class="sub">${escapeHtml(face.sub)}</span></span></td>`);
+}
+function commentPlain(value) {
+    const trimmed = value.trim();
+    return trimmed === "" ? '<span class="muted">brak</span>' : `<span class="comment-snip">${escapeHtml(trimmed)}</span>`;
+}
+function shopCommentClass(target, screen) {
+    if (!target) {
+        return "";
+    }
+    const picked = screen.commentPicks[target.key] === true;
+    if (willOverwrite(target.comment, picked, screen.commentDraft)) {
+        return "will-overwrite";
+    }
+    return picked ? "is-picked" : "";
+}
+function routeCommentClass(total, picked) {
+    if (total === 0 || picked === 0) {
+        return "";
+    }
+    return picked === total ? "is-picked" : "is-partial";
+}
+function joinClass(base, extra) {
+    return [base, extra].filter(Boolean).join(" ");
+}
+function footer(invoice, total, selected, count, allowApprove) {
+    if (!allowApprove) {
+        return ('<footer class="footer">' +
+            `<div class="stat"><span>Suma zestawienia</span><b data-out="sum-all">${formatPln(total)}</b></div>` +
+            '<p class="note">Tryb Harmonogram: podgląd kosztów. Zatwierdzenie faktury w tej wersji niedostępne.</p>' +
+            "</footer>");
+    }
+    const enabled = canPressApprove(invoice, count);
+    return ('<footer class="footer">' +
+        `<div class="stat"><span>Suma zestawienia</span><b data-out="sum-all">${formatPln(total)}</b></div>` +
+        `<div class="stat sel"><span>Suma zaznaczonych · <span data-out="sel-count">${count}</span></span><b data-out="sum-sel">${formatPln(selected)}</b></div>` +
+        '<div class="grow"><label class="field"><span>Numer faktury</span>' +
+        `<input class="invoice" id="invoice" data-edit="invoice" data-keep="invoice" value="${escapeHtml(invoice)}" placeholder="FV/123/09/2026" autocomplete="off"></label>` +
+        `<button type="button" class="btn-go" data-action="approve"${enabled ? "" : " disabled"}>Zatwierdź</button></div></footer>`);
+}
+function rowClass(dead, checked, kind) {
+    return [
+        kind === "route" ? "is-route" : "",
+        kind === "child" ? "is-child" : "",
+        dead ? "is-dead" : "",
+        checked ? "is-checked" : "",
+    ]
+        .filter(Boolean)
+        .join(" ");
+}
+function selectAllBox(lines, selected, filtered) {
+    const on = lines.length > 0 && lines.every((line) => selected[lineKey(line)] === true);
+    const label = filtered ? "Zaznacz widoczne jako rozliczone" : "Zaznacz wszystkie jako rozliczone";
+    const disabled = lines.length === 0 ? " disabled" : "";
+    return `<input type="checkbox" data-toggle="checked-all"${on ? " checked" : ""}${disabled} aria-label="${label}" title="${label}">`;
+}
+function lineBox(line, checked) {
+    return `<input type="checkbox" data-toggle="checked" data-line="${escapeHtml(line)}"${checked ? " checked" : ""} aria-label="Rozliczone">`;
+}
+function tripBox(shop) {
+    const on = !shop.happened;
+    return `<label class="trip"><input type="checkbox" data-toggle="notrip" ${ref(shop)}${on ? " checked" : ""}> nie odbył się</label>`;
+}
+function detachButton(shop) {
+    return `<button type="button" class="btn-detach" data-action="detach" ${ref(shop)} title="Zapis od razu. Sklep schodzi z trasy i zostaje odbiorem za podjazd.">odepnij od trasy</button>`;
+}
+function newRouteBox(screen, shop) {
+    const key = rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName);
+    const left = screen.leftRoute[key];
+    if (!left) {
+        return "";
+    }
+    const draft = screen.routeDraft[key] ?? { name: "", rate: "" };
+    const error = screen.routeDraftError[key];
+    return ('<div class="new-route">' +
+        `<span class="sub">odpięty od ${escapeHtml(left)}</span>` +
+        `<input type="text" data-draft="route-name" data-keep="draft-name-${shop.sheetRow}" ${ref(shop)} value="${escapeHtml(draft.name)}" placeholder="nazwa nowej trasy" autocomplete="off" title="Inna nazwa niż trasa, z której sklep zszedł.">` +
+        `<input type="text" inputmode="decimal" data-draft="route-rate" data-keep="draft-rate-${shop.sheetRow}" ${ref(shop)} value="${escapeHtml(draft.rate)}" placeholder="stawka" title="Pusta nie zapisuje trasy. Kwota 0 jest wpisana.">` +
+        `<button type="button" class="btn-mini" data-action="attach" ${ref(shop)}>Osobna trasa</button>` +
+        (error ? `<span class="err">${escapeHtml(error)}</span>` : "") +
+        "</div>");
+}
+function tieBox(tie, rates) {
+    if (!tie) {
+        return "";
+    }
+    const buttons = tie.candidates
+        .map((candidate) => {
+        const rate = rates[candidate.index];
+        if (!rate) {
+            return "";
+        }
+        const from = candidate.validFrom === "" ? "od zawsze" : candidate.validFrom;
+        const pickup = candidate.pickupAmount === null ? "—" : formatPln(candidate.pickupAmount);
+        const bag = candidate.bagAmount === null ? "—" : formatPln(candidate.bagAmount);
+        return `<button type="button" class="btn-mini" data-action="resolve-tie" data-rate-row="${rate.sheetRow}">${escapeHtml(from)} · podjazd ${pickup} · worek ${bag}</button>`;
+    })
+        .join("");
+    return `<div class="tie"><span class="err">Dwie stawki na ten dzień. Wskaż, która obowiązuje.</span>${buttons}</div>`;
+}
+function dateInput(shop, edit, shown, title, routeName) {
+    const route = routeName ? ` data-route="${escapeHtml(routeName)}"` : "";
+    return `<input type="date" data-edit="${edit}" ${ref(shop)}${route} value="${escapeHtml(sheetDateInputValue(shown))}" title="${escapeHtml(title)}" aria-label="Data odbioru">`;
+}
+function sheetDateInputValue(text) {
+    if (text === "") {
+        return "";
+    }
+    return calendarToIsoDate(parseSheetDate(text));
+}
+function bagCountInput(shop, title) {
+    const shown = shop.bagCount === null ? "" : String(shop.bagCount);
+    return `<input type="text" inputmode="numeric" data-edit="bags" ${ref(shop)} value="${escapeHtml(shown)}" title="${escapeHtml(title)}" autocomplete="off">`;
+}
+function amountInput(shop, edit, override, shown, title, routeName) {
+    const value = override === null ? "" : override !== undefined ? formatAmountInput(override) : shown === null ? "" : formatAmountInput(shown);
+    const route = routeName ? ` data-route="${escapeHtml(routeName)}"` : "";
+    return `<input type="text" inputmode="decimal" data-edit="${edit}" ${ref(shop)}${route} value="${escapeHtml(value)}" title="${escapeHtml(title)}" autocomplete="off">`;
+}
+function money(value, dead) {
+    if (value === null) {
+        return DASH;
+    }
+    const text = formatPln(value);
+    return dead ? `<span class="strike">${text}</span>` : `<span class="money">${text}</span>`;
+}
+function text(value, dead) {
+    if (value === "") {
+        return DASH;
+    }
+    const safe = escapeHtml(value);
+    return dead ? `<span class="strike">${safe}</span>` : safe;
+}
+function ref(shop) {
+    return `data-sheet-name="${escapeHtml(shop.sheetName)}" data-sheet-row="${shop.sheetRow}" data-transport="${escapeHtml(shop.transportNumber)}"`;
+}
+function shopsWord(count) {
+    if (count === 1) {
+        return "1 sklep";
+    }
+    const last = count % 10;
+    const lastTwo = count % 100;
+    if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) {
+        return `${count} sklepy`;
+    }
+    return `${count} sklepów`;
+}
+
+
+/** Numer (fragment) i sposób odbioru. Zakres dat i podwykonawca są już w odczycie. */
+function filterLedgerInvoices(rows, query, mode) {
+    const needle = foldPl(query);
+    return rows.filter((row) => {
+        if (mode !== "all" && row.mode !== mode) {
+            return false;
+        }
+        if (needle === "") {
+            return true;
+        }
+        return foldPl(row.invoice).includes(needle);
+    });
 }
 
 
@@ -6770,6 +7198,7 @@ host.showRozErrorCard = showRozErrorCard;
 
 
 
+
 const STATS_SECTION_IDS = ["pickups", "bags", "costs", "q", "contractors", "empty-bags", "gaps"];
 function todayCalendar() {
     const now = new Date();
@@ -6997,9 +7426,10 @@ function syncCheckedRows() {
     }
     root.querySelector(":scope > p.status-block")?.remove();
     const statement = currentStatement(VIEW.statement);
+    const visible = visibleStatementLines(VIEW.statement, statement);
     const selected = VIEW.statement.selected;
-    for (const line of statement.lines) {
-        const key = lineKey(line);
+    for (const item of visible) {
+        const key = lineKey(item.line);
         const box = root.querySelector(`input[data-toggle="checked"][data-line="${CSS.escape(encodeURIComponent(key))}"]`);
         const row = box?.closest("tr");
         if (!(box instanceof HTMLInputElement) || !row) {
@@ -7013,7 +7443,7 @@ function syncCheckedRows() {
     const all = root.querySelector('input[data-toggle="checked-all"]');
     if (all instanceof HTMLInputElement) {
         all.checked =
-            statement.lines.length > 0 && statement.lines.every((line) => selected[lineKey(line)] === true);
+            visible.length > 0 && visible.every((item) => selected[lineKey(item.line)] === true);
     }
     const countEl = root.querySelector('[data-out="sel-count"]');
     const sumEl = root.querySelector('[data-out="sum-sel"]');
@@ -7489,6 +7919,36 @@ function onClick(event) {
         closeInvoiceMenu();
         paint();
     }
+    else if (action === "statement-menu") {
+        const column = el.dataset.col ?? "";
+        if (isStatementColumnKey(column)) {
+            openStatementMenu(column);
+        }
+    }
+    else if (action === "statement-sort") {
+        const column = el.dataset.col ?? "";
+        const dir = el.dataset.dir === "desc" ? "desc" : "asc";
+        if (isStatementColumnKey(column)) {
+            applyStatementSort(column, dir);
+        }
+    }
+    else if (action === "statement-clear") {
+        const column = el.dataset.col ?? "";
+        if (isStatementColumnKey(column)) {
+            clearStatementColumn(column);
+        }
+    }
+    else if (action === "statement-clear-all") {
+        VIEW.statement = { ...VIEW.statement, table: emptyStatementTable() };
+        paint();
+    }
+    else if (action === "statement-ok") {
+        applyStatementFilter();
+    }
+    else if (action === "statement-cancel") {
+        closeStatementMenu();
+        paint();
+    }
     else if (action === "rates") {
         void openRates();
     }
@@ -7647,6 +8107,10 @@ function onInput(event) {
         setLedgerQuery(el.value);
         return;
     }
+    if (el.dataset.keep === "statement-query") {
+        setStatementQuery(el.value);
+        return;
+    }
     if (el.dataset.keep === "ledger-number") {
         VIEW.ledger = { ...VIEW.ledger, invoiceQuery: el.value, page: 1 };
         paint("ledger-number");
@@ -7774,6 +8238,14 @@ function onChange(event) {
         setLedgerDraftValue(el.dataset.ledgerValue, el.checked);
         return;
     }
+    if (el.dataset.statementAll === "1") {
+        setStatementDraftVisible(el.checked);
+        return;
+    }
+    if (el.dataset.statementValue !== undefined) {
+        setStatementDraftValue(el.dataset.statementValue, el.checked);
+        return;
+    }
     if (el.dataset.stats === "from" || el.dataset.stats === "to") {
         applyStatsField(el.dataset.stats, el.value);
         return;
@@ -7783,7 +8255,9 @@ function onChange(event) {
         return;
     }
     if (el.dataset.toggle === "checked-all") {
-        VIEW.statement = setAllSelected(VIEW.statement, el.checked);
+        const statement = currentStatement(VIEW.statement);
+        const keys = visibleStatementLines(VIEW.statement, statement).map((item) => lineKey(item.line));
+        VIEW.statement = setLinesSelected(VIEW.statement, keys, el.checked);
         VIEW.status = "";
         syncCheckedRows();
         return;
@@ -8087,7 +8561,11 @@ function moveRateActive(field, delta) {
 }
 function statementCommentModel() {
     const statement = currentStatement(VIEW.statement);
-    const targets = commentTargets(statement, VIEW.statement.invoiceComments);
+    const visible = visibleStatementLines(VIEW.statement, statement);
+    const targets = commentTargets({
+        ...statement,
+        lines: visible.map((item) => item.kind === "plain" ? item.line : { ...item.line, shops: [...item.shops] }),
+    }, VIEW.statement.invoiceComments);
     const chosen = chosenComments(targets, VIEW.statement.commentPicks);
     return { targets, chosen };
 }
@@ -8234,7 +8712,7 @@ function toggleAllStatementComments() {
     const on = !allPicked(targets, VIEW.statement.commentPicks);
     VIEW.statement = {
         ...VIEW.statement,
-        commentPicks: picksForAll(targets, on),
+        commentPicks: setCommentPicks(VIEW.statement.commentPicks, targets.map((target) => target.key), on),
         commentNotice: "",
     };
     dropCommentNotice();
@@ -9154,7 +9632,10 @@ function toggleStatsTable(id) {
 function onCaptureScroll(event) {
     if (painting ||
         scrollRestoreGen !== 0 ||
-        (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu && !VIEW.ledger.table.menu)) {
+        (!VIEW.stats.pickups.menu &&
+            !VIEW.stats.invoices.menu &&
+            !VIEW.ledger.table.menu &&
+            !VIEW.statement.table.menu)) {
         return;
     }
     const target = event.target;
@@ -9164,6 +9645,7 @@ function onCaptureScroll(event) {
     closePickupMenu();
     closeInvoiceMenu();
     closeLedgerMenu();
+    closeStatementMenu();
     paint();
 }
 function placePickupMenu() {
@@ -9171,7 +9653,7 @@ function placePickupMenu() {
     if (!(menu instanceof HTMLElement)) {
         return;
     }
-    const btn = document.querySelector('[data-action="pickup-menu"][aria-expanded="true"], [data-action="invoice-menu"][aria-expanded="true"], [data-action="ledger-menu"][aria-expanded="true"]');
+    const btn = document.querySelector('[data-action="pickup-menu"][aria-expanded="true"], [data-action="invoice-menu"][aria-expanded="true"], [data-action="ledger-menu"][aria-expanded="true"], [data-action="statement-menu"][aria-expanded="true"]');
     if (!(btn instanceof HTMLElement)) {
         return;
     }
@@ -9193,24 +9675,26 @@ function placePickupMenu() {
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
     menu.style.visibility = "visible";
-    const all = menu.querySelector("[data-pickup-all], [data-invoice-all], [data-ledger-all]");
+    const all = menu.querySelector("[data-pickup-all], [data-invoice-all], [data-ledger-all], [data-statement-all]");
     if (all instanceof HTMLInputElement && all.dataset.mixed === "1") {
         all.indeterminate = true;
     }
 }
 function dismissPickupMenuOnOutside(target) {
-    if (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu && !VIEW.ledger.table.menu) {
+    if (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu && !VIEW.ledger.table.menu && !VIEW.statement.table.menu) {
         return;
     }
     if (target.closest("[data-xl-menu]") ||
         target.closest("[data-action='pickup-menu']") ||
         target.closest("[data-action='invoice-menu']") ||
-        target.closest("[data-action='ledger-menu']")) {
+        target.closest("[data-action='ledger-menu']") ||
+        target.closest("[data-action='statement-menu']")) {
         return;
     }
     closePickupMenu();
     closeInvoiceMenu();
     closeLedgerMenu();
+    closeStatementMenu();
     paint();
 }
 function closePickupMenu() {
@@ -9566,6 +10050,112 @@ function setInvoiceDraftVisible(on) {
         },
     };
     paint(invoiceDraftKeep());
+}
+function statementChoices(column) {
+    const menu = VIEW.statement.table.menu;
+    return statementColumnChoices(VIEW.statement, currentStatement(VIEW.statement), column).filter((text) => menu ? pickupQueryHits(text, menu.query) : true);
+}
+function openStatementMenu(column) {
+    const current = VIEW.statement.table;
+    if (current.menu?.column === column) {
+        closeStatementMenu();
+        paint();
+        return;
+    }
+    const choices = statementColumnChoices(VIEW.statement, currentStatement(VIEW.statement), column);
+    const saved = current.filters[column];
+    VIEW.statement = {
+        ...VIEW.statement,
+        table: {
+            ...current,
+            menu: { column, draft: saved ? [...saved] : [...choices], query: "" },
+        },
+    };
+    paint();
+}
+function applyStatementSort(column, dir) {
+    VIEW.statement = {
+        ...VIEW.statement,
+        table: { ...VIEW.statement.table, sortKey: column, sortDir: dir, menu: null },
+    };
+    paint();
+}
+function clearStatementColumn(column) {
+    const filters = { ...VIEW.statement.table.filters };
+    delete filters[column];
+    VIEW.statement = {
+        ...VIEW.statement,
+        table: { ...VIEW.statement.table, filters, menu: null },
+    };
+    paint();
+}
+function applyStatementFilter() {
+    const menu = VIEW.statement.table.menu;
+    if (!menu) {
+        return;
+    }
+    const choices = statementColumnChoices(VIEW.statement, currentStatement(VIEW.statement), menu.column);
+    const filters = pickupFiltersAfterApply(VIEW.statement.table.filters, menu.column, choices, menu.draft);
+    VIEW.statement = {
+        ...VIEW.statement,
+        table: { ...VIEW.statement.table, filters, menu: null },
+    };
+    paint();
+}
+function closeStatementMenu() {
+    if (!VIEW.statement.table.menu) {
+        return;
+    }
+    VIEW.statement = { ...VIEW.statement, table: { ...VIEW.statement.table, menu: null } };
+}
+function setStatementQuery(value) {
+    const menu = VIEW.statement.table.menu;
+    if (!menu || menu.query === value) {
+        return;
+    }
+    VIEW.statement = {
+        ...VIEW.statement,
+        table: { ...VIEW.statement.table, menu: { ...menu, query: value } },
+    };
+    paint("statement-query");
+}
+function statementDraftKeep() {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && active.dataset.keep === "statement-query") {
+        return "statement-query";
+    }
+    return undefined;
+}
+function setStatementDraftValue(value, on) {
+    const menu = VIEW.statement.table.menu;
+    if (!menu) {
+        return;
+    }
+    const draft = on
+        ? menu.draft.includes(value)
+            ? menu.draft
+            : [...menu.draft, value]
+        : menu.draft.filter((item) => item !== value);
+    VIEW.statement = {
+        ...VIEW.statement,
+        table: { ...VIEW.statement.table, menu: { ...menu, draft } },
+    };
+    paint(statementDraftKeep());
+}
+function setStatementDraftVisible(on) {
+    const menu = VIEW.statement.table.menu;
+    if (!menu) {
+        return;
+    }
+    const visible = statementChoices(menu.column);
+    VIEW.statement = {
+        ...VIEW.statement,
+        table: {
+            ...VIEW.statement.table,
+            menu: { ...menu, draft: pickupDraftAfterVisible(menu.draft, visible, on) },
+        },
+    };
+    paint(statementDraftKeep());
 }
 function shiftStatsPage(pager, dir) {
     if (pager === "empty-bags") {

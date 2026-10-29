@@ -65,8 +65,10 @@ import {
   currentStatement,
   detachBody,
   emptyStatement,
+  emptyStatementTable,
   findRow,
   formatPln,
+  isStatementColumnKey,
   commentSaveFace,
   freshStatement,
   invoiceCommentBody,
@@ -76,7 +78,7 @@ import {
   routeRateBody,
   selectedKeys,
   selectedLineCount,
-  setAllSelected,
+  setLinesSelected,
   setBagRate,
   setDidNotHappen,
   setPickup,
@@ -117,6 +119,11 @@ import {
   type InvoiceColumnKey,
   type PickupColumnKey,
 } from "./statsView.js";
+import {
+  statementColumnChoices,
+  visibleStatementLines,
+} from "./statementTable.js";
+import type { StatementColumnKey } from "./statement.js";
 import type { CalendarDate } from "./sheetDate.js";
 import { readRozJson, showRozFailure } from "./rozErrorReport.js";
 
@@ -381,9 +388,10 @@ function syncCheckedRows(): void {
   }
   root.querySelector(":scope > p.status-block")?.remove();
   const statement = currentStatement(VIEW.statement);
+  const visible = visibleStatementLines(VIEW.statement, statement);
   const selected = VIEW.statement.selected;
-  for (const line of statement.lines) {
-    const key = lineKey(line);
+  for (const item of visible) {
+    const key = lineKey(item.line);
     const box = root.querySelector(
       `input[data-toggle="checked"][data-line="${CSS.escape(encodeURIComponent(key))}"]`,
     );
@@ -399,7 +407,7 @@ function syncCheckedRows(): void {
   const all = root.querySelector('input[data-toggle="checked-all"]');
   if (all instanceof HTMLInputElement) {
     all.checked =
-      statement.lines.length > 0 && statement.lines.every((line) => selected[lineKey(line)] === true);
+      visible.length > 0 && visible.every((item) => selected[lineKey(item.line)] === true);
   }
   const countEl = root.querySelector('[data-out="sel-count"]');
   const sumEl = root.querySelector('[data-out="sum-sel"]');
@@ -930,6 +938,30 @@ function onClick(event: MouseEvent): void {
   } else if (action === "invoice-cancel") {
     closeInvoiceMenu();
     paint();
+  } else if (action === "statement-menu") {
+    const column = el.dataset.col ?? "";
+    if (isStatementColumnKey(column)) {
+      openStatementMenu(column);
+    }
+  } else if (action === "statement-sort") {
+    const column = el.dataset.col ?? "";
+    const dir = el.dataset.dir === "desc" ? "desc" : "asc";
+    if (isStatementColumnKey(column)) {
+      applyStatementSort(column, dir);
+    }
+  } else if (action === "statement-clear") {
+    const column = el.dataset.col ?? "";
+    if (isStatementColumnKey(column)) {
+      clearStatementColumn(column);
+    }
+  } else if (action === "statement-clear-all") {
+    VIEW.statement = { ...VIEW.statement, table: emptyStatementTable() };
+    paint();
+  } else if (action === "statement-ok") {
+    applyStatementFilter();
+  } else if (action === "statement-cancel") {
+    closeStatementMenu();
+    paint();
   } else if (action === "rates") {
     void openRates();
   } else if (action === "rates-tab") {
@@ -1094,6 +1126,10 @@ function onInput(event: Event): void {
     setLedgerQuery(el.value);
     return;
   }
+  if (el.dataset.keep === "statement-query") {
+    setStatementQuery(el.value);
+    return;
+  }
   if (el.dataset.keep === "ledger-number") {
     VIEW.ledger = { ...VIEW.ledger, invoiceQuery: el.value, page: 1 };
     paint("ledger-number");
@@ -1223,6 +1259,14 @@ function onChange(event: Event): void {
     setLedgerDraftValue(el.dataset.ledgerValue, el.checked);
     return;
   }
+  if (el.dataset.statementAll === "1") {
+    setStatementDraftVisible(el.checked);
+    return;
+  }
+  if (el.dataset.statementValue !== undefined) {
+    setStatementDraftValue(el.dataset.statementValue, el.checked);
+    return;
+  }
   if (el.dataset.stats === "from" || el.dataset.stats === "to") {
     applyStatsField(el.dataset.stats, el.value);
     return;
@@ -1232,7 +1276,9 @@ function onChange(event: Event): void {
     return;
   }
   if (el.dataset.toggle === "checked-all") {
-    VIEW.statement = setAllSelected(VIEW.statement, el.checked);
+    const statement = currentStatement(VIEW.statement);
+    const keys = visibleStatementLines(VIEW.statement, statement).map((item) => lineKey(item.line));
+    VIEW.statement = setLinesSelected(VIEW.statement, keys, el.checked);
     VIEW.status = "";
     syncCheckedRows();
     return;
@@ -1562,7 +1608,16 @@ function moveRateActive(field: RateField, delta: number): void {
 
 function statementCommentModel() {
   const statement = currentStatement(VIEW.statement);
-  const targets = commentTargets(statement, VIEW.statement.invoiceComments);
+  const visible = visibleStatementLines(VIEW.statement, statement);
+  const targets = commentTargets(
+    {
+      ...statement,
+      lines: visible.map((item) =>
+        item.kind === "plain" ? item.line : { ...item.line, shops: [...item.shops] },
+      ),
+    },
+    VIEW.statement.invoiceComments,
+  );
   const chosen = chosenComments(targets, VIEW.statement.commentPicks);
   return { targets, chosen };
 }
@@ -1730,7 +1785,11 @@ function toggleAllStatementComments(): void {
   const on = !allPicked(targets, VIEW.statement.commentPicks);
   VIEW.statement = {
     ...VIEW.statement,
-    commentPicks: picksForAll(targets, on),
+    commentPicks: setCommentPicks(
+      VIEW.statement.commentPicks,
+      targets.map((target) => target.key),
+      on,
+    ),
     commentNotice: "",
   };
   dropCommentNotice();
@@ -2776,7 +2835,10 @@ function onCaptureScroll(event: Event): void {
   if (
     painting ||
     scrollRestoreGen !== 0 ||
-    (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu && !VIEW.ledger.table.menu)
+    (!VIEW.stats.pickups.menu &&
+      !VIEW.stats.invoices.menu &&
+      !VIEW.ledger.table.menu &&
+      !VIEW.statement.table.menu)
   ) {
     return;
   }
@@ -2787,6 +2849,7 @@ function onCaptureScroll(event: Event): void {
   closePickupMenu();
   closeInvoiceMenu();
   closeLedgerMenu();
+  closeStatementMenu();
   paint();
 }
 
@@ -2796,7 +2859,7 @@ function placePickupMenu(): void {
     return;
   }
   const btn = document.querySelector(
-    '[data-action="pickup-menu"][aria-expanded="true"], [data-action="invoice-menu"][aria-expanded="true"], [data-action="ledger-menu"][aria-expanded="true"]',
+    '[data-action="pickup-menu"][aria-expanded="true"], [data-action="invoice-menu"][aria-expanded="true"], [data-action="ledger-menu"][aria-expanded="true"], [data-action="statement-menu"][aria-expanded="true"]',
   );
   if (!(btn instanceof HTMLElement)) {
     return;
@@ -2820,27 +2883,29 @@ function placePickupMenu(): void {
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
   menu.style.visibility = "visible";
-  const all = menu.querySelector("[data-pickup-all], [data-invoice-all], [data-ledger-all]");
+  const all = menu.querySelector("[data-pickup-all], [data-invoice-all], [data-ledger-all], [data-statement-all]");
   if (all instanceof HTMLInputElement && all.dataset.mixed === "1") {
     all.indeterminate = true;
   }
 }
 
 function dismissPickupMenuOnOutside(target: Element): void {
-  if (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu && !VIEW.ledger.table.menu) {
+  if (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu && !VIEW.ledger.table.menu && !VIEW.statement.table.menu) {
     return;
   }
   if (
     target.closest("[data-xl-menu]") ||
     target.closest("[data-action='pickup-menu']") ||
     target.closest("[data-action='invoice-menu']") ||
-    target.closest("[data-action='ledger-menu']")
+    target.closest("[data-action='ledger-menu']") ||
+    target.closest("[data-action='statement-menu']")
   ) {
     return;
   }
   closePickupMenu();
   closeInvoiceMenu();
   closeLedgerMenu();
+  closeStatementMenu();
   paint();
 }
 
@@ -3236,6 +3301,124 @@ function setInvoiceDraftVisible(on: boolean): void {
     },
   };
   paint(invoiceDraftKeep());
+}
+
+function statementChoices(column: StatementColumnKey): string[] {
+  const menu = VIEW.statement.table.menu;
+  return statementColumnChoices(VIEW.statement, currentStatement(VIEW.statement), column).filter((text) =>
+    menu ? pickupQueryHits(text, menu.query) : true,
+  );
+}
+
+function openStatementMenu(column: StatementColumnKey): void {
+  const current = VIEW.statement.table;
+  if (current.menu?.column === column) {
+    closeStatementMenu();
+    paint();
+    return;
+  }
+  const choices = statementColumnChoices(VIEW.statement, currentStatement(VIEW.statement), column);
+  const saved = current.filters[column];
+  VIEW.statement = {
+    ...VIEW.statement,
+    table: {
+      ...current,
+      menu: { column, draft: saved ? [...saved] : [...choices], query: "" },
+    },
+  };
+  paint();
+}
+
+function applyStatementSort(column: StatementColumnKey, dir: "asc" | "desc"): void {
+  VIEW.statement = {
+    ...VIEW.statement,
+    table: { ...VIEW.statement.table, sortKey: column, sortDir: dir, menu: null },
+  };
+  paint();
+}
+
+function clearStatementColumn(column: StatementColumnKey): void {
+  const filters = { ...VIEW.statement.table.filters };
+  delete filters[column];
+  VIEW.statement = {
+    ...VIEW.statement,
+    table: { ...VIEW.statement.table, filters, menu: null },
+  };
+  paint();
+}
+
+function applyStatementFilter(): void {
+  const menu = VIEW.statement.table.menu;
+  if (!menu) {
+    return;
+  }
+  const choices = statementColumnChoices(VIEW.statement, currentStatement(VIEW.statement), menu.column);
+  const filters = pickupFiltersAfterApply(VIEW.statement.table.filters, menu.column, choices, menu.draft);
+  VIEW.statement = {
+    ...VIEW.statement,
+    table: { ...VIEW.statement.table, filters, menu: null },
+  };
+  paint();
+}
+
+function closeStatementMenu(): void {
+  if (!VIEW.statement.table.menu) {
+    return;
+  }
+  VIEW.statement = { ...VIEW.statement, table: { ...VIEW.statement.table, menu: null } };
+}
+
+function setStatementQuery(value: string): void {
+  const menu = VIEW.statement.table.menu;
+  if (!menu || menu.query === value) {
+    return;
+  }
+  VIEW.statement = {
+    ...VIEW.statement,
+    table: { ...VIEW.statement.table, menu: { ...menu, query: value } },
+  };
+  paint("statement-query");
+}
+
+function statementDraftKeep(): string | undefined {
+  const active = document.activeElement;
+  if (active instanceof HTMLInputElement && active.dataset.keep === "statement-query") {
+    return "statement-query";
+  }
+  return undefined;
+}
+
+function setStatementDraftValue(value: string, on: boolean): void {
+  const menu = VIEW.statement.table.menu;
+  if (!menu) {
+    return;
+  }
+  const draft = on
+    ? menu.draft.includes(value)
+      ? menu.draft
+      : [...menu.draft, value]
+    : menu.draft.filter((item) => item !== value);
+  VIEW.statement = {
+    ...VIEW.statement,
+    table: { ...VIEW.statement.table, menu: { ...menu, draft } },
+  };
+  paint(statementDraftKeep());
+}
+
+function setStatementDraftVisible(on: boolean): void {
+  const menu = VIEW.statement.table.menu;
+  if (!menu) {
+    return;
+  }
+  const visible = statementChoices(menu.column);
+  VIEW.statement = {
+    ...VIEW.statement,
+    table: {
+      ...VIEW.statement.table,
+      menu: { ...menu, draft: pickupDraftAfterVisible(menu.draft, visible, on) },
+    },
+  };
+  paint(statementDraftKeep());
 }
 
 function shiftStatsPage(pager: string, dir: string): void {

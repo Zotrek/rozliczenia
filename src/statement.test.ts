@@ -40,6 +40,7 @@ import {
   setDidNotHappen,
   setPickup,
   setAllSelected,
+  setLinesSelected,
   setRouteBagRate,
   skippedCount,
   formatPartialApprove,
@@ -361,6 +362,17 @@ describe("adoptRows", () => {
     expect(next.rows.map((item) => item.sheetRow)).toEqual([2]);
     expect(next.screenByRow["\t2\t2"]?.pickupAmount).toBe(0);
     expect(next.screenByRow["\t3\t3"]).toBeUndefined();
+    expect(next.table).toEqual(prev.table);
+  });
+
+  it("test_setLinesSelected_changes_only_given_keys", () => {
+    const base = screen([row({ sheetRow: 2 }), row({ sheetRow: 3 })]);
+    const first = lineKey(currentStatement(base).lines[0]);
+    const second = lineKey(currentStatement(base).lines[1]);
+    const on = setLinesSelected(base, [first], true);
+    expect(on.selected).toEqual({ [first]: true });
+    const off = setLinesSelected({ ...on, selected: { [first]: true, [second]: true } }, [first], false);
+    expect(off.selected).toEqual({ [second]: true });
   });
 
   it("test_adoptRows_takes_invoice_comment_from_the_sheet_row", () => {

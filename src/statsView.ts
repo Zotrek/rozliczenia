@@ -74,6 +74,8 @@ const INVOICE_COLUMNS: readonly { key: InvoiceColumnKey; label: string; numeric:
 const FUNNEL_ICON =
   '<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M1.5 2.5h13l-5 6.1V13l-3 1.1V8.6z"/></svg>';
 
+type ColumnFilterAction = "pickup" | "invoice" | "ledger" | "statement";
+
 export function emptyPickupTable(): PickupTableState {
   return { sortKey: null, sortDir: "asc", filters: {}, menu: null };
 }
@@ -1209,7 +1211,7 @@ export function columnHead<Key extends string>(
     menu: { column: Key } | null;
   },
   sectionOpen: boolean,
-  action: "pickup" | "invoice" | "ledger",
+  action: ColumnFilterAction,
   menuFor: (key: Key) => string,
 ): string {
   return columns
@@ -1279,7 +1281,7 @@ function invoiceMenu(model: StatsViewModel, column: InvoiceColumnKey): string {
 }
 
 function xlColumnMenu(args: {
-  action: "pickup" | "invoice" | "ledger";
+  action: ColumnFilterAction;
   column: string;
   label: string;
   sortAscLabel: string;
@@ -1339,7 +1341,7 @@ export function columnBar<Key extends string>(
     sortDir: "asc" | "desc";
     filters: Partial<Record<Key, readonly string[]>>;
   },
-  action: "pickup" | "invoice" | "ledger",
+  action: ColumnFilterAction,
   phrase: (key: Key, dir: "asc" | "desc") => string,
 ): string {
   const filtered = columns.filter((col) => state.filters[col.key] != null).map((col) => col.label);
@@ -1360,6 +1362,21 @@ export function columnBar<Key extends string>(
     `<span>${escapeHtml(bits.join(" · "))}</span>` +
     `<button type="button" data-action="${action}-clear-all">Wyczyść</button></div>`
   );
+}
+
+export function renderColumnFilterMenu(args: {
+  action: ColumnFilterAction;
+  column: string;
+  label: string;
+  sortAscLabel: string;
+  sortDescLabel: string;
+  sortDir: "asc" | "desc" | null;
+  hasFilter: boolean;
+  query: string;
+  visible: readonly string[];
+  picked: ReadonlySet<string>;
+}): string {
+  return xlColumnMenu(args);
 }
 
 export function renderLedgerColumnMenu(args: {

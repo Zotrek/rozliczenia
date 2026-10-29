@@ -54,9 +54,12 @@ function screen(
 describe("renderStatement", () => {
   it("test_renderStatement_leg_amount_has_header_between_kind_and_bags", () => {
     const html = renderStatement(screen([row({ sheetRow: 2, pickupRate: 14_000 })], [rate({ sheetRow: 2, shop: "Sklepowa 1" })]));
-    expect(html).toContain(
-      '<th>Podjazd/Trasa</th><th class="num">Kwota podjazdu/trasy</th><th class="num">Liczba worków</th>',
-    );
+    expect(html).toContain("Podjazd/Trasa");
+    expect(html).toContain("Kwota podjazdu/trasy");
+    expect(html).toContain("Liczba worków");
+    expect(html).toContain('data-action="statement-menu" data-col="kind"');
+    expect(html).toContain('data-action="statement-menu" data-col="leg"');
+    expect(html).toContain('data-action="statement-menu" data-col="bags"');
     expect(html).toContain('<td><span class="tag">podjazd</span></td><td class="num"><input type="text" inputmode="decimal" data-edit="pickup"');
   });
 
@@ -68,7 +71,7 @@ describe("renderStatement", () => {
       ),
     );
     const finalCost = formatPln(3_000);
-    expect(html).toContain(">Razem</th>");
+    expect(html).toContain(">Razem</span>");
     expect(html).not.toContain(">Koszt odbioru</th>");
     expect(html).not.toContain(">Suma trasy</th>");
     const rowHtml = html.slice(html.indexOf('data-kind="plain"'), html.indexOf("</tr>", html.indexOf('data-kind="plain"')));
@@ -92,7 +95,7 @@ describe("renderStatement", () => {
     );
     const rowHtml = html.slice(html.indexOf('data-kind="plain"'), html.indexOf("</tr>", html.indexOf('data-kind="plain"')));
     const cells = rowHtml.split('<td class="num">');
-    expect(html).toContain(">Razem</th>");
+    expect(html).toContain(">Razem</span>");
     expect(html).not.toContain(">Suma trasy</th>");
     expect(cells.at(-1)).toContain(formatPln(1_000));
     expect(cells.at(-1)).not.toContain(">—<");
@@ -160,7 +163,7 @@ describe("renderStatement", () => {
     const html = renderStatement(
       screen(rows, rates, { selected: { [routeSelectionKey("trasa")]: true }, invoice: "FV/1" }),
     );
-    expect(html).toContain(">Razem</th>");
+    expect(html).toContain(">Razem</span>");
     const routeHtml = html.slice(html.indexOf('data-kind="route"'), html.indexOf("</tr>", html.indexOf('data-kind="route"')));
     expect(routeHtml).toContain(`<td class="num"><span class="money">${formatPln(10_000)}</span></td>`);
     expect(html).toContain(`data-out="sum-all">${formatPln(10_000)}`);
@@ -295,6 +298,35 @@ describe("renderStatement", () => {
     });
     expect(overwrite).toContain("Nadpisze istniejący komentarz: Dębogórska.");
     expect(overwrite).toContain("will-overwrite");
+  });
+
+  it("test_renderStatement_column_filter_hides_other_shops_and_keeps_the_menu", () => {
+    const html = renderStatement(
+      screen(
+        [
+          row({ sheetRow: 2, shopName: "Zostaje", address: "A" }),
+          row({ sheetRow: 3, shopName: "Znika", address: "B" }),
+        ],
+        [rate({ sheetRow: 2, shop: "A" }), rate({ sheetRow: 3, shop: "B" })],
+        {
+          table: {
+            sortKey: null,
+            sortDir: "asc",
+            filters: { shop: ["Zostaje"] },
+            menu: { column: "shop", draft: ["Zostaje"], query: "" },
+          },
+        },
+      ),
+    );
+    expect(html).toContain("1 z 2 pozycji w zestawieniu");
+    expect(html).toContain('data-sheet-row="2"');
+    expect(html).not.toContain('data-sheet-row="3"');
+    expect(html).toContain('data-statement-value="Znika"');
+    expect(html).toContain('data-statement-value="Zostaje" checked');
+    expect(html).toContain('class="xl-btn is-on"');
+    expect(html).toContain('data-xl-menu');
+    expect(html).toContain("Filtr: Sklep");
+    expect(html).toContain("Zaznacz widoczne jako rozliczone");
   });
 });
 

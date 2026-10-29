@@ -1045,6 +1045,7 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
   gap: 4px;
 }
 th.num .xl-head { justify-content: flex-end; }
+th.c .xl-head { justify-content: center; }
 th.xl-th.is-open { z-index: 6; }
 .xl-btn {
   display: inline-grid;

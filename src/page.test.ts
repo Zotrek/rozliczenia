@@ -162,7 +162,7 @@ describe("page wiring", () => {
     expect(change).toContain('el.dataset.toggle === "notrip"');
     expect(change).toContain('el.dataset.toggle === "checked"');
     expect(change).toContain('el.dataset.toggle === "checked-all"');
-    expect(change).toContain("setAllSelected(");
+    expect(change).toContain("setLinesSelected(");
     expect(change).toContain('el.dataset.toggle === "nofrom"');
     expect(change).toContain("setDidNotHappen(");
     expect(change).toContain("toggleSelected(");

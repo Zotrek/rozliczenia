@@ -19,20 +19,31 @@ import { calendarToIsoDate } from "./range.js";
 import { addressWithCommaAfterLocality } from "./rateWindow.js";
 import { parseSheetDate } from "./sheetDate.js";
 import type { SettlementRateRow } from "./search.js";
+import { columnBar, renderColumnFilterMenu } from "./statsView.js";
 import {
   canPressApprove,
   currentStatement,
   formatAmountInput,
   formatPln,
-  positionLabel,
   routeSelectionKey,
   selectedKeys,
   selectedLineCount,
+  type StatementColumnKey,
   type StatementScreen,
 } from "./statement.js";
+import {
+  STATEMENT_COLUMNS,
+  statementColumnChoices,
+  statementCountLabel,
+  statementQueryHits,
+  statementSortPhrase,
+  visibleStatementLines,
+} from "./statementTable.js";
 import type { Grosze, RateTie, ShopCost, Statement, StatementLine } from "./types.js";
 
 const DASH = '<span class="muted">—</span>';
+const STATEMENT_FUNNEL =
+  '<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M1.5 2.5h13l-5 6.1V13l-3 1.1V8.6z"/></svg>';
 
 export function renderStatement(
   screen: StatementScreen,
@@ -41,6 +52,13 @@ export function renderStatement(
 ): string {
   const allowApprove = options.allowApprove !== false;
   const statement = currentStatement(screen);
+  const visible = visibleStatementLines(screen, statement);
+  const shown: Statement = {
+    ...statement,
+    lines: visible.map((item) =>
+      item.kind === "plain" ? item.line : { ...item.line, shops: item.shops },
+    ),
+  };
   const selectedSum = sumSelected(statement, selectedKeys(screen.selected));
   const count = selectedLineCount(statement, screen.selected);
   const note = status ? `<p class="err status-block">${escapeHtml(status)}</p>` : "";
@@ -53,10 +71,10 @@ export function renderStatement(
   const body =
     statement.lines.length === 0
       ? `<div class="blank"><strong>Brak pozycji.</strong><p>${emptyHint}</p></div>`
-      : table(screen, statement);
-  const composer = statement.lines.length === 0 ? "" : commentComposer(screen, statement);
+      : table(screen, shown);
+  const composer = shown.lines.length === 0 ? "" : commentComposer(screen, shown);
   return (
-    `<div class="center-h">${escapeHtml(positionLabel(statement.lines.length))}</div>` +
+    `<div class="center-h">${escapeHtml(statementCountLabel(shown.lines.length, statement.lines.length))}</div>` +
     note +
     commentNote +
     body +
@@ -82,16 +100,82 @@ function table(screen: StatementScreen, statement: Statement): string {
       rows.push(childRow(screen, shop, shared, targets));
     }
   }
+  const body =
+    rows.length === 0
+      ? `<tr><td class="note" colspan="${STATEMENT_COLUMNS.length}">Brak pozycji dla tego filtra.</td></tr>`
+      : rows.join("");
   return (
+    columnBar(STATEMENT_COLUMNS, screen.table, "statement", statementSortPhrase) +
     '<div class="table-wrap"><table><thead><tr>' +
-    `<th class="c"><span class="col-check"><span>Rozliczone</span>${selectAllBox(statement.lines, screen.selected)}</span></th><th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th>` +
-    "<th>Podjazd/Trasa</th><th class=\"num\">Kwota podjazdu/trasy</th><th class=\"num\">Liczba worków</th><th class=\"num\">Kwota za worek</th>" +
-    "<th class=\"num\">Suma za worki</th>" +
-    "<th class=\"num\" title=\"Podjazd: kwota podjazdu plus worki. Trasa: stawka raz plus worki.\">Razem</th>" +
-    "<th>transport się odbył</th>" +
-    '<th class="comment-col wrap">Komentarz do faktury</th>' +
-    `</tr></thead><tbody>${rows.join("")}</tbody></table></div>`
+    statementHead(screen, statement.lines) +
+    `</tr></thead><tbody>${body}</tbody></table></div>`
   );
+}
+
+function statementHead(screen: StatementScreen, lines: readonly StatementLine[]): string {
+  const state = screen.table;
+  const filtered = (Object.keys(state.filters) as StatementColumnKey[]).some((key) => state.filters[key] != null);
+  return STATEMENT_COLUMNS.map((col) => {
+    const open = state.menu?.column === col.key;
+    const on = state.filters[col.key] != null;
+    const sort = state.sortKey === col.key ? state.sortDir : null;
+    const mark = sort === "asc" ? "▲" : sort === "desc" ? "▼" : STATEMENT_FUNNEL;
+    const extra = col.key === "settled" ? "c " : col.key === "comment" ? "comment-col wrap " : "";
+    const numeric = col.numeric ? "num " : "";
+    const title =
+      col.key === "total"
+        ? ' title="Podjazd: kwota podjazdu plus worki. Trasa: stawka raz plus worki."'
+        : "";
+    const label =
+      col.key === "settled"
+        ? `<span class="col-check"><span>Rozliczone</span>${selectAllBox(lines, screen.selected, filtered)}</span>`
+        : `<span>${escapeHtml(col.label)}</span>`;
+    return (
+      `<th class="${numeric}${extra}xl-th${open ? " is-open" : ""}"${title}>` +
+      `<div class="xl-head">${label}` +
+      `<button type="button" class="xl-btn${on ? " is-on" : ""}" data-action="statement-menu" data-col="${col.key}"` +
+      ` aria-expanded="${open ? "true" : "false"}" aria-label="${escapeHtml(statementFilterButtonLabel(col.label, on, sort))}">${mark}</button>` +
+      "</div>" +
+      (open ? statementMenu(screen, col.key) : "") +
+      "</th>"
+    );
+  }).join("");
+}
+
+function statementMenu(screen: StatementScreen, column: StatementColumnKey): string {
+  const menu = screen.table.menu;
+  if (!menu || menu.column !== column) {
+    return "";
+  }
+  const choices = statementColumnChoices(screen, currentStatement(screen), column);
+  const visible = choices.filter((text) => statementQueryHits(text, menu.query));
+  const label = STATEMENT_COLUMNS.find((item) => item.key === column)?.label ?? column;
+  return renderColumnFilterMenu({
+    action: "statement",
+    column,
+    label,
+    sortAscLabel: statementSortPhrase(column, "asc"),
+    sortDescLabel: statementSortPhrase(column, "desc"),
+    sortDir: screen.table.sortKey === column ? screen.table.sortDir : null,
+    hasFilter: screen.table.filters[column] != null,
+    query: menu.query,
+    visible,
+    picked: new Set(menu.draft),
+  });
+}
+
+function statementFilterButtonLabel(label: string, filtered: boolean, sort: "asc" | "desc" | null): string {
+  const bits = [`Sortuj i filtruj kolumnę ${label}`];
+  if (filtered) {
+    bits.push("filtr włączony");
+  }
+  if (sort === "asc") {
+    bits.push("sortowanie rosnąco");
+  }
+  if (sort === "desc") {
+    bits.push("sortowanie malejąco");
+  }
+  return bits.join(", ");
 }
 
 function plainRow(screen: StatementScreen, shop: ShopCost, targets: readonly CommentTarget[]): string {
@@ -355,9 +439,15 @@ function rowClass(dead: boolean, checked: boolean, kind: "plain" | "route" | "ch
     .join(" ");
 }
 
-function selectAllBox(lines: readonly StatementLine[], selected: StatementScreen["selected"]): string {
+function selectAllBox(
+  lines: readonly StatementLine[],
+  selected: StatementScreen["selected"],
+  filtered: boolean,
+): string {
   const on = lines.length > 0 && lines.every((line) => selected[lineKey(line)] === true);
-  return `<input type="checkbox" data-toggle="checked-all"${on ? " checked" : ""} aria-label="Zaznacz wszystkie jako rozliczone" title="Zaznacz wszystkie jako rozliczone">`;
+  const label = filtered ? "Zaznacz widoczne jako rozliczone" : "Zaznacz wszystkie jako rozliczone";
+  const disabled = lines.length === 0 ? " disabled" : "";
+  return `<input type="checkbox" data-toggle="checked-all"${on ? " checked" : ""}${disabled} aria-label="${label}" title="${label}">`;
 }
 
 function lineBox(line: string, checked: boolean): string {

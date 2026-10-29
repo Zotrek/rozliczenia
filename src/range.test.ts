@@ -227,6 +227,7 @@ describe("screens", () => {
     expect(screenAfterChangeRange()).toBe("range");
     expect(screenAfterWorkBack("range")).toBe("range");
     expect(screenAfterWorkBack("stats")).toBe("stats");
+    expect(screenAfterWorkBack("ledger")).toBe("ledger");
   });
 
   it("test_screenAfterApprove_returns_to_range", () => {

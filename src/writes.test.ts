@@ -938,6 +938,28 @@ describe("approve", () => {
     expect(register.writes).toEqual([
       { row: 2, col: 10, numRows: 1, numCols: 1 },
       { row: 2, col: 15, numRows: 1, numCols: 4 },
+      { row: 1, col: 22, numRows: 1, numCols: 1 },
+      { row: 2, col: 22, numRows: 1, numCols: 1 },
+    ]);
+    expect(register.cell(1, 22)).toBe("Data zatwierdzenia");
+    expect(register.cell(2, 22)).toMatch(/^\d{2}\.\d{2}\.\d{4}$/);
+  });
+
+  it("test_approve_keeps_existing_approval_date", () => {
+    const { register } = fresh();
+    seedRegister(register, 2, { 22: "01.01.2020" });
+    register.put(1, 22, "Data zatwierdzenia");
+
+    postToSheet({
+      action: "approve",
+      numerFaktury: "FV/1",
+      wiersze: [{ sheetRow: 2, transportNumber: "15", koszt: 3000 }],
+    });
+
+    expect(register.cell(2, 22)).toBe("01.01.2020");
+    expect(register.writes).toEqual([
+      { row: 2, col: 10, numRows: 1, numCols: 1 },
+      { row: 2, col: 15, numRows: 1, numCols: 4 },
     ]);
   });
 

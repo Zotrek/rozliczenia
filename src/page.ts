@@ -1,4 +1,4 @@
-import { renderApp, renderContractorList, renderRateContractorList, renderRateShopList, emptyStats, type RangeViewModel } from "./rangeView.js";
+import { renderApp, renderContractorList, renderRateContractorList, renderRateShopList, emptyLedger, emptyStats, type RangeViewModel } from "./rangeView.js";
 import {
   applyNoStartDate,
   fieldsForSearch,
@@ -9,6 +9,7 @@ import {
   screenAfterWorkBack,
   invoiceParams,
   screenAfterInvoices,
+  screenAfterOpenLedger,
   screenAfterOpenStats,
   screenAfterSearch,
   searchParams,
@@ -93,11 +94,14 @@ import { rateContractorNames, rateSaveMessage, readAddressList, resolveStoreAddr
 import {
   buildStatsReport,
   chartShouldStack,
+  listPeriodInvoices,
   resolveStatsPeriod,
   type StatsPeriodKind,
 } from "./stats.js";
+import { filterLedgerInvoices } from "./ledger.js";
 import {
   emptyInvoiceTable,
+  emptyLedgerTable,
   emptyPickupTable,
   invoiceColumnChoices,
   invoiceFiltersAfterApply,
@@ -167,6 +171,7 @@ const VIEW: RangeViewModel = {
   ratesMessage: "",
   ratesMessageOk: false,
   stats: emptyStats(todayAtBoot),
+  ledger: emptyLedger(todayAtBoot),
 };
 
 let heldFrom = "";
@@ -665,11 +670,17 @@ function failOpen(message: string): void {
     VIEW.status = "";
     return;
   }
+  if (VIEW.workReturn === "ledger") {
+    VIEW.ledger = { ...VIEW.ledger, status: message };
+    VIEW.screen = "ledger";
+    VIEW.status = "";
+    return;
+  }
   VIEW.status = message;
 }
 
 function failRangeStart(error: keyof typeof RANGE_ERROR): void {
-  if (VIEW.workReturn === "stats") {
+  if (VIEW.workReturn === "stats" || VIEW.workReturn === "ledger") {
     failOpen(RANGE_ERROR[error]);
   } else {
     VIEW.error = error;
@@ -679,12 +690,19 @@ function failRangeStart(error: keyof typeof RANGE_ERROR): void {
   paint();
 }
 
-/** Podgląd i edycja z tabeli odbiorów: ten podwykonawca, tryb wiersza, okres raportu. */
+/** Podgląd i edycja: ten podwykonawca, tryb wiersza, okres raportu albo ewidencji. */
 function armPickupWork(el: HTMLElement): boolean {
-  const from = sheetToIsoDate(VIEW.stats.appliedFrom);
-  const to = sheetToIsoDate(VIEW.stats.appliedTo);
+  const fromLedger = VIEW.screen === "ledger";
+  const appliedFrom = fromLedger ? VIEW.ledger.appliedFrom : VIEW.stats.appliedFrom;
+  const appliedTo = fromLedger ? VIEW.ledger.appliedTo : VIEW.stats.appliedTo;
+  const from = sheetToIsoDate(appliedFrom);
+  const to = sheetToIsoDate(appliedTo);
   if (!from || !to) {
-    VIEW.stats = { ...VIEW.stats, status: "Najpierw pokaż raport." };
+    if (fromLedger) {
+      VIEW.ledger = { ...VIEW.ledger, status: "Najpierw pokaż ewidencję." };
+    } else {
+      VIEW.stats = { ...VIEW.stats, status: "Najpierw pokaż raport." };
+    }
     paint();
     return false;
   }
@@ -695,7 +713,7 @@ function armPickupWork(el: HTMLElement): boolean {
   VIEW.from = from;
   VIEW.to = to;
   VIEW.noFrom = false;
-  VIEW.workReturn = "stats";
+  VIEW.workReturn = fromLedger ? "ledger" : "stats";
   VIEW.error = "";
   VIEW.invoiceFocus = el.dataset.invoiceKnown === "1" ? (el.dataset.invoice ?? "") : null;
   VIEW.invoiceNotice = "";
@@ -807,6 +825,50 @@ function onClick(event: MouseEvent): void {
     paint();
   } else if (action === "nav") {
     goMenu(el.dataset.place ?? "");
+  } else if (action === "ledger-period") {
+    const period = el.dataset.period as StatsPeriodKind | undefined;
+    if (!period) {
+      return;
+    }
+    VIEW.ledger = { ...VIEW.ledger, period, status: "" };
+    paint();
+  } else if (action === "ledger-mode") {
+    const mode = el.dataset.mode;
+    if (mode !== "all" && mode !== "report" && mode !== "schedule") {
+      return;
+    }
+    VIEW.ledger = { ...VIEW.ledger, mode, page: 1 };
+    paint();
+  } else if (action === "ledger-show") {
+    void runLedger();
+  } else if (action === "ledger-page") {
+    const next = VIEW.ledger.page + (el.dataset.dir === "next" ? 1 : -1);
+    VIEW.ledger = { ...VIEW.ledger, page: Math.max(1, next) };
+    paint();
+  } else if (action === "ledger-menu") {
+    const column = el.dataset.col ?? "";
+    if (isInvoiceColumnKey(column)) {
+      openLedgerMenu(column);
+    }
+  } else if (action === "ledger-sort") {
+    const column = el.dataset.col ?? "";
+    const dir = el.dataset.dir === "desc" ? "desc" : "asc";
+    if (isInvoiceColumnKey(column)) {
+      applyLedgerSort(column, dir);
+    }
+  } else if (action === "ledger-clear") {
+    const column = el.dataset.col ?? "";
+    if (isInvoiceColumnKey(column)) {
+      clearLedgerColumn(column);
+    }
+  } else if (action === "ledger-clear-all") {
+    VIEW.ledger = { ...VIEW.ledger, page: 1, table: emptyLedgerTable() };
+    paint();
+  } else if (action === "ledger-ok") {
+    applyLedgerFilter();
+  } else if (action === "ledger-cancel") {
+    closeLedgerMenu();
+    paint();
   } else if (action === "stats-period") {
     const period = el.dataset.period as StatsPeriodKind | undefined;
     if (!period) {
@@ -1028,6 +1090,15 @@ function onInput(event: Event): void {
     setInvoiceQuery(el.value);
     return;
   }
+  if (el.dataset.keep === "ledger-query") {
+    setLedgerQuery(el.value);
+    return;
+  }
+  if (el.dataset.keep === "ledger-number") {
+    VIEW.ledger = { ...VIEW.ledger, invoiceQuery: el.value, page: 1 };
+    paint("ledger-number");
+    return;
+  }
   if (
     el.dataset.edit === "invoice-bags" ||
     el.dataset.edit === "invoice-pickup" ||
@@ -1121,6 +1192,10 @@ function onChange(event: Event): void {
     applyStatsField(el.dataset.stats, el.value);
     return;
   }
+  if (el instanceof HTMLSelectElement && el.dataset.ledger) {
+    applyLedgerField(el.dataset.ledger, el.value);
+    return;
+  }
   if (!(el instanceof HTMLInputElement)) {
     return;
   }
@@ -1140,8 +1215,20 @@ function onChange(event: Event): void {
     setInvoiceDraftValue(el.dataset.invoiceValue, el.checked);
     return;
   }
+  if (el.dataset.ledgerAll === "1") {
+    setLedgerDraftVisible(el.checked);
+    return;
+  }
+  if (el.dataset.ledgerValue !== undefined) {
+    setLedgerDraftValue(el.dataset.ledgerValue, el.checked);
+    return;
+  }
   if (el.dataset.stats === "from" || el.dataset.stats === "to") {
     applyStatsField(el.dataset.stats, el.value);
+    return;
+  }
+  if (el.dataset.ledger === "from" || el.dataset.ledger === "to") {
+    applyLedgerField(el.dataset.ledger, el.value);
     return;
   }
   if (el.dataset.toggle === "checked-all") {
@@ -1781,11 +1868,12 @@ function syncInvoiceComment(): void {
 }
 
 function onKeyDown(event: KeyboardEvent): void {
-  if (VIEW.stats.pickups.menu || VIEW.stats.invoices.menu) {
+  if (VIEW.stats.pickups.menu || VIEW.stats.invoices.menu || VIEW.ledger.table.menu) {
     if (event.key === "Escape") {
       event.preventDefault();
       closePickupMenu();
       closeInvoiceMenu();
+      closeLedgerMenu();
       paint();
       return;
     }
@@ -1798,6 +1886,11 @@ function onKeyDown(event: KeyboardEvent): void {
     if (event.key === "Enter" && field instanceof HTMLInputElement && field.dataset.keep === "invoice-query") {
       event.preventDefault();
       applyInvoiceFilter();
+      return;
+    }
+    if (event.key === "Enter" && field instanceof HTMLInputElement && field.dataset.keep === "ledger-query") {
+      event.preventDefault();
+      applyLedgerFilter();
       return;
     }
   }
@@ -2545,10 +2638,14 @@ async function runApprove(): Promise<void> {
   }
 }
 
-/** Zakres, Zestawienie albo Statystyki. Nie czyta arkusza i nie kasuje zestawienia. */
+/** Zakres, Zestawienie, Statystyki albo Ewidencja. Nie czyta arkusza i nie kasuje zestawienia. */
 function goMenu(place: string): void {
   if (place === "stats") {
     openStats();
+    return;
+  }
+  if (place === "ledger") {
+    openLedger();
     return;
   }
   if (place === "statement") {
@@ -2562,6 +2659,27 @@ function goMenu(place: string): void {
   VIEW.loading = false;
   VIEW.ratesOpen = false;
   paint();
+}
+
+function openLedger(): void {
+  VIEW.ratesOpen = false;
+  VIEW.status = "";
+  if (VIEW.ledger.invoices !== null) {
+    VIEW.screen = screenAfterOpenLedger();
+    paint();
+    return;
+  }
+  const today = todayCalendar();
+  VIEW.ledger = {
+    ...emptyLedger(today),
+    contractors: VIEW.contractors,
+    contractor: VIEW.contractor,
+    invoiceQuery: VIEW.ledger.invoiceQuery,
+    mode: VIEW.ledger.mode,
+  };
+  VIEW.screen = screenAfterOpenLedger();
+  paint();
+  void runLedger();
 }
 
 function openStats(): void {
@@ -2583,6 +2701,23 @@ function openStats(): void {
   VIEW.screen = screenAfterOpenStats();
   paint();
   void runStats();
+}
+
+function applyLedgerField(field: string, value: string): void {
+  if (field === "month") {
+    VIEW.ledger = { ...VIEW.ledger, month: value };
+  } else if (field === "quarter") {
+    VIEW.ledger = { ...VIEW.ledger, quarter: value };
+  } else if (field === "from") {
+    VIEW.ledger = { ...VIEW.ledger, from: value };
+  } else if (field === "to") {
+    VIEW.ledger = { ...VIEW.ledger, to: value };
+  } else if (field === "contractor") {
+    VIEW.ledger = { ...VIEW.ledger, contractor: value };
+  } else {
+    return;
+  }
+  paint();
 }
 
 function applyStatsField(field: string, value: string): void {
@@ -2638,7 +2773,11 @@ function toggleStatsTable(id: string): void {
 }
 
 function onCaptureScroll(event: Event): void {
-  if (painting || scrollRestoreGen !== 0 || (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu)) {
+  if (
+    painting ||
+    scrollRestoreGen !== 0 ||
+    (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu && !VIEW.ledger.table.menu)
+  ) {
     return;
   }
   const target = event.target;
@@ -2647,6 +2786,7 @@ function onCaptureScroll(event: Event): void {
   }
   closePickupMenu();
   closeInvoiceMenu();
+  closeLedgerMenu();
   paint();
 }
 
@@ -2656,7 +2796,7 @@ function placePickupMenu(): void {
     return;
   }
   const btn = document.querySelector(
-    '[data-action="pickup-menu"][aria-expanded="true"], [data-action="invoice-menu"][aria-expanded="true"]',
+    '[data-action="pickup-menu"][aria-expanded="true"], [data-action="invoice-menu"][aria-expanded="true"], [data-action="ledger-menu"][aria-expanded="true"]',
   );
   if (!(btn instanceof HTMLElement)) {
     return;
@@ -2680,25 +2820,27 @@ function placePickupMenu(): void {
   menu.style.left = `${left}px`;
   menu.style.top = `${top}px`;
   menu.style.visibility = "visible";
-  const all = menu.querySelector("[data-pickup-all], [data-invoice-all]");
+  const all = menu.querySelector("[data-pickup-all], [data-invoice-all], [data-ledger-all]");
   if (all instanceof HTMLInputElement && all.dataset.mixed === "1") {
     all.indeterminate = true;
   }
 }
 
 function dismissPickupMenuOnOutside(target: Element): void {
-  if (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu) {
+  if (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu && !VIEW.ledger.table.menu) {
     return;
   }
   if (
     target.closest("[data-xl-menu]") ||
     target.closest("[data-action='pickup-menu']") ||
-    target.closest("[data-action='invoice-menu']")
+    target.closest("[data-action='invoice-menu']") ||
+    target.closest("[data-action='ledger-menu']")
   ) {
     return;
   }
   closePickupMenu();
   closeInvoiceMenu();
+  closeLedgerMenu();
   paint();
 }
 
@@ -2912,6 +3054,134 @@ function closeInvoiceMenu(): void {
   VIEW.stats = { ...VIEW.stats, invoices: { ...VIEW.stats.invoices, menu: null } };
 }
 
+function ledgerSource() {
+  return filterLedgerInvoices(VIEW.ledger.invoices ?? [], VIEW.ledger.invoiceQuery, VIEW.ledger.mode);
+}
+
+function ledgerChoices(column: InvoiceColumnKey): string[] {
+  return invoiceColumnChoices(ledgerSource(), VIEW.ledger.table.filters, column).filter((text) => {
+    const menu = VIEW.ledger.table.menu;
+    return menu ? pickupQueryHits(text, menu.query) : true;
+  });
+}
+
+function openLedgerMenu(column: InvoiceColumnKey): void {
+  if (!VIEW.ledger.invoices) {
+    return;
+  }
+  const current = VIEW.ledger.table;
+  if (current.menu?.column === column) {
+    closeLedgerMenu();
+    paint();
+    return;
+  }
+  const choices = invoiceColumnChoices(ledgerSource(), current.filters, column);
+  const saved = current.filters[column];
+  VIEW.ledger = {
+    ...VIEW.ledger,
+    table: {
+      ...current,
+      menu: { column, draft: saved ? [...saved] : [...choices], query: "" },
+    },
+  };
+  paint();
+}
+
+function applyLedgerSort(column: InvoiceColumnKey, dir: "asc" | "desc"): void {
+  VIEW.ledger = {
+    ...VIEW.ledger,
+    page: 1,
+    table: { ...VIEW.ledger.table, sortKey: column, sortDir: dir, menu: null },
+  };
+  paint();
+}
+
+function clearLedgerColumn(column: InvoiceColumnKey): void {
+  const filters = { ...VIEW.ledger.table.filters };
+  delete filters[column];
+  VIEW.ledger = {
+    ...VIEW.ledger,
+    page: 1,
+    table: { ...VIEW.ledger.table, filters, menu: null },
+  };
+  paint();
+}
+
+function applyLedgerFilter(): void {
+  const menu = VIEW.ledger.table.menu;
+  if (!menu || !VIEW.ledger.invoices) {
+    return;
+  }
+  const choices = invoiceColumnChoices(ledgerSource(), VIEW.ledger.table.filters, menu.column);
+  const filters = invoiceFiltersAfterApply(VIEW.ledger.table.filters, menu.column, choices, menu.draft);
+  VIEW.ledger = {
+    ...VIEW.ledger,
+    page: 1,
+    table: { ...VIEW.ledger.table, filters, menu: null },
+  };
+  paint();
+}
+
+function closeLedgerMenu(): void {
+  if (!VIEW.ledger.table.menu) {
+    return;
+  }
+  VIEW.ledger = { ...VIEW.ledger, table: { ...VIEW.ledger.table, menu: null } };
+}
+
+function setLedgerQuery(value: string): void {
+  const menu = VIEW.ledger.table.menu;
+  if (!menu || menu.query === value) {
+    return;
+  }
+  VIEW.ledger = {
+    ...VIEW.ledger,
+    table: { ...VIEW.ledger.table, menu: { ...menu, query: value } },
+  };
+  paint("ledger-query");
+}
+
+function ledgerDraftKeep(): string | undefined {
+  const active = document.activeElement;
+  if (active instanceof HTMLInputElement && active.dataset.keep === "ledger-query") {
+    return "ledger-query";
+  }
+  return undefined;
+}
+
+function setLedgerDraftValue(value: string, on: boolean): void {
+  const menu = VIEW.ledger.table.menu;
+  if (!menu) {
+    return;
+  }
+  const draft = on
+    ? menu.draft.includes(value)
+      ? menu.draft
+      : [...menu.draft, value]
+    : menu.draft.filter((item) => item !== value);
+  VIEW.ledger = {
+    ...VIEW.ledger,
+    table: { ...VIEW.ledger.table, menu: { ...menu, draft } },
+  };
+  paint(ledgerDraftKeep());
+}
+
+function setLedgerDraftVisible(on: boolean): void {
+  const menu = VIEW.ledger.table.menu;
+  if (!menu || !VIEW.ledger.invoices) {
+    return;
+  }
+  const visible = ledgerChoices(menu.column);
+  VIEW.ledger = {
+    ...VIEW.ledger,
+    table: {
+      ...VIEW.ledger.table,
+      menu: { ...menu, draft: pickupDraftAfterVisible(menu.draft, visible, on) },
+    },
+  };
+  paint(ledgerDraftKeep());
+}
+
 function setInvoiceQuery(value: string): void {
   const menu = VIEW.stats.invoices.menu;
   if (!menu || menu.query === value) {
@@ -3097,6 +3367,105 @@ async function runStats(): Promise<void> {
       "page.ts runStats",
       "Odczyt statystyk nie doszedł.",
       "Wykresy zostają puste albo przy poprzednim odczycie. Możesz zmienić okres i spróbować jeszcze raz.",
+      { technical: err },
+    );
+  } finally {
+    VIEW.loading = false;
+    paint();
+  }
+}
+
+async function runLedger(): Promise<void> {
+  if (webapp === "") {
+    VIEW.ledger = { ...VIEW.ledger, status: "Brak adresu Web App. Dopisz ?webapp= do adresu tej strony." };
+    reportMissingWebApp("page.ts runLedger");
+    paint();
+    return;
+  }
+  const today = todayCalendar();
+  const range = resolveStatsPeriod(VIEW.ledger.period, today, {
+    month: VIEW.ledger.month,
+    quarter: VIEW.ledger.quarter,
+    from: VIEW.ledger.from,
+    to: VIEW.ledger.to,
+  });
+  if (!range) {
+    const status =
+      VIEW.ledger.period === "exact"
+        ? "Podaj poprawny zakres od–do (data początkowa nie później niż końcowa)."
+        : VIEW.ledger.period === "prevQuarter"
+          ? "Wybierz kwartał z listy."
+          : "Wybierz miesiąc z listy.";
+    VIEW.ledger = { ...VIEW.ledger, status };
+    paint();
+    return;
+  }
+  VIEW.loading = true;
+  VIEW.loadKind = "logo";
+  VIEW.loadMessage = "Ładuję ewidencję…";
+  VIEW.ledger = { ...VIEW.ledger, status: "" };
+  paint();
+  try {
+    const response = await fetch(
+      webAppUrl(
+        webapp,
+        statsParams({
+          dataOd: range.from,
+          dataDo: range.to,
+          podwykonawca: VIEW.ledger.contractor,
+        }),
+      ),
+    );
+    const loaded = await readRozJson(response);
+    if (!loaded.ok) {
+      if (!loaded.silent) {
+        VIEW.ledger = { ...VIEW.ledger, status: "Odczyt ewidencji nie doszedł." };
+        reportFailure(
+          "ROZ-E-LEDGER",
+          "page.ts runLedger",
+          "Odczyt ewidencji nie doszedł.",
+          "Lista zostaje pusta albo przy poprzednim odczycie. Możesz zmienić okres i spróbować jeszcze raz.",
+          loaded,
+        );
+      }
+      return;
+    }
+    const parsed = readSettlementStats(loaded.body);
+    if (!parsed.ok) {
+      VIEW.ledger = { ...VIEW.ledger, status: parsed.error };
+      reportFailure(
+        "ROZ-E-LEDGER",
+        "page.ts runLedger",
+        "Odczyt ewidencji nie doszedł.",
+        "Lista zostaje pusta albo przy poprzednim odczycie. Możesz zmienić okres i spróbować jeszcze raz.",
+        { technical: parsed.error },
+      );
+      return;
+    }
+    const invoices = listPeriodInvoices([...parsed.rows, ...(parsed.scheduleRows ?? [])], {
+      range,
+      contractor: VIEW.ledger.contractor || undefined,
+    });
+    VIEW.ledger = {
+      ...VIEW.ledger,
+      appliedFrom: range.from,
+      appliedTo: range.to,
+      appliedKind: VIEW.ledger.period,
+      appliedMonth: VIEW.ledger.month,
+      appliedQuarter: VIEW.ledger.quarter,
+      appliedContractor: VIEW.ledger.contractor,
+      invoices,
+      status: "",
+      page: 1,
+      table: emptyLedgerTable(),
+    };
+  } catch (err) {
+    VIEW.ledger = { ...VIEW.ledger, status: "Odczyt ewidencji nie doszedł." };
+    reportFailure(
+      "ROZ-E-LEDGER",
+      "page.ts runLedger",
+      "Odczyt ewidencji nie doszedł.",
+      "Lista zostaje pusta albo przy poprzednim odczycie. Możesz zmienić okres i spróbować jeszcze raz.",
       { technical: err },
     );
   } finally {

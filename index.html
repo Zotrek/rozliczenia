@@ -1620,9 +1620,19 @@ function screenAfterInvoices() {
 function screenAfterChangeRange() {
     return "range";
 }
-/** Powrót z podglądu albo zestawienia. Ze statystyk wraca do raportu. */
+/** Powrót z podglądu albo zestawienia. Ze statystyk wraca do raportu, z ewidencji do listy. */
 function screenAfterWorkBack(workReturn) {
-    return workReturn === "stats" ? "stats" : screenAfterChangeRange();
+    if (workReturn === "stats") {
+        return "stats";
+    }
+    if (workReturn === "ledger") {
+        return "ledger";
+    }
+    return screenAfterChangeRange();
+}
+/** Zakres, zestawienie albo statystyki → ewidencja faktur. */
+function screenAfterOpenLedger() {
+    return "ledger";
 }
 /** Po udanym Zatwierdź wraca na Zakres. Zestawienie w pamięci zostaje. */
 function screenAfterApprove() {
@@ -2858,6 +2868,16 @@ function readSettlementStats(body) {
         }
         rows.push(row);
     }
+    const scheduleRows = [];
+    if (Array.isArray(body.scheduleRows)) {
+        for (const item of body.scheduleRows) {
+            const row = readStatsRow(item);
+            if (!row) {
+                return { ok: false, error: "Odczyt statystyk nie doszedł." };
+            }
+            scheduleRows.push(row);
+        }
+    }
     const rates = [];
     for (const item of body.rates) {
         const rate = readRateRow(item);
@@ -2866,7 +2886,7 @@ function readSettlementStats(body) {
         }
         rates.push(rate);
     }
-    return { ok: true, rows, rates };
+    return { ok: true, rows, rates, scheduleRows };
 }
 function findRow(rows, sheetRow, transportNumber, sheetName = "") {
     return (rows.find((row) => row.sheetRow === sheetRow &&
@@ -3430,6 +3450,7 @@ function readStatsRow(value) {
         }
         invoice = text.trim();
     }
+    const approvedRaw = typeof value.approvedDate === "string" ? value.approvedDate.trim() : "";
     return {
         ...base,
         settled: value.settled,
@@ -3438,6 +3459,7 @@ function readStatsRow(value) {
         costPerBag,
         invoice,
         mode: value.mode === "schedule" ? "schedule" : value.mode === "report" ? "report" : undefined,
+        approvedDate: hasSheetDateShape(approvedRaw) ? approvedRaw : "",
     };
 }
 function readRateRow(value) {
@@ -4628,6 +4650,7 @@ function listPeriodInvoices(rows, filters) {
             amount: 0,
             amountAny: false,
             pickupDate: row.pickupDate,
+            approvedDate: "",
         };
         if (row.bagCount != null) {
             group.bags += row.bagCount;
@@ -4640,6 +4663,7 @@ function listPeriodInvoices(rows, filters) {
         if (compareSheetDate(row.pickupDate, group.pickupDate) > 0) {
             group.pickupDate = row.pickupDate;
         }
+        group.approvedDate = earlierApprovedDate(group.approvedDate, row.approvedDate ?? "");
         groups.set(key, group);
     }
     return [...groups.values()]
@@ -4650,6 +4674,7 @@ function listPeriodInvoices(rows, filters) {
         bagCount: group.bagAny ? group.bags : null,
         amount: group.amountAny ? group.amount : null,
         pickupDate: group.pickupDate,
+        approvedDate: group.approvedDate,
     }))
         .sort((a, b) => {
         const byDate = compareSheetDate(b.pickupDate, a.pickupDate);
@@ -4672,6 +4697,16 @@ function listPeriodInvoices(rows, filters) {
 }
 function invoiceGroupKey(row, invoice) {
     return `${rowMode(row)}\n${row.contractor}\n${invoice}`;
+}
+/** Najwcześniejsza poprawna data. Pusta albo zła nie przesuwa już zapisanej. */
+function earlierApprovedDate(current, next) {
+    if (!hasSheetDateShape(next)) {
+        return current;
+    }
+    if (!hasSheetDateShape(current)) {
+        return next;
+    }
+    return compareSheetDate(next, current) < 0 ? next : current;
 }
 function aggregateTimeSeries(rows, filters, rules) {
     const granularity = timeBucketGranularity(filters.range);
@@ -5052,6 +5087,21 @@ function chartShouldStack(series) {
 }
 
 
+/** Numer (fragment) i sposób odbioru. Zakres dat i podwykonawca są już w odczycie. */
+function filterLedgerInvoices(rows, query, mode) {
+    const needle = foldPl(query);
+    return rows.filter((row) => {
+        if (mode !== "all" && row.mode !== mode) {
+            return false;
+        }
+        if (needle === "") {
+            return true;
+        }
+        return foldPl(row.invoice).includes(needle);
+    });
+}
+
+
 
 
 
@@ -5067,7 +5117,7 @@ const PICKUP_COLUMNS = [
     { key: "invoiceNumber", label: "Numer faktury", numeric: false },
     { key: "invoice", label: "Wartość faktury", numeric: true },
 ];
-const INVOICE_COLUMN_KEYS = ["name", "contractor", "mode", "date", "bags", "amount"];
+const INVOICE_COLUMN_KEYS = ["name", "contractor", "mode", "date", "bags", "amount", "approved"];
 const INVOICE_COLUMNS = [
     { key: "name", label: "Nazwa", numeric: false },
     { key: "contractor", label: "Podwykonawca", numeric: false },
@@ -5082,6 +5132,10 @@ function emptyPickupTable() {
 }
 function emptyInvoiceTable() {
     return { sortKey: null, sortDir: "asc", filters: {}, menu: null };
+}
+/** Ewidencja: od najnowszej daty zatwierdzenia. Puste daty zostają na końcu. */
+function emptyLedgerTable() {
+    return { sortKey: "approved", sortDir: "desc", filters: {}, menu: null };
 }
 function isPickupColumnKey(value) {
     return PICKUP_COLUMN_KEYS.includes(value);
@@ -5151,6 +5205,9 @@ function invoiceCellText(row, key) {
     }
     if (key === "date") {
         return row.pickupDate;
+    }
+    if (key === "approved") {
+        return hasSheetDateShape(row.approvedDate) ? row.approvedDate : "—";
     }
     if (key === "bags") {
         return row.bagCount === null ? "—" : String(row.bagCount);
@@ -5272,6 +5329,9 @@ function isBlankInvoice(row, key) {
     if (key === "name") {
         return row.invoice.trim() === "";
     }
+    if (key === "approved") {
+        return !hasSheetDateShape(row.approvedDate);
+    }
     return false;
 }
 function comparePlText(a, b) {
@@ -5292,6 +5352,9 @@ function comparePickups(a, b, key) {
 function compareInvoices(a, b, key) {
     if (key === "date") {
         return compareSheetDate(a.pickupDate, b.pickupDate);
+    }
+    if (key === "approved") {
+        return compareSheetDate(a.approvedDate, b.approvedDate);
     }
     if (key === "bags") {
         return (a.bagCount ?? 0) - (b.bagCount ?? 0);
@@ -5320,7 +5383,7 @@ function sortPhrase(key, dir) {
     return sortPhraseKind("text", dir);
 }
 function invoiceSortPhrase(key, dir) {
-    if (key === "date") {
+    if (key === "date" || key === "approved") {
         return sortPhraseKind("date", dir);
     }
     if (key === "bags" || key === "amount") {
@@ -5939,9 +6002,252 @@ function columnBar(columns, state, action, phrase) {
         `<span>${escapeHtml(bits.join(" · "))}</span>` +
         `<button type="button" data-action="${action}-clear-all">Wyczyść</button></div>`);
 }
+function renderLedgerColumnMenu(args) {
+    return xlColumnMenu({
+        action: "ledger",
+        column: args.column,
+        label: args.label,
+        sortAscLabel: invoiceSortPhrase(args.column, "asc"),
+        sortDescLabel: invoiceSortPhrase(args.column, "desc"),
+        sortDir: args.sortDir,
+        hasFilter: args.hasFilter,
+        query: args.query,
+        visible: args.visible,
+        picked: args.picked,
+    });
+}
 function emptyRow(cols, message = "Brak danych w tym okresie.") {
     return `<tr><td colspan="${cols}" class="note" style="border:none;background:transparent">${escapeHtml(message)}</td></tr>`;
 }
+
+
+
+
+
+
+
+const LEDGER_PAGE_SIZE = 20;
+const LEDGER_COLUMNS = [
+    { key: "name", label: "Numer", numeric: false },
+    { key: "contractor", label: "Podwykonawca", numeric: false },
+    { key: "mode", label: "Sposób odbioru", numeric: false },
+    { key: "approved", label: "Data zatwierdzenia", numeric: false },
+    { key: "date", label: "Data odbioru", numeric: false },
+    { key: "bags", label: "Worki", numeric: true },
+    { key: "amount", label: "Kwota", numeric: true },
+];
+function defaultLedgerView(today, over = {}) {
+    const months = previousMonthOptions(today);
+    const month = months[0]?.value ?? `${today.year}-${String(today.month).padStart(2, "0")}`;
+    const quarters = previousQuarterOptions(today);
+    const quarter = quarters[0]?.value ?? `${today.year}-Q1`;
+    return {
+        period: "current",
+        month,
+        quarter,
+        from: "",
+        to: "",
+        contractor: "",
+        contractors: [],
+        months,
+        quarters,
+        invoiceQuery: "",
+        mode: "all",
+        appliedFrom: "",
+        appliedTo: "",
+        appliedKind: "current",
+        appliedMonth: month,
+        appliedQuarter: quarter,
+        appliedContractor: "",
+        invoices: null,
+        status: "",
+        page: 1,
+        table: emptyLedgerTable(),
+        ...over,
+    };
+}
+function renderLedgerScreen(model) {
+    return ('<div class="stats" data-screen="ledger">' +
+        ledgerFilters(model) +
+        ledgerBody(model) +
+        "</div>");
+}
+function ledgerFilters(model) {
+    const chips = [
+        { id: "current", label: "Bieżący miesiąc" },
+        { id: "prev", label: "Poprzednie miesiące" },
+        { id: "quarter", label: "Bieżący kwartał" },
+        { id: "prevQuarter", label: "Poprzednie kwartały" },
+        { id: "exact", label: "Dokładny zakres" },
+    ];
+    const chipHtml = chips
+        .map((chip) => `<button type="button" class="chip${model.period === chip.id ? " is-on" : ""}" ` +
+        `data-action="ledger-period" data-period="${chip.id}">${chip.label}</button>`)
+        .join("");
+    const modes = [
+        { id: "all", label: "Wszystkie" },
+        { id: "report", label: "Na zgłoszenie" },
+        { id: "schedule", label: "Harmonogram" },
+    ];
+    const modeHtml = modes
+        .map((chip) => `<button type="button" class="chip${model.mode === chip.id ? " is-on" : ""}" ` +
+        `data-action="ledger-mode" data-mode="${chip.id}">${chip.label}</button>`)
+        .join("");
+    const monthOpts = model.months
+        .map((m) => `<option value="${escapeHtml(m.value)}"${m.value === model.month ? " selected" : ""}>` +
+        `${escapeHtml(m.label)}</option>`)
+        .join("");
+    const quarterOpts = model.quarters
+        .map((q) => `<option value="${escapeHtml(q.value)}"${q.value === model.quarter ? " selected" : ""}>` +
+        `${escapeHtml(q.label)}</option>`)
+        .join("");
+    const whoOpts = '<option value="">Wszyscy</option>' +
+        model.contractors
+            .map((c) => {
+            const name = c.nazwa.trim();
+            if (name === "") {
+                return "";
+            }
+            return (`<option value="${escapeHtml(name)}"${name === model.contractor ? " selected" : ""}>` +
+                `${escapeHtml(name)}</option>`);
+        })
+            .join("");
+    return ('<div class="filters">' +
+        '<div class="field" style="flex: 1 1 100%;"><span>Okres odbioru</span>' +
+        `<div class="period-chips" role="group" aria-label="Okres">${chipHtml}</div></div>` +
+        `<div class="field month-pick${model.period === "prev" ? " is-on" : ""}">` +
+        '<label for="ledger-month">Miesiąc</label>' +
+        `<select id="ledger-month" data-ledger="month">${monthOpts}</select></div>` +
+        `<div class="field quarter-pick${model.period === "prevQuarter" ? " is-on" : ""}">` +
+        '<label for="ledger-quarter">Kwartał</label>' +
+        `<select id="ledger-quarter" data-ledger="quarter">${quarterOpts}</select></div>` +
+        `<div class="exact-range${model.period === "exact" ? " is-on" : ""}">` +
+        '<div class="field"><label for="ledger-from">Od</label>' +
+        `<input id="ledger-from" type="date" data-ledger="from" value="${escapeHtml(model.from)}"></div>` +
+        '<div class="field"><label for="ledger-to">Do</label>' +
+        `<input id="ledger-to" type="date" data-ledger="to" value="${escapeHtml(model.to)}"></div></div>` +
+        '<div class="field"><label for="ledger-who">Podwykonawca</label>' +
+        `<select id="ledger-who" data-ledger="contractor">${whoOpts}</select></div>` +
+        '<div class="field"><label for="ledger-number">Numer faktury</label>' +
+        `<input id="ledger-number" type="text" data-keep="ledger-number" value="${escapeHtml(model.invoiceQuery)}" ` +
+        'placeholder="Fragment numeru" autocomplete="off"></div>' +
+        '<div class="field" style="flex: 1 1 100%;"><span>Sposób odbioru</span>' +
+        `<div class="period-chips" role="group" aria-label="Sposób odbioru">${modeHtml}</div></div>` +
+        '<button type="button" class="btn-teal" data-action="ledger-show">Pokaż</button>' +
+        "</div>");
+}
+function ledgerBody(model) {
+    const status = model.status ? `<p class="err">${escapeHtml(model.status)}</p>` : "";
+    if (!model.invoices) {
+        return (`<div class="body">${status}` +
+            '<p class="period-label">Wybierz okres i naciśnij <strong>Pokaż</strong>.</p></div>');
+    }
+    const who = model.appliedContractor === "" ? "Wszyscy" : model.appliedContractor;
+    const kindLabel = statsPeriodKindLabel(model.appliedKind, model.appliedMonth, model.appliedQuarter);
+    const periodLabel = `Odbiory: <strong>${escapeHtml(model.appliedFrom)} – ${escapeHtml(model.appliedTo)}</strong>` +
+        ` (${escapeHtml(kindLabel)}) · podwykonawca: <strong>${escapeHtml(who)}</strong>`;
+    return `<div class="body">${status}<p class="period-label">${periodLabel}</p>${ledgerTable(model)}</div>`;
+}
+function ledgerTable(model) {
+    const source = model.invoices ?? [];
+    const narrowed = filterLedgerInvoices(source, model.invoiceQuery, model.mode).slice().sort((a, b) => a.invoice.localeCompare(b.invoice, "pl", { numeric: true, sensitivity: "base" }));
+    const shown = visiblePeriodInvoices(narrowed, model.table);
+    const paged = pageSlice(shown, model.page, LEDGER_PAGE_SIZE);
+    const body = paged.slice
+        .map((row) => {
+        const bags = row.bagCount === null ? "—" : String(row.bagCount);
+        const amount = row.amount === null ? "—" : formatPln(row.amount);
+        return (`<tr><td class="shop">${escapeHtml(row.invoice)}</td>` +
+            `<td>${escapeHtml(row.contractor)}</td>` +
+            `<td>${escapeHtml(modeLabel(row.mode))}</td>` +
+            `<td>${escapeHtml(invoiceCellText(row, "approved"))}</td>` +
+            `<td>${escapeHtml(row.pickupDate)}</td>` +
+            `<td class="num">${escapeHtml(bags)}</td>` +
+            `<td class="num">${escapeHtml(amount)}</td>` +
+            `<td>${ledgerLinks(row)}</td></tr>`);
+    })
+        .join("");
+    const empty = source.length === 0 ? "Brak faktur w tym okresie." : "Brak pozycji dla tego filtra.";
+    return (ledgerBar(model.table) +
+        "<table><thead><tr>" +
+        ledgerHead(model) +
+        "<th></th>" +
+        `</tr></thead><tbody>${body || emptyRow(LEDGER_COLUMNS.length + 1, empty)}</tbody></table>` +
+        ledgerPager(paged) +
+        '<p class="note" style="margin: 10px 12px 12px;">' +
+        "Każdy wiersz to jeden numer faktury u jednego podwykonawcy i w jednym sposobie odbioru. " +
+        "Lista jest od najnowszej daty zatwierdzenia. Faktury sprzed tej daty są na końcu. " +
+        "Okres dotyczy daty odbioru, więc stare faktury bez daty zatwierdzenia też widać. " +
+        "Podgląd nic nie zapisuje. Edycja otwiera zestawienie z tym numerem. " +
+        `Po ${LEDGER_PAGE_SIZE} pozycji na stronę.</p>`);
+}
+function ledgerLinks(row) {
+    const attrs = ` data-contractor="${escapeHtml(row.contractor)}"` +
+        ` data-mode="${row.mode}"` +
+        ` data-invoice="${escapeHtml(row.invoice)}"` +
+        ' data-invoice-known="1"';
+    return ('<div class="row-links">' +
+        `<button type="button" data-action="invoice-preview"${attrs}>Podgląd</button>` +
+        `<button type="button" data-action="invoice-edit"${attrs}>Edycja</button>` +
+        "</div>");
+}
+function ledgerHead(model) {
+    return columnHead(LEDGER_COLUMNS, model.table, true, "ledger", (key) => ledgerMenu(model, key));
+}
+function ledgerMenu(model, column) {
+    const menu = model.table.menu;
+    if (!model.invoices || !menu || menu.column !== column) {
+        return "";
+    }
+    const narrowed = filterLedgerInvoices(model.invoices, model.invoiceQuery, model.mode).slice().sort((a, b) => a.invoice.localeCompare(b.invoice, "pl", { numeric: true, sensitivity: "base" }));
+    const choices = invoiceColumnChoices(narrowed, model.table.filters, column);
+    const visible = choices.filter((text) => pickupQueryHits(text, menu.query));
+    const label = LEDGER_COLUMNS.find((item) => item.key === column)?.label ?? column;
+    return renderLedgerColumnMenu({
+        column,
+        label,
+        sortDir: model.table.sortKey === column ? model.table.sortDir : null,
+        hasFilter: model.table.filters[column] != null,
+        query: menu.query,
+        visible,
+        picked: new Set(menu.draft),
+    });
+}
+function ledgerBar(state) {
+    const defaultSort = state.sortKey === "approved" && state.sortDir === "desc";
+    const shown = defaultSort ? { ...state, sortKey: null } : state;
+    return columnBar(LEDGER_COLUMNS, shown, "ledger", ledgerSortPhrase);
+}
+function ledgerSortPhrase(key, dir) {
+    if (key === "date" || key === "approved") {
+        return dir === "asc" ? "od najstarszych" : "od najnowszych";
+    }
+    if (key === "bags" || key === "amount") {
+        return dir === "asc" ? "od najmniejszych" : "od największych";
+    }
+    return dir === "asc" ? "od A do Z" : "od Z do A";
+}
+function ledgerPager(paged) {
+    if (paged.total <= LEDGER_PAGE_SIZE) {
+        return `<div class="pager" data-pager="ledger" hidden></div>`;
+    }
+    const from = (paged.page - 1) * LEDGER_PAGE_SIZE + 1;
+    const to = Math.min(paged.page * LEDGER_PAGE_SIZE, paged.total);
+    const meta = `Pozycje ${from}–${to} z ${paged.total} · po ${LEDGER_PAGE_SIZE} na stronę`;
+    return (`<div class="pager" data-pager="ledger">` +
+        `<span class="meta">${escapeHtml(meta)}</span>` +
+        '<div class="nav">' +
+        `<button type="button" data-action="ledger-page" data-dir="prev"` +
+        `${paged.page <= 1 ? " disabled" : ""}>← Poprzednia</button>` +
+        `<span class="page-label">${paged.page} / ${paged.pages}</span>` +
+        `<button type="button" data-action="ledger-page" data-dir="next"` +
+        `${paged.page >= paged.pages ? " disabled" : ""}>Następna →</button>` +
+        "</div></div>");
+}
+function emptyRow(cols, message) {
+    return `<tr><td colspan="${cols}" class="note" style="border:none;background:transparent">${escapeHtml(message)}</td></tr>`;
+}
+
 
 
 
@@ -6082,31 +6388,60 @@ function ratesButton() {
 function statsReturnButton() {
     return '<button type="button" class="btn-ghost" data-action="back">← Statystyki</button>';
 }
+function ledgerReturnButton() {
+    return '<button type="button" class="btn-ghost" data-action="back">← Ewidencja</button>';
+}
+function workBackButton(workReturn) {
+    if (workReturn === "ledger") {
+        return ledgerReturnButton();
+    }
+    if (workReturn === "stats") {
+        return statsReturnButton();
+    }
+    return "";
+}
 function menuPlaceButton(place, label, on, disabled) {
     const onClass = on ? ' class="is-on"' : "";
     const off = disabled ? " disabled" : "";
     const title = disabled ? ' title="Najpierw Szukaj na Zakresie"' : "";
     return `<button type="button"${onClass} data-action="nav" data-place="${place}"${off}${title}>${label}</button>`;
 }
-function activePlace(screen) {
-    if (screen === "statement") {
-        return "statement";
+function activePlace(model) {
+    if (model.screen === "ledger") {
+        return "ledger";
     }
-    if (screen === "stats" || screen === "invoices") {
+    if (model.screen === "statement") {
+        return model.workReturn === "ledger" ? "ledger" : "statement";
+    }
+    if (model.screen === "invoices" && model.workReturn === "ledger") {
+        return "ledger";
+    }
+    if (model.screen === "stats" || model.screen === "invoices") {
         return "stats";
     }
     return "range";
 }
-/** Pasek miejsc. Podgląd faktury świeci Statystyki. Zestawienie czeka na Szukaj. */
+function menuSubtitle(model) {
+    if (model.screen === "stats") {
+        return "Statystyki";
+    }
+    if (model.screen === "ledger" ||
+        ((model.screen === "invoices" || model.screen === "statement") && model.workReturn === "ledger")) {
+        return "Ewidencja faktur";
+    }
+    return modeLabel(model.mode);
+}
+/** Pasek miejsc. Podgląd ze statystyk świeci Statystyki, z ewidencji — Ewidencję. */
 function menuBar(model) {
-    const place = activePlace(model.screen);
-    const subtitle = model.screen === "stats" ? "Statystyki" : modeLabel(model.mode);
+    const place = activePlace(model);
+    const subtitle = menuSubtitle(model);
     return ('<header class="menu">' +
         brand(subtitle) +
         '<nav class="menu-nav" aria-label="Miejsca">' +
         menuPlaceButton("range", "Zakres", place === "range", false) +
         menuPlaceButton("statement", "Zestawienie", place === "statement", !model.searched) +
         menuPlaceButton("stats", "Statystyki", place === "stats", false) +
+        menuPlaceButton("ledger", "Ewidencja", place === "ledger", false) +
         "</nav>" +
         `<div class="menu-side">${ratesButton()}</div>` +
         "</header>");
@@ -6139,7 +6474,7 @@ function renderRangeScreen(model) {
 }
 function renderStatementScreen(model) {
     const label = model.applied ? rangeLabel(model.applied) : "";
-    const back = model.workReturn === "stats" ? statsReturnButton() : "";
+    const back = workBackButton(model.workReturn);
     return ('<div class="statement" data-screen="statement"><div class="top">' +
         `<div class="range"><span>${escapeHtml(modeLabel(model.mode))}</span><strong>${escapeHtml(label)}</strong></div>` +
         back +
@@ -6149,7 +6484,7 @@ function renderStatementScreen(model) {
         "</div>");
 }
 function focusedInvoiceBlock(model) {
-    if (model.workReturn !== "stats" || model.invoiceFocus === null) {
+    if ((model.workReturn !== "stats" && model.workReturn !== "ledger") || model.invoiceFocus === null) {
         return "";
     }
     return ('<div class="focused-invoice">' +
@@ -6162,7 +6497,7 @@ function renderInvoicesScreen(model) {
     const status = model.status ? `<p class="err status-block">${escapeHtml(model.status)}</p>` : "";
     return ('<div class="statement" data-screen="invoices"><div class="top">' +
         invoiceHeading(model.invoiceFocus, label) +
-        statsReturnButton() +
+        (model.workReturn === "ledger" ? ledgerReturnButton() : statsReturnButton()) +
         "</div>" +
         status +
         renderInvoiceList(model.invoices, model.invoiceFocus, model.invoiceComment ?? emptyInvoiceComment()) +
@@ -6221,7 +6556,9 @@ function renderApp(model) {
             ? renderInvoicesScreen(model)
             : model.screen === "stats"
                 ? renderStatsScreen(model.stats)
-                : renderRangeScreen(model);
+                : model.screen === "ledger"
+                    ? renderLedgerScreen(model.ledger)
+                    : renderRangeScreen(model);
     const dialog = model.ratesOpen ? renderRatesDialog(model) : "";
     const loading = model.loading ? renderLoading(model.loadMessage, model.loadKind === "unicorn") : "";
     return menuBar(model) + `<div class="app-body">${main}</div>` + dialog + loading;
@@ -6229,6 +6566,9 @@ function renderApp(model) {
 /** Domyślny stan stats w modelu aplikacji (zegar = dziś lokalnie). */
 function emptyStats(today) {
     return defaultStatsView(today);
+}
+function emptyLedger(today) {
+    return defaultLedgerView(today);
 }
 
 /**
@@ -6429,6 +6769,7 @@ host.showRozErrorCard = showRozErrorCard;
 
 
 
+
 const STATS_SECTION_IDS = ["pickups", "bags", "costs", "q", "contractors", "empty-bags", "gaps"];
 function todayCalendar() {
     const now = new Date();
@@ -6477,6 +6818,7 @@ const VIEW = {
     ratesMessage: "",
     ratesMessageOk: false,
     stats: emptyStats(todayAtBoot),
+    ledger: emptyLedger(todayAtBoot),
 };
 let heldFrom = "";
 let webapp = "";
@@ -6872,10 +7214,16 @@ function failOpen(message) {
         VIEW.status = "";
         return;
     }
+    if (VIEW.workReturn === "ledger") {
+        VIEW.ledger = { ...VIEW.ledger, status: message };
+        VIEW.screen = "ledger";
+        VIEW.status = "";
+        return;
+    }
     VIEW.status = message;
 }
 function failRangeStart(error) {
-    if (VIEW.workReturn === "stats") {
+    if (VIEW.workReturn === "stats" || VIEW.workReturn === "ledger") {
         failOpen(RANGE_ERROR[error]);
     }
     else {
@@ -6885,12 +7233,20 @@ function failRangeStart(error) {
     VIEW.contractorOpen = false;
     paint();
 }
-/** Podgląd i edycja z tabeli odbiorów: ten podwykonawca, tryb wiersza, okres raportu. */
+/** Podgląd i edycja: ten podwykonawca, tryb wiersza, okres raportu albo ewidencji. */
 function armPickupWork(el) {
-    const from = sheetToIsoDate(VIEW.stats.appliedFrom);
-    const to = sheetToIsoDate(VIEW.stats.appliedTo);
+    const fromLedger = VIEW.screen === "ledger";
+    const appliedFrom = fromLedger ? VIEW.ledger.appliedFrom : VIEW.stats.appliedFrom;
+    const appliedTo = fromLedger ? VIEW.ledger.appliedTo : VIEW.stats.appliedTo;
+    const from = sheetToIsoDate(appliedFrom);
+    const to = sheetToIsoDate(appliedTo);
     if (!from || !to) {
-        VIEW.stats = { ...VIEW.stats, status: "Najpierw pokaż raport." };
+        if (fromLedger) {
+            VIEW.ledger = { ...VIEW.ledger, status: "Najpierw pokaż ewidencję." };
+        }
+        else {
+            VIEW.stats = { ...VIEW.stats, status: "Najpierw pokaż raport." };
+        }
         paint();
         return false;
     }
@@ -6901,7 +7257,7 @@ function armPickupWork(el) {
     VIEW.from = from;
     VIEW.to = to;
     VIEW.noFrom = false;
-    VIEW.workReturn = "stats";
+    VIEW.workReturn = fromLedger ? "ledger" : "stats";
     VIEW.error = "";
     VIEW.invoiceFocus = el.dataset.invoiceKnown === "1" ? (el.dataset.invoice ?? "") : null;
     VIEW.invoiceNotice = "";
@@ -7000,6 +7356,60 @@ function onClick(event) {
     }
     else if (action === "nav") {
         goMenu(el.dataset.place ?? "");
+    }
+    else if (action === "ledger-period") {
+        const period = el.dataset.period;
+        if (!period) {
+            return;
+        }
+        VIEW.ledger = { ...VIEW.ledger, period, status: "" };
+        paint();
+    }
+    else if (action === "ledger-mode") {
+        const mode = el.dataset.mode;
+        if (mode !== "all" && mode !== "report" && mode !== "schedule") {
+            return;
+        }
+        VIEW.ledger = { ...VIEW.ledger, mode, page: 1 };
+        paint();
+    }
+    else if (action === "ledger-show") {
+        void runLedger();
+    }
+    else if (action === "ledger-page") {
+        const next = VIEW.ledger.page + (el.dataset.dir === "next" ? 1 : -1);
+        VIEW.ledger = { ...VIEW.ledger, page: Math.max(1, next) };
+        paint();
+    }
+    else if (action === "ledger-menu") {
+        const column = el.dataset.col ?? "";
+        if (isInvoiceColumnKey(column)) {
+            openLedgerMenu(column);
+        }
+    }
+    else if (action === "ledger-sort") {
+        const column = el.dataset.col ?? "";
+        const dir = el.dataset.dir === "desc" ? "desc" : "asc";
+        if (isInvoiceColumnKey(column)) {
+            applyLedgerSort(column, dir);
+        }
+    }
+    else if (action === "ledger-clear") {
+        const column = el.dataset.col ?? "";
+        if (isInvoiceColumnKey(column)) {
+            clearLedgerColumn(column);
+        }
+    }
+    else if (action === "ledger-clear-all") {
+        VIEW.ledger = { ...VIEW.ledger, page: 1, table: emptyLedgerTable() };
+        paint();
+    }
+    else if (action === "ledger-ok") {
+        applyLedgerFilter();
+    }
+    else if (action === "ledger-cancel") {
+        closeLedgerMenu();
+        paint();
     }
     else if (action === "stats-period") {
         const period = el.dataset.period;
@@ -7233,6 +7643,15 @@ function onInput(event) {
         setInvoiceQuery(el.value);
         return;
     }
+    if (el.dataset.keep === "ledger-query") {
+        setLedgerQuery(el.value);
+        return;
+    }
+    if (el.dataset.keep === "ledger-number") {
+        VIEW.ledger = { ...VIEW.ledger, invoiceQuery: el.value, page: 1 };
+        paint("ledger-number");
+        return;
+    }
     if (el.dataset.edit === "invoice-bags" ||
         el.dataset.edit === "invoice-pickup" ||
         el.dataset.edit === "invoice-bag-rate" ||
@@ -7324,6 +7743,10 @@ function onChange(event) {
         applyStatsField(el.dataset.stats, el.value);
         return;
     }
+    if (el instanceof HTMLSelectElement && el.dataset.ledger) {
+        applyLedgerField(el.dataset.ledger, el.value);
+        return;
+    }
     if (!(el instanceof HTMLInputElement)) {
         return;
     }
@@ -7343,8 +7766,20 @@ function onChange(event) {
         setInvoiceDraftValue(el.dataset.invoiceValue, el.checked);
         return;
     }
+    if (el.dataset.ledgerAll === "1") {
+        setLedgerDraftVisible(el.checked);
+        return;
+    }
+    if (el.dataset.ledgerValue !== undefined) {
+        setLedgerDraftValue(el.dataset.ledgerValue, el.checked);
+        return;
+    }
     if (el.dataset.stats === "from" || el.dataset.stats === "to") {
         applyStatsField(el.dataset.stats, el.value);
+        return;
+    }
+    if (el.dataset.ledger === "from" || el.dataset.ledger === "to") {
+        applyLedgerField(el.dataset.ledger, el.value);
         return;
     }
     if (el.dataset.toggle === "checked-all") {
@@ -7933,11 +8368,12 @@ function syncInvoiceComment() {
     }
 }
 function onKeyDown(event) {
-    if (VIEW.stats.pickups.menu || VIEW.stats.invoices.menu) {
+    if (VIEW.stats.pickups.menu || VIEW.stats.invoices.menu || VIEW.ledger.table.menu) {
         if (event.key === "Escape") {
             event.preventDefault();
             closePickupMenu();
             closeInvoiceMenu();
+            closeLedgerMenu();
             paint();
             return;
         }
@@ -7950,6 +8386,11 @@ function onKeyDown(event) {
         if (event.key === "Enter" && field instanceof HTMLInputElement && field.dataset.keep === "invoice-query") {
             event.preventDefault();
             applyInvoiceFilter();
+            return;
+        }
+        if (event.key === "Enter" && field instanceof HTMLInputElement && field.dataset.keep === "ledger-query") {
+            event.preventDefault();
+            applyLedgerFilter();
             return;
         }
     }
@@ -8580,10 +9021,14 @@ async function runApprove() {
         paint();
     }
 }
-/** Zakres, Zestawienie albo Statystyki. Nie czyta arkusza i nie kasuje zestawienia. */
+/** Zakres, Zestawienie, Statystyki albo Ewidencja. Nie czyta arkusza i nie kasuje zestawienia. */
 function goMenu(place) {
     if (place === "stats") {
         openStats();
+        return;
+    }
+    if (place === "ledger") {
+        openLedger();
         return;
     }
     if (place === "statement") {
@@ -8598,6 +9043,26 @@ function goMenu(place) {
     VIEW.loading = false;
     VIEW.ratesOpen = false;
     paint();
+}
+function openLedger() {
+    VIEW.ratesOpen = false;
+    VIEW.status = "";
+    if (VIEW.ledger.invoices !== null) {
+        VIEW.screen = screenAfterOpenLedger();
+        paint();
+        return;
+    }
+    const today = todayCalendar();
+    VIEW.ledger = {
+        ...emptyLedger(today),
+        contractors: VIEW.contractors,
+        contractor: VIEW.contractor,
+        invoiceQuery: VIEW.ledger.invoiceQuery,
+        mode: VIEW.ledger.mode,
+    };
+    VIEW.screen = screenAfterOpenLedger();
+    paint();
+    void runLedger();
 }
 function openStats() {
     VIEW.ratesOpen = false;
@@ -8618,6 +9083,27 @@ function openStats() {
     VIEW.screen = screenAfterOpenStats();
     paint();
     void runStats();
+}
+function applyLedgerField(field, value) {
+    if (field === "month") {
+        VIEW.ledger = { ...VIEW.ledger, month: value };
+    }
+    else if (field === "quarter") {
+        VIEW.ledger = { ...VIEW.ledger, quarter: value };
+    }
+    else if (field === "from") {
+        VIEW.ledger = { ...VIEW.ledger, from: value };
+    }
+    else if (field === "to") {
+        VIEW.ledger = { ...VIEW.ledger, to: value };
+    }
+    else if (field === "contractor") {
+        VIEW.ledger = { ...VIEW.ledger, contractor: value };
+    }
+    else {
+        return;
+    }
+    paint();
 }
 function applyStatsField(field, value) {
     if (field === "month") {
@@ -8666,7 +9152,9 @@ function toggleStatsTable(id) {
     paint();
 }
 function onCaptureScroll(event) {
-    if (painting || scrollRestoreGen !== 0 || (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu)) {
+    if (painting ||
+        scrollRestoreGen !== 0 ||
+        (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu && !VIEW.ledger.table.menu)) {
         return;
     }
     const target = event.target;
@@ -8675,6 +9163,7 @@ function onCaptureScroll(event) {
     }
     closePickupMenu();
     closeInvoiceMenu();
+    closeLedgerMenu();
     paint();
 }
 function placePickupMenu() {
@@ -8682,7 +9171,7 @@ function placePickupMenu() {
     if (!(menu instanceof HTMLElement)) {
         return;
     }
-    const btn = document.querySelector('[data-action="pickup-menu"][aria-expanded="true"], [data-action="invoice-menu"][aria-expanded="true"]');
+    const btn = document.querySelector('[data-action="pickup-menu"][aria-expanded="true"], [data-action="invoice-menu"][aria-expanded="true"], [data-action="ledger-menu"][aria-expanded="true"]');
     if (!(btn instanceof HTMLElement)) {
         return;
     }
@@ -8704,22 +9193,24 @@ function placePickupMenu() {
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
     menu.style.visibility = "visible";
-    const all = menu.querySelector("[data-pickup-all], [data-invoice-all]");
+    const all = menu.querySelector("[data-pickup-all], [data-invoice-all], [data-ledger-all]");
     if (all instanceof HTMLInputElement && all.dataset.mixed === "1") {
         all.indeterminate = true;
     }
 }
 function dismissPickupMenuOnOutside(target) {
-    if (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu) {
+    if (!VIEW.stats.pickups.menu && !VIEW.stats.invoices.menu && !VIEW.ledger.table.menu) {
         return;
     }
     if (target.closest("[data-xl-menu]") ||
         target.closest("[data-action='pickup-menu']") ||
-        target.closest("[data-action='invoice-menu']")) {
+        target.closest("[data-action='invoice-menu']") ||
+        target.closest("[data-action='ledger-menu']")) {
         return;
     }
     closePickupMenu();
     closeInvoiceMenu();
+    closeLedgerMenu();
     paint();
 }
 function closePickupMenu() {
@@ -8909,6 +9400,123 @@ function closeInvoiceMenu() {
     }
     VIEW.stats = { ...VIEW.stats, invoices: { ...VIEW.stats.invoices, menu: null } };
 }
+function ledgerSource() {
+    return filterLedgerInvoices(VIEW.ledger.invoices ?? [], VIEW.ledger.invoiceQuery, VIEW.ledger.mode);
+}
+function ledgerChoices(column) {
+    return invoiceColumnChoices(ledgerSource(), VIEW.ledger.table.filters, column).filter((text) => {
+        const menu = VIEW.ledger.table.menu;
+        return menu ? pickupQueryHits(text, menu.query) : true;
+    });
+}
+function openLedgerMenu(column) {
+    if (!VIEW.ledger.invoices) {
+        return;
+    }
+    const current = VIEW.ledger.table;
+    if (current.menu?.column === column) {
+        closeLedgerMenu();
+        paint();
+        return;
+    }
+    const choices = invoiceColumnChoices(ledgerSource(), current.filters, column);
+    const saved = current.filters[column];
+    VIEW.ledger = {
+        ...VIEW.ledger,
+        table: {
+            ...current,
+            menu: { column, draft: saved ? [...saved] : [...choices], query: "" },
+        },
+    };
+    paint();
+}
+function applyLedgerSort(column, dir) {
+    VIEW.ledger = {
+        ...VIEW.ledger,
+        page: 1,
+        table: { ...VIEW.ledger.table, sortKey: column, sortDir: dir, menu: null },
+    };
+    paint();
+}
+function clearLedgerColumn(column) {
+    const filters = { ...VIEW.ledger.table.filters };
+    delete filters[column];
+    VIEW.ledger = {
+        ...VIEW.ledger,
+        page: 1,
+        table: { ...VIEW.ledger.table, filters, menu: null },
+    };
+    paint();
+}
+function applyLedgerFilter() {
+    const menu = VIEW.ledger.table.menu;
+    if (!menu || !VIEW.ledger.invoices) {
+        return;
+    }
+    const choices = invoiceColumnChoices(ledgerSource(), VIEW.ledger.table.filters, menu.column);
+    const filters = invoiceFiltersAfterApply(VIEW.ledger.table.filters, menu.column, choices, menu.draft);
+    VIEW.ledger = {
+        ...VIEW.ledger,
+        page: 1,
+        table: { ...VIEW.ledger.table, filters, menu: null },
+    };
+    paint();
+}
+function closeLedgerMenu() {
+    if (!VIEW.ledger.table.menu) {
+        return;
+    }
+    VIEW.ledger = { ...VIEW.ledger, table: { ...VIEW.ledger.table, menu: null } };
+}
+function setLedgerQuery(value) {
+    const menu = VIEW.ledger.table.menu;
+    if (!menu || menu.query === value) {
+        return;
+    }
+    VIEW.ledger = {
+        ...VIEW.ledger,
+        table: { ...VIEW.ledger.table, menu: { ...menu, query: value } },
+    };
+    paint("ledger-query");
+}
+function ledgerDraftKeep() {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && active.dataset.keep === "ledger-query") {
+        return "ledger-query";
+    }
+    return undefined;
+}
+function setLedgerDraftValue(value, on) {
+    const menu = VIEW.ledger.table.menu;
+    if (!menu) {
+        return;
+    }
+    const draft = on
+        ? menu.draft.includes(value)
+            ? menu.draft
+            : [...menu.draft, value]
+        : menu.draft.filter((item) => item !== value);
+    VIEW.ledger = {
+        ...VIEW.ledger,
+        table: { ...VIEW.ledger.table, menu: { ...menu, draft } },
+    };
+    paint(ledgerDraftKeep());
+}
+function setLedgerDraftVisible(on) {
+    const menu = VIEW.ledger.table.menu;
+    if (!menu || !VIEW.ledger.invoices) {
+        return;
+    }
+    const visible = ledgerChoices(menu.column);
+    VIEW.ledger = {
+        ...VIEW.ledger,
+        table: {
+            ...VIEW.ledger.table,
+            menu: { ...menu, draft: pickupDraftAfterVisible(menu.draft, visible, on) },
+        },
+    };
+    paint(ledgerDraftKeep());
+}
 function setInvoiceQuery(value) {
     const menu = VIEW.stats.invoices.menu;
     if (!menu || menu.query === value) {
@@ -9066,6 +9674,82 @@ async function runStats() {
     catch (err) {
         VIEW.stats = { ...VIEW.stats, status: "Odczyt statystyk nie doszedł.", report: null };
         reportFailure("ROZ-E-STATS", "page.ts runStats", "Odczyt statystyk nie doszedł.", "Wykresy zostają puste albo przy poprzednim odczycie. Możesz zmienić okres i spróbować jeszcze raz.", { technical: err });
+    }
+    finally {
+        VIEW.loading = false;
+        paint();
+    }
+}
+async function runLedger() {
+    if (webapp === "") {
+        VIEW.ledger = { ...VIEW.ledger, status: "Brak adresu Web App. Dopisz ?webapp= do adresu tej strony." };
+        reportMissingWebApp("page.ts runLedger");
+        paint();
+        return;
+    }
+    const today = todayCalendar();
+    const range = resolveStatsPeriod(VIEW.ledger.period, today, {
+        month: VIEW.ledger.month,
+        quarter: VIEW.ledger.quarter,
+        from: VIEW.ledger.from,
+        to: VIEW.ledger.to,
+    });
+    if (!range) {
+        const status = VIEW.ledger.period === "exact"
+            ? "Podaj poprawny zakres od–do (data początkowa nie później niż końcowa)."
+            : VIEW.ledger.period === "prevQuarter"
+                ? "Wybierz kwartał z listy."
+                : "Wybierz miesiąc z listy.";
+        VIEW.ledger = { ...VIEW.ledger, status };
+        paint();
+        return;
+    }
+    VIEW.loading = true;
+    VIEW.loadKind = "logo";
+    VIEW.loadMessage = "Ładuję ewidencję…";
+    VIEW.ledger = { ...VIEW.ledger, status: "" };
+    paint();
+    try {
+        const response = await fetch(webAppUrl(webapp, statsParams({
+            dataOd: range.from,
+            dataDo: range.to,
+            podwykonawca: VIEW.ledger.contractor,
+        })));
+        const loaded = await readRozJson(response);
+        if (!loaded.ok) {
+            if (!loaded.silent) {
+                VIEW.ledger = { ...VIEW.ledger, status: "Odczyt ewidencji nie doszedł." };
+                reportFailure("ROZ-E-LEDGER", "page.ts runLedger", "Odczyt ewidencji nie doszedł.", "Lista zostaje pusta albo przy poprzednim odczycie. Możesz zmienić okres i spróbować jeszcze raz.", loaded);
+            }
+            return;
+        }
+        const parsed = readSettlementStats(loaded.body);
+        if (!parsed.ok) {
+            VIEW.ledger = { ...VIEW.ledger, status: parsed.error };
+            reportFailure("ROZ-E-LEDGER", "page.ts runLedger", "Odczyt ewidencji nie doszedł.", "Lista zostaje pusta albo przy poprzednim odczycie. Możesz zmienić okres i spróbować jeszcze raz.", { technical: parsed.error });
+            return;
+        }
+        const invoices = listPeriodInvoices([...parsed.rows, ...(parsed.scheduleRows ?? [])], {
+            range,
+            contractor: VIEW.ledger.contractor || undefined,
+        });
+        VIEW.ledger = {
+            ...VIEW.ledger,
+            appliedFrom: range.from,
+            appliedTo: range.to,
+            appliedKind: VIEW.ledger.period,
+            appliedMonth: VIEW.ledger.month,
+            appliedQuarter: VIEW.ledger.quarter,
+            appliedContractor: VIEW.ledger.contractor,
+            invoices,
+            status: "",
+            page: 1,
+            table: emptyLedgerTable(),
+        };
+    }
+    catch (err) {
+        VIEW.ledger = { ...VIEW.ledger, status: "Odczyt ewidencji nie doszedł." };
+        reportFailure("ROZ-E-LEDGER", "page.ts runLedger", "Odczyt ewidencji nie doszedł.", "Lista zostaje pusta albo przy poprzednim odczycie. Możesz zmienić okres i spróbować jeszcze raz.", { technical: err });
     }
     finally {
         VIEW.loading = false;

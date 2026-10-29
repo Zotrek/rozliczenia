@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildPage } from "../scripts/build-page.mjs";
-import { CONTRACTOR_LIST_LIMIT, emptyStats, renderApp, renderModes, type RangeViewModel } from "./rangeView.js";
+import { CONTRACTOR_LIST_LIMIT, emptyLedger, emptyStats, renderApp, renderModes, type RangeViewModel } from "./rangeView.js";
 import type { StartedSearch } from "./range.js";
 import { emptyInvoiceEdit } from "./invoiceEdit.js";
 import { emptyInvoiceComment } from "./invoiceComment.js";
@@ -50,6 +50,7 @@ function model(over: Partial<RangeViewModel> = {}): RangeViewModel {
     ratesMessage: "",
     ratesMessageOk: false,
     stats: emptyStats({ year: 2026, month: 9, day: 23 }),
+    ledger: emptyLedger({ year: 2026, month: 9, day: 23 }),
     ...over,
   };
 }

@@ -17,7 +17,7 @@ import {
   type StatsReport,
   type TimeSeriesStats,
 } from "./stats.js";
-import { compareSheetDate, type CalendarDate } from "./sheetDate.js";
+import { compareSheetDate, hasSheetDateShape, type CalendarDate } from "./sheetDate.js";
 import type { Grosze } from "./types.js";
 
 const PICKUP_COLUMN_KEYS = ["date", "shop", "contractor", "mode", "bags", "settled", "invoiceNumber", "invoice"] as const;
@@ -50,7 +50,7 @@ const PICKUP_COLUMNS: readonly { key: PickupColumnKey; label: string; numeric: b
   { key: "invoice", label: "Wartość faktury", numeric: true },
 ];
 
-const INVOICE_COLUMN_KEYS = ["name", "contractor", "mode", "date", "bags", "amount"] as const;
+const INVOICE_COLUMN_KEYS = ["name", "contractor", "mode", "date", "bags", "amount", "approved"] as const;
 
 export type InvoiceColumnKey = (typeof INVOICE_COLUMN_KEYS)[number];
 
@@ -80,6 +80,11 @@ export function emptyPickupTable(): PickupTableState {
 
 export function emptyInvoiceTable(): InvoiceTableState {
   return { sortKey: null, sortDir: "asc", filters: {}, menu: null };
+}
+
+/** Ewidencja: od najnowszej daty zatwierdzenia. Puste daty zostają na końcu. */
+export function emptyLedgerTable(): InvoiceTableState {
+  return { sortKey: "approved", sortDir: "desc", filters: {}, menu: null };
 }
 
 export function isPickupColumnKey(value: string): value is PickupColumnKey {
@@ -172,6 +177,9 @@ export function invoiceCellText(row: PeriodInvoice, key: InvoiceColumnKey): stri
   }
   if (key === "date") {
     return row.pickupDate;
+  }
+  if (key === "approved") {
+    return hasSheetDateShape(row.approvedDate) ? row.approvedDate : "—";
   }
   if (key === "bags") {
     return row.bagCount === null ? "—" : String(row.bagCount);
@@ -348,6 +356,9 @@ function isBlankInvoice(row: PeriodInvoice, key: InvoiceColumnKey): boolean {
   if (key === "name") {
     return row.invoice.trim() === "";
   }
+  if (key === "approved") {
+    return !hasSheetDateShape(row.approvedDate);
+  }
   return false;
 }
 
@@ -371,6 +382,9 @@ function comparePickups(a: PeriodPickup, b: PeriodPickup, key: PickupColumnKey):
 function compareInvoices(a: PeriodInvoice, b: PeriodInvoice, key: InvoiceColumnKey): number {
   if (key === "date") {
     return compareSheetDate(a.pickupDate, b.pickupDate);
+  }
+  if (key === "approved") {
+    return compareSheetDate(a.approvedDate, b.approvedDate);
   }
   if (key === "bags") {
     return (a.bagCount ?? 0) - (b.bagCount ?? 0);
@@ -402,7 +416,7 @@ function sortPhrase(key: PickupColumnKey, dir: "asc" | "desc"): string {
 }
 
 function invoiceSortPhrase(key: InvoiceColumnKey, dir: "asc" | "desc"): string {
-  if (key === "date") {
+  if (key === "date" || key === "approved") {
     return sortPhraseKind("date", dir);
   }
   if (key === "bags" || key === "amount") {
@@ -1186,7 +1200,7 @@ function invoiceHead(model: StatsViewModel): string {
   );
 }
 
-function columnHead<Key extends string>(
+export function columnHead<Key extends string>(
   columns: readonly { key: Key; label: string; numeric: boolean }[],
   state: {
     sortKey: Key | null;
@@ -1195,7 +1209,7 @@ function columnHead<Key extends string>(
     menu: { column: Key } | null;
   },
   sectionOpen: boolean,
-  action: "pickup" | "invoice",
+  action: "pickup" | "invoice" | "ledger",
   menuFor: (key: Key) => string,
 ): string {
   return columns
@@ -1265,7 +1279,7 @@ function invoiceMenu(model: StatsViewModel, column: InvoiceColumnKey): string {
 }
 
 function xlColumnMenu(args: {
-  action: "pickup" | "invoice";
+  action: "pickup" | "invoice" | "ledger";
   column: string;
   label: string;
   sortAscLabel: string;
@@ -1318,14 +1332,14 @@ function pickupBar(state: PickupTableState): string {
   return columnBar(PICKUP_COLUMNS, state, "pickup", sortPhrase);
 }
 
-function columnBar<Key extends string>(
+export function columnBar<Key extends string>(
   columns: readonly { key: Key; label: string }[],
   state: {
     sortKey: Key | null;
     sortDir: "asc" | "desc";
     filters: Partial<Record<Key, readonly string[]>>;
   },
-  action: "pickup" | "invoice",
+  action: "pickup" | "invoice" | "ledger",
   phrase: (key: Key, dir: "asc" | "desc") => string,
 ): string {
   const filtered = columns.filter((col) => state.filters[col.key] != null).map((col) => col.label);
@@ -1346,6 +1360,29 @@ function columnBar<Key extends string>(
     `<span>${escapeHtml(bits.join(" · "))}</span>` +
     `<button type="button" data-action="${action}-clear-all">Wyczyść</button></div>`
   );
+}
+
+export function renderLedgerColumnMenu(args: {
+  column: InvoiceColumnKey;
+  label: string;
+  sortDir: "asc" | "desc" | null;
+  hasFilter: boolean;
+  query: string;
+  visible: readonly string[];
+  picked: ReadonlySet<string>;
+}): string {
+  return xlColumnMenu({
+    action: "ledger",
+    column: args.column,
+    label: args.label,
+    sortAscLabel: invoiceSortPhrase(args.column, "asc"),
+    sortDescLabel: invoiceSortPhrase(args.column, "desc"),
+    sortDir: args.sortDir,
+    hasFilter: args.hasFilter,
+    query: args.query,
+    visible: args.visible,
+    picked: args.picked,
+  });
 }
 
 function emptyRow(cols: number, message = "Brak danych w tym okresie."): string {

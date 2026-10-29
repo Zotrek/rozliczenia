@@ -25,7 +25,7 @@ export const RANGE_ERROR = {
 
 export type RangeError = keyof typeof RANGE_ERROR;
 
-export type ScreenId = "range" | "statement" | "invoices" | "stats";
+export type ScreenId = "range" | "statement" | "invoices" | "stats" | "ledger";
 
 export type SettlementMode = "report" | "schedule";
 
@@ -267,9 +267,20 @@ export function screenAfterChangeRange(): ScreenId {
   return "range";
 }
 
-/** Powrót z podglądu albo zestawienia. Ze statystyk wraca do raportu. */
-export function screenAfterWorkBack(workReturn: "range" | "stats"): ScreenId {
-  return workReturn === "stats" ? "stats" : screenAfterChangeRange();
+/** Powrót z podglądu albo zestawienia. Ze statystyk wraca do raportu, z ewidencji do listy. */
+export function screenAfterWorkBack(workReturn: "range" | "stats" | "ledger"): ScreenId {
+  if (workReturn === "stats") {
+    return "stats";
+  }
+  if (workReturn === "ledger") {
+    return "ledger";
+  }
+  return screenAfterChangeRange();
+}
+
+/** Zakres, zestawienie albo statystyki → ewidencja faktur. */
+export function screenAfterOpenLedger(): ScreenId {
+  return "ledger";
 }
 
 /** Po udanym Zatwierdź wraca na Zakres. Zestawienie w pamięci zostaje. */

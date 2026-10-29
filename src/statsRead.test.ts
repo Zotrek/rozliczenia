@@ -302,6 +302,45 @@ describe("buildSettlementStats_", () => {
   });
 });
 
+describe("buildSettlementStats_ data zatwierdzenia", () => {
+  it("test_buildSettlementStats_returns_approval_date_and_schedule_invoices_apart_from_rows", () => {
+    const report = entry(2, { 14: "tak", 15: "FV/1", 16: 30, 17: 15, 21: "02.09.2026" });
+    const schedule = {
+      sheetRow: 4,
+      sheetName: "Harmonogram Wrzesień 2026",
+      cells: (() => {
+        const row = Array.from({ length: 21 }, () => "" as unknown);
+        row[0] = "Sklepowa 2";
+        row[3] = "11.09.2026";
+        row[4] = "gpw";
+        row[7] = 3;
+        row[13] = "tak";
+        row[14] = "FV/9";
+        row[15] = 40;
+        row[16] = 13.33;
+        row[20] = "03.09.2026";
+        return row;
+      })(),
+    };
+    const result = stats(gpw, [report], [], undefined, [schedule]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({ invoice: "FV/1", approvedDate: "02.09.2026", mode: "report" });
+    expect(result.scheduleRows).toEqual([
+      expect.objectContaining({
+        invoice: "FV/9",
+        approvedDate: "03.09.2026",
+        mode: "schedule",
+        sheetName: "Harmonogram Wrzesień 2026",
+        contractor: "gpw",
+      }),
+    ]);
+  });
+});
+
 describe("akcja settlementStats w transport-log.gs", () => {
   it("test_settlementStats_reads_without_write_and_only_on_get", () => {
     const body = functionSource("settlementStats_");

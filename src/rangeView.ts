@@ -19,6 +19,7 @@ import { invoiceFocusLabel, type SettledInvoiceRow } from "./invoices.js";
 import { renderFocusedInvoice, renderInvoiceList } from "./invoicesView.js";
 import type { StatementScreen } from "./statement.js";
 import { renderStatement } from "./statementView.js";
+import { defaultLedgerView, renderLedgerScreen, type LedgerViewModel } from "./ledgerView.js";
 import { defaultStatsView, renderStatsScreen, type StatsViewModel } from "./statsView.js";
 import type { CalendarDate } from "./sheetDate.js";
 
@@ -54,8 +55,8 @@ export interface RangeViewModel {
   invoiceNotice: string;
   /** Worki, stawki i odpięcie sklepu na edycji faktury. Zapis po przycisku. */
   invoiceEdit: InvoiceEditDraft;
-  /** Dokąd wraca ← Statystyki z podglądu albo z zestawienia otwartego Edycją. */
-  workReturn: "range" | "stats";
+  /** Dokąd wraca wstecz z podglądu albo z zestawienia otwartego Edycją. */
+  workReturn: "range" | "stats" | "ledger";
   /** Udane Szukaj. Dopiero wtedy Zestawienie w pasku prowadzi do ostatniego wyniku. */
   searched: boolean;
   /** Od 10 000 zł przy Zatwierdź. Inaczej pulsujące logo. */
@@ -78,6 +79,7 @@ export interface RangeViewModel {
   ratesMessage: string;
   ratesMessageOk: boolean;
   stats: StatsViewModel;
+  ledger: LedgerViewModel;
 }
 
 
@@ -274,8 +276,22 @@ function statsReturnButton(): string {
   return '<button type="button" class="btn-ghost" data-action="back">← Statystyki</button>';
 }
 
+function ledgerReturnButton(): string {
+  return '<button type="button" class="btn-ghost" data-action="back">← Ewidencja</button>';
+}
+
+function workBackButton(workReturn: RangeViewModel["workReturn"]): string {
+  if (workReturn === "ledger") {
+    return ledgerReturnButton();
+  }
+  if (workReturn === "stats") {
+    return statsReturnButton();
+  }
+  return "";
+}
+
 function menuPlaceButton(
-  place: "range" | "statement" | "stats",
+  place: "range" | "statement" | "stats" | "ledger",
   label: string,
   on: boolean,
   disabled: boolean,
@@ -286,20 +302,39 @@ function menuPlaceButton(
   return `<button type="button"${onClass} data-action="nav" data-place="${place}"${off}${title}>${label}</button>`;
 }
 
-function activePlace(screen: RangeViewModel["screen"]): "range" | "statement" | "stats" {
-  if (screen === "statement") {
-    return "statement";
+function activePlace(model: RangeViewModel): "range" | "statement" | "stats" | "ledger" {
+  if (model.screen === "ledger") {
+    return "ledger";
   }
-  if (screen === "stats" || screen === "invoices") {
+  if (model.screen === "statement") {
+    return model.workReturn === "ledger" ? "ledger" : "statement";
+  }
+  if (model.screen === "invoices" && model.workReturn === "ledger") {
+    return "ledger";
+  }
+  if (model.screen === "stats" || model.screen === "invoices") {
     return "stats";
   }
   return "range";
 }
 
-/** Pasek miejsc. Podgląd faktury świeci Statystyki. Zestawienie czeka na Szukaj. */
+function menuSubtitle(model: RangeViewModel): string {
+  if (model.screen === "stats") {
+    return "Statystyki";
+  }
+  if (
+    model.screen === "ledger" ||
+    ((model.screen === "invoices" || model.screen === "statement") && model.workReturn === "ledger")
+  ) {
+    return "Ewidencja faktur";
+  }
+  return modeLabel(model.mode);
+}
+
+/** Pasek miejsc. Podgląd ze statystyk świeci Statystyki, z ewidencji — Ewidencję. */
 function menuBar(model: RangeViewModel): string {
-  const place = activePlace(model.screen);
-  const subtitle = model.screen === "stats" ? "Statystyki" : modeLabel(model.mode);
+  const place = activePlace(model);
+  const subtitle = menuSubtitle(model);
   return (
     '<header class="menu">' +
     brand(subtitle) +
@@ -307,6 +342,7 @@ function menuBar(model: RangeViewModel): string {
     menuPlaceButton("range", "Zakres", place === "range", false) +
     menuPlaceButton("statement", "Zestawienie", place === "statement", !model.searched) +
     menuPlaceButton("stats", "Statystyki", place === "stats", false) +
+    menuPlaceButton("ledger", "Ewidencja", place === "ledger", false) +
     "</nav>" +
     `<div class="menu-side">${ratesButton()}</div>` +
     "</header>"
@@ -347,7 +383,7 @@ function renderRangeScreen(model: RangeViewModel): string {
 
 function renderStatementScreen(model: RangeViewModel): string {
   const label = model.applied ? rangeLabel(model.applied) : "";
-  const back = model.workReturn === "stats" ? statsReturnButton() : "";
+  const back = workBackButton(model.workReturn);
   return (
     '<div class="statement" data-screen="statement"><div class="top">' +
     `<div class="range"><span>${escapeHtml(modeLabel(model.mode))}</span><strong>${escapeHtml(label)}</strong></div>` +
@@ -360,7 +396,7 @@ function renderStatementScreen(model: RangeViewModel): string {
 }
 
 function focusedInvoiceBlock(model: RangeViewModel): string {
-  if (model.workReturn !== "stats" || model.invoiceFocus === null) {
+  if ((model.workReturn !== "stats" && model.workReturn !== "ledger") || model.invoiceFocus === null) {
     return "";
   }
   return (
@@ -377,7 +413,7 @@ function renderInvoicesScreen(model: RangeViewModel): string {
   return (
     '<div class="statement" data-screen="invoices"><div class="top">' +
     invoiceHeading(model.invoiceFocus, label) +
-    statsReturnButton() +
+    (model.workReturn === "ledger" ? ledgerReturnButton() : statsReturnButton()) +
     "</div>" +
     status +
     renderInvoiceList(model.invoices, model.invoiceFocus, model.invoiceComment ?? emptyInvoiceComment()) +
@@ -460,7 +496,9 @@ export function renderApp(model: RangeViewModel): string {
         ? renderInvoicesScreen(model)
         : model.screen === "stats"
         ? renderStatsScreen(model.stats)
-        : renderRangeScreen(model);
+        : model.screen === "ledger"
+          ? renderLedgerScreen(model.ledger)
+          : renderRangeScreen(model);
   const dialog = model.ratesOpen ? renderRatesDialog(model) : "";
   const loading = model.loading ? renderLoading(model.loadMessage, model.loadKind === "unicorn") : "";
   return menuBar(model) + `<div class="app-body">${main}</div>` + dialog + loading;
@@ -469,4 +507,8 @@ export function renderApp(model: RangeViewModel): string {
 /** Domyślny stan stats w modelu aplikacji (zegar = dziś lokalnie). */
 export function emptyStats(today: CalendarDate): StatsViewModel {
   return defaultStatsView(today);
+}
+
+export function emptyLedger(today: CalendarDate): LedgerViewModel {
+  return defaultLedgerView(today);
 }

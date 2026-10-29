@@ -35,12 +35,16 @@ export interface SettlementStatsRow extends RegisterRow {
   invoice: string | null;
   /** Brak / report = Na zgłoszenie; schedule = z „odebrane z harmonogramu”. */
   mode?: SettlementMode;
+  /** Data zatwierdzenia, `dd.mm.yyyy`. Pusty tekst = brak. */
+  approvedDate?: string;
 }
 
 export interface SettlementStatsOk {
   ok: true;
   rows: SettlementStatsRow[];
   rates: SettlementRateRow[];
+  /** Rozliczone wiersze rejestru Harmonogram. Brak pola w starym odczycie = pusta lista. */
+  scheduleRows?: SettlementStatsRow[];
 }
 
 export type SettlementStatsResult = SettlementStatsOk | SettlementSearchErr;

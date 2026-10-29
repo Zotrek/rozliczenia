@@ -31,6 +31,8 @@ export interface StatsRow extends RegisterRow {
    * (do czasu kolumny trybu w rejestrze).
    */
   mode?: SettlementMode;
+  /** Data zatwierdzenia wiersza, `dd.mm.yyyy`. Pusty albo brak = nie było zapisu. */
+  approvedDate?: string;
 }
 
 export interface SheetDateRange {
@@ -185,6 +187,11 @@ export interface PeriodInvoice {
   amount: Grosze | null;
   /** Najnowsza data odbioru tej faktury w okresie. */
   pickupDate: string;
+  /**
+   * Najwcześniejsza data zatwierdzenia wierszy tej faktury (`dd.mm.yyyy`).
+   * Pusty tekst = żaden wiersz jej nie ma (faktury sprzed kolumny).
+   */
+  approvedDate: string;
 }
 
 /** Próg inkluzywnej długości okresu: ≤ → tygodnie, inaczej miesiące. */
@@ -631,6 +638,7 @@ export function listPeriodInvoices(
       amount: number;
       amountAny: boolean;
       pickupDate: string;
+      approvedDate: string;
     }
   >();
   for (const row of matched) {
@@ -645,6 +653,7 @@ export function listPeriodInvoices(
       amount: 0,
       amountAny: false,
       pickupDate: row.pickupDate,
+      approvedDate: "",
     };
     if (row.bagCount != null) {
       group.bags += row.bagCount;
@@ -657,6 +666,7 @@ export function listPeriodInvoices(
     if (compareSheetDate(row.pickupDate, group.pickupDate) > 0) {
       group.pickupDate = row.pickupDate;
     }
+    group.approvedDate = earlierApprovedDate(group.approvedDate, row.approvedDate ?? "");
     groups.set(key, group);
   }
   return [...groups.values()]
@@ -667,6 +677,7 @@ export function listPeriodInvoices(
       bagCount: group.bagAny ? group.bags : null,
       amount: group.amountAny ? group.amount : null,
       pickupDate: group.pickupDate,
+      approvedDate: group.approvedDate,
     }))
     .sort((a, b) => {
       const byDate = compareSheetDate(b.pickupDate, a.pickupDate);
@@ -690,6 +701,17 @@ export function listPeriodInvoices(
 
 function invoiceGroupKey(row: StatsRow, invoice: string): string {
   return `${rowMode(row)}\n${row.contractor}\n${invoice}`;
+}
+
+/** Najwcześniejsza poprawna data. Pusta albo zła nie przesuwa już zapisanej. */
+function earlierApprovedDate(current: string, next: string): string {
+  if (!hasSheetDateShape(next)) {
+    return current;
+  }
+  if (!hasSheetDateShape(current)) {
+    return next;
+  }
+  return compareSheetDate(next, current) < 0 ? next : current;
 }
 
 function aggregateTimeSeries(

@@ -1,7 +1,7 @@
 import { lineKey, rowKey, settle, sumSelected } from "./engine.js";
 import { commentApplyNotice, commentTargets, openingCommentPicks } from "./invoiceComment.js";
 import { isoToSheetDate, type SettlementMode } from "./range.js";
-import { parseSheetDate } from "./sheetDate.js";
+import { hasSheetDateShape, parseSheetDate } from "./sheetDate.js";
 import type {
   SettlementRateRow,
   SettlementSearchResult,
@@ -311,6 +311,16 @@ export function readSettlementStats(body: unknown): SettlementStatsResult {
     }
     rows.push(row);
   }
+  const scheduleRows = [];
+  if (Array.isArray(body.scheduleRows)) {
+    for (const item of body.scheduleRows) {
+      const row = readStatsRow(item);
+      if (!row) {
+        return { ok: false, error: "Odczyt statystyk nie doszedł." };
+      }
+      scheduleRows.push(row);
+    }
+  }
   const rates: SettlementRateRow[] = [];
   for (const item of body.rates) {
     const rate = readRateRow(item);
@@ -319,7 +329,7 @@ export function readSettlementStats(body: unknown): SettlementStatsResult {
     }
     rates.push(rate);
   }
-  return { ok: true, rows, rates };
+  return { ok: true, rows, rates, scheduleRows };
 }
 
 export function findRow(
@@ -1035,6 +1045,7 @@ function readStatsRow(value: unknown): SettlementStatsRow | null {
     }
     invoice = text.trim();
   }
+  const approvedRaw = typeof value.approvedDate === "string" ? value.approvedDate.trim() : "";
   return {
     ...base,
     settled: value.settled,
@@ -1043,6 +1054,7 @@ function readStatsRow(value: unknown): SettlementStatsRow | null {
     costPerBag,
     invoice,
     mode: value.mode === "schedule" ? "schedule" : value.mode === "report" ? "report" : undefined,
+    approvedDate: hasSheetDateShape(approvedRaw) ? approvedRaw : "",
   };
 }
 

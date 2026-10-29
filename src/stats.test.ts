@@ -1036,6 +1036,41 @@ describe("aggregateContractorRanks / listZeroBagPickups", () => {
     });
   });
 
+  it("test_listPeriodInvoices_keeps_earliest_approval_date_and_still_sorts_by_pickup", () => {
+    const list = listPeriodInvoices(
+      [
+        statsRow({
+          sheetRow: 2,
+          settled: true,
+          invoice: "FV/1",
+          pickupDate: "10.09.2026",
+          approvedDate: "20.09.2026",
+          receptionCost: 100,
+        }),
+        statsRow({
+          sheetRow: 3,
+          settled: true,
+          invoice: "FV/1",
+          pickupDate: "12.09.2026",
+          approvedDate: "01.09.2026",
+          receptionCost: 200,
+        }),
+        statsRow({
+          sheetRow: 4,
+          settled: true,
+          invoice: "FV/2",
+          pickupDate: "18.09.2026",
+          approvedDate: "",
+          receptionCost: 300,
+        }),
+      ],
+      { range },
+    );
+    expect(list.map((row) => row.invoice)).toEqual(["FV/2", "FV/1"]);
+    expect(list[1].approvedDate).toBe("01.09.2026");
+    expect(list[0].approvedDate).toBe("");
+  });
+
   it("test_listPeriodInvoices_blank_bags_and_costs_stay_empty", () => {
     expect(
       listPeriodInvoices(
@@ -1053,6 +1088,7 @@ describe("aggregateContractorRanks / listZeroBagPickups", () => {
     ).toEqual([
       {
         invoice: "FV/1",
+        approvedDate: "",
         contractor: "gpw",
         mode: "report",
         bagCount: null,

@@ -226,6 +226,13 @@ describe("page wiring", () => {
 
   it("test_page_stats_helpers_persist_fold_and_reload_report", () => {
     expect(functionBody("openStats")).toContain("screenAfterOpenStats()");
+    expect(functionBody("goMenu")).toContain("openLedger()");
+    expect(functionBody("openLedger")).toContain("screenAfterOpenLedger()");
+    expect(functionBody("openLedger")).toContain("void runLedger()");
+    expect(functionBody("armPickupWork")).toContain('VIEW.workReturn = fromLedger ? "ledger" : "stats"');
+    expect(functionBody("failOpen")).toContain('VIEW.workReturn === "ledger"');
+    expect(functionBody("runLedger")).toContain("listPeriodInvoices(");
+    expect(functionBody("runLedger")).toContain("scheduleRows");
     expect(functionBody("toggleStatsSection")).toContain("writeStatsFold(");
     expect(functionBody("toggleStatsTable")).toContain("writeStatsFold(");
     expect(functionBody("runStats")).toContain("readSettlementStats(");

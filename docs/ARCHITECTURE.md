@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — Rozliczenia
 
-> **Status:** Zatwierdzone 2026-09-19; uzupełnienie Statystyk 2026-09-23. Kolejność prac jest w [`PLAN.md`](PLAN.md).  
-> **Ostatnia aktualizacja:** 2026-10-26  
+> **Status:** Zatwierdzone 2026-09-19; uzupełnienie Statystyk 2026-09-23; Ewidencja i lejek zestawienia 2026-10-29. Kolejność prac jest w [`PLAN.md`](PLAN.md).  
+> **Ostatnia aktualizacja:** 2026-10-29  
 > **Na podstawie:** `rozliczenia/docs/SPECIFICATION.md`, makiety `makiety-tabeli.html` i `makiety-statystyki.html`  
 > **Wzorzec wdrożenia:** Arkusz-mapa i Druga Mila (strona + Apps Script + ten sam plik Google). Nie Symfony, nie Vue, nie PostgreSQL.
 
@@ -24,7 +24,7 @@ Specyfikacja mówi wprost, że z zachowania nie wynika Symfony, Vue ani PostgreS
 | Źródło danych | Istniejący plik Google | Rejestr (`Arkusz1` po nazwie), Baza stawek, Lista podwykonawców |
 | Zapis i odczyt | Rozszerzenie istniejącego Web App (`arkusz-mapa/google-apps-script/transport-log.gs`) | Lock, odczyt zestawienia, zapis edycji i zatwierdzenia. Nagłówki rejestru tylko przy dopisaniu protokołu. Nagłówki Bazy stawek przy pierwszym zapisie stawki |
 | Reguły kosztów | TypeScript, czyste funkcje, Vitest | Liczenie na ekranie. Te same funkcje da się odpalić w teście bez arkusza |
-| Ekran | Jedna strona HTML, style z makiet | Trzy widoki: Zakres, Zestawienie, Statystyki. Okno Baza stawek, nie osobny ekran |
+| Ekran | Jedna strona HTML, style z makiet | Cztery widoki: Zakres, Zestawienie, Statystyki, Ewidencja. Okno Baza stawek, nie osobny ekran |
 | Hosting | Własne repozytorium, GitHub Pages z `gh-pages` | Sekret `TRANSPORT_WEBAPP_URL` wchodzi do `index.html` w workflow. Nie ścieżka w Pages mapy |
 
 Vue i Symfony odpadają na tę wersję: nie ma encji do trzymania, a stawka podjazdu i worka zmieniona na zestawieniu **nie** idzie do bazy stawek. Kwota ostateczna powstaje dopiero przy Zatwierdź, z tego, co widać na ekranie. Osobna baza rozjechałaby się z arkuszem.
@@ -38,13 +38,15 @@ Decyzja jest w [Zatwierdzenie](#zatwierdzenie).
 ```mermaid
 flowchart LR
   subgraph app [Strona rozliczen]
-    App[Strona rozliczen]
+    Zakres[Zakres]
+    Zestawienie[Zestawienie]
+    Statystyki[Statystyki]
+    Ewidencja[Ewidencja]
     Engine[Silnik kosztow TS]
-    Stats[Agregacje stats TS]
   end
   subgraph gas [Apps Script Web App]
     Read[Odczyt zestawienia]
-    StatsRead[Odczyt statystyk]
+    StatsRead[settlementStats]
     Write[Zapis edycji i Zatwierdz]
   end
   subgraph sheet [Jeden plik Google]
@@ -53,11 +55,12 @@ flowchart LR
     Lista[Lista podwykonawcow]
   end
   Mapa[Arkusz-mapa]
-  App --> Engine
-  App --> Stats
-  App --> Read
-  App --> StatsRead
-  App --> Write
+  Zestawienie --> Engine
+  Zakres --> Read
+  Zestawienie --> Read
+  Zestawienie --> Write
+  Statystyki --> StatsRead
+  Ewidencja --> StatsRead
   Read --> Rejestr
   Read --> Stawki
   Read --> Lista
@@ -71,8 +74,8 @@ flowchart LR
 
 Podział odpowiedzialności:
 
-- **Przeglądarka** liczy koszt, grupuje trasy, trzyma stan ekranu, który nie ma kolumny: przekreślenie „transport się nie odbył” przed zatwierdzeniem, podgląd stawki podjazdu i worka innej niż w bazie. Podjazd 0 zł wpisuje się w kwotę podjazdu. Osobnej opcji „tylko za liczbę worków” nie ma. Na Statystykach agreguje KPI i rankingi (czyste funkcje TS + Vitest).
-- **Apps Script** jest jedynym miejscem zapisu. Przy Zatwierdź nie liczy kosztu na nowo z bazy: zapisuje to, co ekran już policzył, po sprawdzeniu, że wiersz wolno ruszyć. W Harmonogramie Szukaj przepisuje stawki podjazdu i worka z Bazy cen harmonogram, a edycja liczby worków na rozliczonym wierszu przelicza koszt z kolumn tego wiersza. Odczyt Statystyk nic nie zapisuje.
+- **Przeglądarka** liczy koszt, grupuje trasy, trzyma stan ekranu, który nie ma kolumny: przekreślenie „transport się nie odbył” przed zatwierdzeniem, podgląd stawki podjazdu i worka innej niż w bazie, lejek i sort zestawienia. Podjazd 0 zł wpisuje się w kwotę podjazdu. Osobnej opcji „tylko za liczbę worków” nie ma. Na Statystykach agreguje KPI i rankingi (czyste funkcje TS + Vitest). Ewidencja czyta ten sam `settlementStats` co Statystyki.
+- **Apps Script** jest jedynym miejscem zapisu. Przy Zatwierdź nie liczy kosztu na nowo z bazy: zapisuje to, co ekran już policzył, po sprawdzeniu, że wiersz wolno ruszyć. W Harmonogramie Szukaj przepisuje stawki podjazdu i worka z Bazy cen harmonogram, a edycja liczby worków na rozliczonym wierszu przelicza koszt z kolumn tego wiersza. Odczyt Statystyk i Ewidencji nic nie zapisuje. Lejek zestawienia do arkusza nie schodzi.
 - **Arkusz** jest stanem trwałym. Po Zatwierdź koszt odbioru i koszt na worek się nie przeliczają. Wyjątek: edycja **Ilość worków** na rozliczonym wierszu Harmonogramu.
 
 ---
@@ -113,6 +116,8 @@ Makro szuka rejestru po nazwie (`REGISTER_SHEET_NAME`), nie po kolejności kart.
 
 To układ sprzed przesunięcia „transport się odbył”. Harmonogram na tej tabeli nie stoi.
 
+**Data zatwierdzenia** jest kolumną rejestru: Na zgłoszenie 22, Harmonogram 21. Zatwierdź wpisuje ją raz, tekstem `dd.mm.yyyy`, tylko gdy komórka jest pusta. Nagłówek „Data zatwierdzenia” dopisuje ten sam zapis, gdy komórka nagłówka jest pusta. Transport oznaczony `nie` tej daty nie dostaje.
+
 Wiersz z kolumną 14 = `tak` albo kolumną 18 = `nie` nie wraca do wyszukiwania.
 
 Data w kolumnie 5 jest tekstem `dd.mm.yyyy`, tak jak zapisuje ją dziś mapa. Silnik i wyszukanie parsują ten tekst. Nie zakładają ISO.
@@ -133,6 +138,8 @@ Te rzeczy są tylko na ekranie, aż do Zatwierdź. Payload zatwierdzenia musi je
 
 - znacznik „transport się nie odbył” ustawiony na zestawieniu, zanim w kolumnie 18 stoi `nie`,
 - kwota za podjazd i kwota za worek zmienione na wierszu, inne niż w Bazie stawek.
+
+Lejek i sort zestawienia też są tylko w przeglądarce. Do arkusza nie schodzą i payload zatwierdzenia ich nie niesie.
 
 W Na zgłoszenie te kwoty po Zatwierdź zostają tylko w koszcie. Kolumn stawki zatwierdzenie nie rusza. W Harmonogramie Zatwierdź zapisuje je w kolumnach stawki zatwierdzanego wiersza. Przy trasie sam worek. Udział w trasie nie wchodzi do stawki podjazdu. Szczegóły: specyfikacja, [Harmonogram — stawki i liczba worków](SPECIFICATION.md#harmonogram--stawki-i-liczba-worków).
 
@@ -186,6 +193,7 @@ Nowe akcje obok istniejących (`modalData`, `listReferenceData`, zapis protokoł
 6. Wiersz trasy rozpisuje na sklepy z rozwinięcia, nie na jeden rekord.
 7. Nie rusza wierszy spoza zaznaczenia. U nich `nie` też się nie zapisuje.
 8. Nie rusza wiersza, który w międzyczasie dostał `tak`.
+9. **Data zatwierdzenia** (Na zgłoszenie kolumna 22, Harmonogram 21) wpisuje się przy odbytych, raz, tylko gdy komórka jest pusta. Nagłówek „Data zatwierdzenia” dopisuje się, gdy jest pusty. Transport `nie` tej kolumny nie dostaje.
 
 Edycja **Ilość worków** w arkuszu na wierszu Harmonogramu z **Rozliczony** `tak` przelicza **Koszt odbioru** i **Koszt odbioru per worek** od razu. Część za podjazd albo udział w trasie zostaje. Nowa opłata za worki to nowa liczba razy **Stawka za worek** tego wiersza. Pusta albo zerowa stawka worka zostawia koszt i przelicza tylko koszt na worek (przy pustej liczbie albo 0 dzieli przez 1). Sync mapki i Szukaj tego wiersza nie ruszają. W Na zgłoszenie ta edycja kosztu nie przelicza.
 
@@ -197,12 +205,13 @@ Odczyt nie wybiera kolumny po nagłówku. Zapis nie przesuwa kolumn 1–11. Każ
 
 Układ, kolory i typografia z `makiety-menu.html` (pasek miejsc), `makiety-tabeli.html` (Zakres / Zestawienie) oraz `makiety-statystyki.html` (Statystyki). Pasek przełączników na górze makiet (podgląd) do aplikacji nie wchodzi. Na Zestawieniu wykresu składu kosztów nie ma. Na Statystykach: słupki CSS (worki, koszty), bez Chart.js.
 
-Cztery widoki + okno:
+Cztery miejsca w pasku plus podgląd faktury i okno:
 
 1. **Zakres.** Karta na środku. Na zgłoszenie zaznaczone. Harmonogram da się zaznaczyć. Podwykonawca z listy, zawężanie po Nazwa albo Dane do Worda. Tekstu spoza listy nie da się wybrać. Data początkowa, opcja bez daty początkowej, data końcowa wymagana. Szukaj nie startuje bez podwykonawcy, bez daty końcowej, ani gdy data początkowa jest późniejsza niż końcowa. Na dole karty przycisków nie ma: Statystyki i Baza stawek są w pasku. Baza stawek otwiera okno z zakładką Baza cen harmonogram i nie zmienia widoku.
-2. **Zestawienie.** Po Szukaj. Opis zakresu zostaje. Przycisku Zmień zakres nie ma. Liczba pozycji bez sklepów z rozwinięcia. Tabela. Stopka: Suma zestawienia, Suma zaznaczonych, numer faktury, Zatwierdź. Bazy stawek w nagłówku nie ma. Statystyki są w pasku.
+2. **Zestawienie.** Po Szukaj. Opis zakresu zostaje. Przycisku Zmień zakres nie ma. Liczba pozycji bez sklepów z rozwinięcia. Tabela. Na każdej kolumnie lejek: stan przeglądarki, nie kolumna arkusza. Stopka: Suma zestawienia, Suma zaznaczonych, numer faktury, Zatwierdź. Obie sumy liczą całe rozliczenie, także wiersze schowane lejkiem. Bazy stawek w nagłówku nie ma. Statystyki są w pasku.
 3. **Podgląd rozliczonych.** Ze Statystyk, link **Podgląd** przy rozliczonym odbiorze. Ten podwykonawca, tryb wiersza i okres raportu. Na ekranie zostaje tylko numer faktury z tego wiersza. Koszt odbioru i koszt na worek z arkusza. Bez Zatwierdź. ← Statystyki wraca do raportu. **Edycja** w tej samej tabeli otwiera zestawienie nierozliczonych, wpisuje numer tej faktury i nad listą pokazuje pozycje tylko tej faktury. Kolumna **Wartość faktury** jest sumą kosztów tego numeru w okresie.
-4. **Statystyki.** Z paska. Przycisku ← Powrót nie ma. Pierwsze wejście czyta raport, kolejne go nie zeruje. Filtry okresu (bieżący miesiąc domyślnie, poprzednie miesiące, bieżący kwartał, poprzednie kwartały, dokładny zakres), podwykonawca, Pokaż raport. KPI, rankingi, serie czasowe (CSS), listy ze stronicowaniem 5, zwijanie sekcji (`localStorage`). Agregacje w `src/stats.ts` (+ planowany `statsView.ts`). Copy UI: język zarządu (SPEC § Statystyki).
+4. **Statystyki.** Z paska. Przycisku ← Powrót nie ma. Pierwsze wejście czyta raport, kolejne go nie zeruje. Filtry okresu (bieżący miesiąc domyślnie, poprzednie miesiące, bieżący kwartał, poprzednie kwartały, dokładny zakres), podwykonawca, Pokaż raport. KPI, rankingi, serie czasowe (CSS), listy ze stronicowaniem 5, zwijanie sekcji (`localStorage`). Agregacje w `src/stats.ts` (+ planowany `statsView.ts`). Copy UI: język zarządu (SPEC § Statystyki). Odczyt `settlementStats`, bez zapisu.
+5. **Ewidencja.** Z paska. Czyta ten sam `settlementStats` co Statystyki. Nowego zapisu nie ma. Lista numerów, lejek kolumn, podgląd i edycja jak w Statystykach.
 
 Kolumny Zestawienia od lewej: Rozliczone, Numer protokołu, Adres, Sklep, Data, Podjazd/Trasa, Kwota podjazdu/trasy, Liczba worków, Kwota za worek, Suma za worki, Razem, transport się odbył. Pusta komórka pokazuje „—”. Remis stawek widać na wierszu z błędem, nie w oknie Baza stawek. Wskazanie woła `resolveRateTie`.
 

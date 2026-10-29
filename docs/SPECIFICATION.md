@@ -1,7 +1,7 @@
 # SPECIFICATION.md — Rozliczanie kosztów odbiorów
 
 > **Status:** Faza 1 — specyfikacja biznesowa  
-> **Ostatnia aktualizacja:** 2026-10-26  
+> **Ostatnia aktualizacja:** 2026-10-29  
 > **Właściciel:** Zespół Zwrotka  
 > **Źródło:** Wytyczne „Aplikacja do rozliczania kosztów odbiorów” + doprecyzowanie względem rejestru transportów Arkusz-mapa + makiety `rozliczenia/docs/makiety-tabeli.html` i `rozliczenia/docs/makiety-statystyki.html`
 
@@ -129,7 +129,7 @@ Słowniki (**Lista podwykonawców**, **Popraw adres**, **Baza stawek**) też są
 
 Kolumny rejestru są po **kolejności**, nie po nazwie nagłówka. Numer kolumny jest umową zapisu i odczytu, w makrze i w aplikacji rozliczeń. Nagłówek w wierszu 1 jest dla człowieka: ma stać w tej samej kolumnie i tym samym tekstem. Wstawienie albo zamiana kolumny w środku zmienia znaczenie danych. Nowe pole dopisuje się zwykle na końcu — wyjątek: migracje układu V2/V3 w [TRANSPORT_SHEET.md](../../arkusz-mapa/docs/TRANSPORT_SHEET.md).
 
-Właścicielem wiersza nagłówków rejestru jest makro mapy, to samo, które dopisuje protokół. Zanim pierwszy raz dopisze jakikolwiek wiersz protokołu, także gdy to nie jest odbiór z trasy, wpisuje nagłówki kolumn 10–21 w wierszu 1, jeśli te komórki są puste. W tym samym kroku, raz, zakłada na kolumnie 10 listę `tak` / `nie` i przekreślenie wiersza z `nie`. Kolumn 1–9 nie rusza i nie przesuwa. Brak nagłówka nie jest powodem, żeby pominąć zapis albo wybrać inną kolumnę. Nagłówków 10–20 aplikacja rozliczeń nie wpisuje. Gdy nagłówek kolumny 21 jest pusty, zapis komentarza do faktury go dopisuje. Pisze w te same numery. Nie szuka kolumny po nazwie. Brak kolumny 10 znaczy to samo co pusta: transport się odbył.
+Właścicielem wiersza nagłówków rejestru jest makro mapy, to samo, które dopisuje protokół. Zanim pierwszy raz dopisze jakikolwiek wiersz protokołu, także gdy to nie jest odbiór z trasy, wpisuje nagłówki kolumn 10–22 w wierszu 1, jeśli te komórki są puste. W tym samym kroku, raz, zakłada na kolumnie 10 listę `tak` / `nie` i przekreślenie wiersza z `nie`. Kolumn 1–9 nie rusza i nie przesuwa. Brak nagłówka nie jest powodem, żeby pominąć zapis albo wybrać inną kolumnę. Nagłówków 10–20 aplikacja rozliczeń nie wpisuje. Gdy nagłówek kolumny 21 jest pusty, zapis komentarza do faktury go dopisuje. Gdy nagłówek kolumny 22 jest pusty, Zatwierdź dopisuje „Data zatwierdzenia”. Pisze w te same numery. Nie szuka kolumny po nazwie. Brak kolumny 10 znaczy to samo co pusta: transport się odbył.
 
 | Jak się znajduje | Zakładka | Rola |
 |------------------|----------|------|
@@ -168,6 +168,7 @@ Kolejność kolumn rejestru (układ V3):
 19. **Komentarz 1** — tylko rejestr / protokół mapy. Rozliczenia nie czytają.
 20. **Komentarz 2** — j.w.
 21. **Komentarz do faktury** — tekst rozliczeń. Pusty, dopóki ktoś go nie wpisze. Zapis idzie od razu, także na wierszu już rozliczonym (`Rozliczony` `tak`). Nie rusza Rozliczony, numeru faktury ani kosztów. W Harmonogramie to kolumna 20. Komentarz 1 i 2 zostają kolumnami protokołu.
+22. **Data zatwierdzenia** — data pierwszego Zatwierdź tego wiersza, tekst `dd.mm.yyyy`. Pusta, dopóki wiersz nie dostanie rozliczenia. Zatwierdź wpisuje ją raz, tylko gdy komórka jest pusta. Późniejszy zapis worków albo stawek jej nie rusza. Transport `nie` jej nie dostaje. W Harmonogramie to kolumna 21.
 
 Gdy **transport się odbył** (kolumna 10) ma wartość `nie`, także wpisaną w arkuszu przed otwarciem rozliczenia, wiersz nie wchodzi do wyszukiwania. W rejestrze jest przekreślony. W aplikacji rozliczeń go nie ma. Arkusz-mapa traktuje worki tego wiersza jako nieodebrane. Data tego wiersza nie odcina worków tak, jak data transportu, który się odbył. W pozostałych miejscach wiersz jest transportem, który się nie odbył. Nie wchodzi w koszt: bez podjazdu, bez worków i bez udziału w trasie. Przy trasie ten sklep nie wchodzi w liczbę sklepów ani w sumę worków. Gdy żaden sklep trasy się nie odbył, kosztu trasy nie ma.
 
@@ -304,7 +305,7 @@ Pięć widoków aplikacji + okno Bazy stawek. Tabeli na Zakresie nie ma. Na Zest
 
 **Zakres.** Na środku karta. Przełącznik trybu zostaje na karcie, w tym samym miejscu, z tymi samymi napisami. Na starcie Na zgłoszenie. Jeden tryb naraz. Zmiana trybu nie przeładowuje zestawienia ani raportu. Potem podwykonawca, data początkowa, data końcowa i Szukaj. Dolnych przycisków Statystyki i Baza stawek nie ma. Sklep i podwykonawca są listami, bez wpisu ręcznego: adres z kolumny Adres sklepu rejestru, nazwa krótka z Listy podwykonawców. To nie są pinezki mapy.
 
-**Zestawienie.** Po Szukaj. Zostaje opis zakresu (podwykonawca i daty). Przycisku Zmień zakres nie ma: Zakres jest w pasku. Bazy stawek w nagłówku nie ma: jest w pasku. Gdy zestawienie otwarto Edycją z tabeli odbiorów, zostaje **← Statystyki** i wraca do tego samego raportu. Numer faktury i pozycje tej faktury zostają, dopóki użytkownik nie zrobi nowego Szukaj z Zakresu. Pod opisem liczba pozycji w zestawieniu, bez sklepów z rozwinięcia trasy. Potem tabela. Na dole Suma zestawienia, Suma zaznaczonych, numer faktury i Zatwierdź. Po Zatwierdź wraca na Zakres.
+**Zestawienie.** Po Szukaj. Zostaje opis zakresu (podwykonawca i daty). Przycisku Zmień zakres nie ma: Zakres jest w pasku. Bazy stawek w nagłówku nie ma: jest w pasku. Gdy zestawienie otwarto Edycją z tabeli odbiorów, zostaje **← Statystyki** i wraca do tego samego raportu. Numer faktury i pozycje tej faktury zostają, dopóki użytkownik nie zrobi nowego Szukaj z Zakresu. Pod opisem liczba pozycji w zestawieniu, bez sklepów z rozwinięcia trasy. Gdy lejek kolumn coś chowa, licznik brzmi „N z M pozycji w zestawieniu”. Bez filtra zostaje sam licznik pozycji. Potem tabela. Na dole Suma zestawienia, Suma zaznaczonych, numer faktury i Zatwierdź. Po Zatwierdź wraca na Zakres.
 
 **Podgląd rozliczonych.** Ze Statystyk, z wiersza odbioru w tabeli **Odbiory w okresie**. Ten podwykonawca, ten tryb wiersza i okres raportu. Gdy wiersz ma numer faktury, na ekranie jest tylko ta faktura. Kwoty z arkusza. W pasku świeci się Statystyki. **← Statystyki** zostaje i wraca do tego samego raportu. Szczegóły: [Podgląd rozliczonych faktur](#podgląd-rozliczonych-faktur).
 
@@ -315,6 +316,8 @@ Pięć widoków aplikacji + okno Bazy stawek. Tabeli na Zakresie nie ma. Na Zest
 Opcji **tylko za liczbę worków** nie ma. Nie stoi pod nazwą sklepu, nie ma jej w kolumnie i nie ma jej na trasie. Gdy podjazd nie jest naliczany, w Kwota podjazdu/trasy wpisuje się 0 zł.
 
 Kolumny tabeli, od lewej: Rozliczone, Numer protokołu, Adres, Sklep, Data, Podjazd/Trasa, Kwota podjazdu/trasy, Liczba worków, Kwota za worek, Suma za worki, Razem, transport się odbył. Komórka bez wartości pokazuje „—”. Na odbiorze zwykłym Razem to całość kosztu ostatecznego. Na wierszu trasy nazwa trasy jest w Adres, Razem to stawka raz plus worki, a „—” jest w Numer protokołu, Sklep i transport się odbył. Adresy są pogrubione. Nazwy sklepów nie. W Podjazd/Trasa stoi znacznik podjazd albo trasa. Kwota jest w osobnej kolumnie obok.
+
+Na każdej kolumnie tej tabeli, także na **Komentarz do faktury**, jest ten sam lejek co przy odbiorach w Statystykach i przy Ewidencji: lista wartości, szukanie, sortowanie, OK, wyczyść jedną kolumnę, wyczyść wszystko. Filtr i sort są tylko na ekranie. Do arkusza nie schodzą. Podjazd zostaje, gdy jego komórki pasują do wszystkich włączonych filtrów. Trasa zostaje, gdy pasuje wiersz trasy albo któryś jej sklep. Po rozwinięciu widać sklepy spełniające filtr. Filtr „trasa” pokazuje całą trasę. Puste komórki na liście filtra to „—”. Suma zestawienia i suma zaznaczonych liczą całe rozliczenie, także wiersze schowane filtrem. Checkbox w nagłówku kolumny Rozliczone przy włączonym filtrze zaznacza tylko widoczne pozycje. Zaznaczenie schowanych wierszy zostaje. Ten sam lejek jest na zestawieniu Na zgłoszenie i Harmonogram.
 
 ### Edycja stawek
 
@@ -460,8 +463,8 @@ W trakcie zapisu poniżej 10 000 zł widać to samo pulsujące logo co przy każ
 ### Sumy na ekranie
 
 - **Razem** — kwota wiersza na ekranie. Na podjeździe podjazd plus worki, ta sama kwota co Koszt odbioru tego sklepu. Na trasie stawka raz plus worki. Po rozwinięciu zostaje raz, na wierszu trasy.
-- **Suma zestawienia** — suma Razem wierszy aktualnie pokazanych, także niezaznaczonych. Wiersz trasy liczy się raz, bez doliczania sklepów z rozwinięcia.
-- **Suma zaznaczonych** — to samo, tylko dla wierszy z checkboxem. Aktualizuje się przy zaznaczaniu, jeszcze przed Zatwierdź.
+- **Suma zestawienia** — suma Razem pozycji zestawienia, także niezaznaczonych i schowanych lejkiem. Wiersz trasy liczy się raz, bez doliczania sklepów z rozwinięcia.
+- **Suma zaznaczonych** — to samo, tylko dla wierszy z checkboxem, także schowanych filtrem. Aktualizuje się przy zaznaczaniu, jeszcze przed Zatwierdź.
 
 ---
 
@@ -471,7 +474,7 @@ Dotyczy zakładek `Harmonogram {Miesiąc} {Rok}` i legacy `zestawienie z harmono
 
 **Szukaj.** Zestawienie bierze nierozliczone wiersze rejestru Harmonogram tego podwykonawcy i tego zakresu dat. Zapis stawek dotyczy tylko tych wierszy, nie całej zakładki. Szukaj bierze datę tak jak sync zestawienia. Przy tym odczycie **Stawka za podjazd** (kolumna 12) i **Stawka za worek** (kolumna 13) dostają stawkę z **Bazy cen harmonogram** obowiązującą na datę odbioru: adres i podwykonawca, najpóźniejsza data nie późniejsza niż odbiór. Pusta data w Bazie cen to „od zawsze” i jest starsza niż każda wpisana. Remis tej samej daty zostawia pierwszy wiersz w kolejności zakładki. „Tak jak sync” dotyczy całego wyboru daty, nie tylko dwóch wierszy z jedną datą. Para, której każda data jest późniejsza niż odbiór, jest tym samym co brak pary: czyszczone są kolumny 12 i 13. **Trasa** i **Stawka za trasę** zostają. Wiersz z **Rozliczony** `tak` i wiersz z **transport się odbył** `nie` nie wchodzą do zestawienia i kolumn nie dostają. Baza cen się od tego nie zmienia. `saveRateHarmonogram` pustą datę pomija (`resolveHarmonogramSnapshot_` przeskakuje `\u0000`) i nadal przepisuje też trasę. Szukaj tego pominięcia nie kopiuje. Sync mapki zostaje przy swoim przepisywaniu trasy: dalej pomija rozliczone, nie czyści zakładki i nadal sam przepisuje też trasę na nierozliczonych.
 
-Kolumny Harmonogramu, bez numeru transportowego: **Ilość worków** 8, **Stawka za podjazd** 12, **Stawka za worek** 13, **Koszt odbioru** 16, **Koszt odbioru per worek** 17. Numery 17 i 18 w rejestrze Na zgłoszenie to inne pola.
+Kolumny Harmonogramu, bez numeru transportowego: **Ilość worków** 8, **Stawka za podjazd** 12, **Stawka za worek** 13, **Koszt odbioru** 16, **Koszt odbioru per worek** 17, **Data zatwierdzenia** 21. Numery 17 i 18 w rejestrze Na zgłoszenie to inne pola.
 
 Kwota wpisana z ręki na zestawieniu, jeszcze niezatwierdzona, zostaje na ekranie. Do kolumn schodzi dopiero przy Zatwierdź. Ponowne Szukaj przed zatwierdzeniem znowu bierze bazę do kolumn podjazdu i worka. Ekran liczy z kwoty wpisanej z ręki, gdy ta kwota na zestawieniu stoi.
 

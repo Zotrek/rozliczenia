@@ -1,7 +1,7 @@
 # PLAN.md — Kolejność prac
 
-> **Status:** Zatwierdzony 2026-09-19. Etap 0 zamknięty. M1–M6 zamknięte. R1–R7 w toku / zamknięte wg `dev_docs`. R8 (Statystyki) = zadanie `0010_statystyki`. W1: sekretu zapisu nie ma, nowa wersja Web App jeszcze nie weszła.  
-> **Ostatnia aktualizacja:** 2026-09-23  
+> **Status:** Zatwierdzony 2026-09-19. Etap 0 zamknięty. M1–M6 zamknięte. R1–R7 w toku / zamknięte wg `dev_docs`. R8 (Statystyki) = zadanie `0010_statystyki`. Ewidencja i lejek zestawienia są zrobione, bez nowego etapu. W1: sekretu zapisu nie ma, nowa wersja Web App jeszcze nie weszła.  
+> **Ostatnia aktualizacja:** 2026-10-29  
 > **Reguły:** [`SPECIFICATION.md`](SPECIFICATION.md). Ten plik ich nie powtarza.  
 > **Kontrakt techniczny:** [`ARCHITECTURE.md`](ARCHITECTURE.md). Stos, kolumny, akcje, klucz wiersza, gdzie leży kod.
 
@@ -33,6 +33,8 @@ Zapis pliku `.gs` w repozytorium nie zmienia żywej mapy. Żywy zapis mapy jest 
 | R8 | rozliczenia | Statystyki (KPI, rankingi, serie CSS, listy) | R1, R2, R5 | Makieta `makiety-statystyki.html`. Plan: `dev_docs/active/0010_statystyki/`. Odczyt `settlementStats`. Bez Chart.js |
 
 M1 można pisać razem z R1. M5 nie czeka na M2. M4 jest jedynym miejscem, w którym powstaje `saveRate`. R7 go woła. R8 nie czeka na R6/R7 (wejście z Zakresu).
+
+Ewidencja faktur i lejek kolumn zestawienia są zrobione. To nie jest nowy etap i nie zmienia zamkniętych R1–R8. Zachowanie: [`SPECIFICATION.md`](SPECIFICATION.md), [Układ ekranu](SPECIFICATION.md#układ-ekranu). Ślad: `dev_docs/active/0013_ewidencja-faktur/` i `dev_docs/active/0014_filtr-kolumn-zestawienia/`.
 
 ---
 

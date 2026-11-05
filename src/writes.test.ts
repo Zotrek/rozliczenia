@@ -6,6 +6,14 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 type Cell = string | number | null;
 
+/** Apps Script z apostrofem na początku trzyma tekst bez tego znaku. */
+function unwrapForcedDate(value: Cell): Cell {
+  if (typeof value === "string" && /^'\d{2}-\d{2}-\d{4}$/.test(value)) {
+    return value.slice(1);
+  }
+  return value;
+}
+
 type Write = {
   row: number;
   col: number;
@@ -54,7 +62,7 @@ class FakeRange {
     });
     for (let r = 0; r < values.length; r += 1) {
       for (let c = 0; c < values[r].length; c += 1) {
-        this.sheet.put(this.row + r, this.col + c, values[r][c]);
+        this.sheet.put(this.row + r, this.col + c, unwrapForcedDate(values[r][c]));
       }
     }
   }
@@ -503,7 +511,7 @@ describe("patchBags", () => {
 describe("patchPickupDate", () => {
   it("test_patchPickupDate_same_month_sheet_writes_date_cell_only", () => {
     const { register } = fresh("Na zgłoszenie Wrzesień 2026");
-    seedRegister(register, 2);
+    seedRegister(register, 2, { 22: "01.09.2026" });
 
     const result = postToSheet({
       action: "patchPickupDate",
@@ -517,7 +525,8 @@ describe("patchPickupDate", () => {
       ok: true,
       zapisane: [{ sheetName: "Na zgłoszenie Wrzesień 2026", sheetRow: 2, transportNumber: "15" }],
     });
-    expect(register.cell(2, 5)).toBe("19.09.2026");
+    expect(register.cell(2, 5)).toBe("19-09-2026");
+    expect(register.cell(2, 22)).toBe("01.09.2026");
     expect(register.deletes).toEqual([]);
     expect(extraSheets.size).toBe(0);
     expectCostsUntouched(register, [2]);
@@ -525,8 +534,8 @@ describe("patchPickupDate", () => {
 
   it("test_patchPickupDate_other_month_moves_row_and_keeps_cost", () => {
     const { register } = fresh();
-    seedRegister(register, 2);
-    seedRegister(register, 3, { 1: 16 });
+    seedRegister(register, 2, { 22: "04.09.2026" });
+    seedRegister(register, 3, { 1: 16, 22: "05.09.2026" });
 
     const result = postToSheet({
       action: "patchPickupDate",
@@ -547,11 +556,13 @@ describe("patchPickupDate", () => {
     expect(register.cell(2, 1)).toBe("");
     expect(register.cell(3, 1)).toBe("");
     expect(dest?.cell(2, 1)).toBe(16);
-    expect(dest?.cell(2, 5)).toBe("02.10.2026");
+    expect(dest?.cell(2, 5)).toBe("02-10-2026");
     expect(dest?.cell(2, 17)).toBe("999");
     expect(dest?.cell(2, 18)).toBe("111");
+    expect(dest?.cell(2, 22)).toBe("05-09-2026");
     expect(dest?.cell(3, 1)).toBe(15);
-    expect(dest?.cell(3, 5)).toBe("02.10.2026");
+    expect(dest?.cell(3, 5)).toBe("02-10-2026");
+    expect(dest?.cell(3, 22)).toBe("04-09-2026");
   });
 
   it("test_patchPickupDate_bad_date_or_settled_row_writes_nothing", () => {
@@ -599,8 +610,29 @@ describe("patchPickupDate", () => {
     expect(result.zapisane).toEqual([
       { sheetName: "Harmonogram Wrzesień 2026", sheetRow: 2, transportNumber: "" },
     ]);
-    expect(register.cell(2, 4)).toBe("21.09.2026");
+    expect(register.cell(2, 4)).toBe("21-09-2026");
     expect(register.deletes).toEqual([]);
+  });
+
+  it("test_patchPickupDate_schedule_other_month_keeps_approved_date", () => {
+    const { register } = fresh("Harmonogram Wrzesień 2026");
+    seedSchedule(register, 2, { 21: "03.09.2026" });
+
+    const result = postToSheet({
+      action: "patchPickupDate",
+      tryb: "harmonogram",
+      sheetName: "Harmonogram Wrzesień 2026",
+      sheetRow: 2,
+      dataOdbioru: "02.10.2026",
+    });
+
+    const dest = extraSheets.get("Harmonogram Październik 2026");
+    expect(result.zapisane).toEqual([
+      { sheetName: "Harmonogram Październik 2026", sheetRow: 2, transportNumber: "" },
+    ]);
+    expect(dest?.cell(2, 4)).toBe("02-10-2026");
+    expect(dest?.cell(2, 21)).toBe("03-09-2026");
+    expect(register.cell(2, 1)).toBe("");
   });
 });
 
@@ -942,7 +974,7 @@ describe("approve", () => {
       { row: 2, col: 22, numRows: 1, numCols: 1 },
     ]);
     expect(register.cell(1, 22)).toBe("Data zatwierdzenia");
-    expect(register.cell(2, 22)).toMatch(/^\d{2}\.\d{2}\.\d{4}$/);
+    expect(register.cell(2, 22)).toMatch(/^\d{2}-\d{2}-\d{4}$/);
   });
 
   it("test_approve_keeps_existing_approval_date", () => {

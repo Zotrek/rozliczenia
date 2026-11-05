@@ -715,7 +715,7 @@ describe("route edits and commits", () => {
       pickupDate: "02.10.2026",
       body: {
         action: "patchPickupDate",
-        dataOdbioru: "02.10.2026",
+        dataOdbioru: "02-10-2026",
         tryb: "harmonogram",
         wiersze: [
           { sheetName: "Na zgłoszenie Wrzesień 2026", sheetRow: 2, transportNumber: "2" },

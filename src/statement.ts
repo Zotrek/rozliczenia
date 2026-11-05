@@ -771,7 +771,7 @@ export function pickupDateBody(
     pickupDate,
     body: {
       action: "patchPickupDate",
-      dataOdbioru: pickupDate,
+      dataOdbioru: mode === "schedule" ? pickupDate.replaceAll(".", "-") : pickupDate,
       wiersze: rows.map((row) => ({
         sheetName: row.sheetName,
         sheetRow: row.sheetRow,

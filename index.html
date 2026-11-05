@@ -1436,6 +1436,19 @@ function isOnOrBefore(validFrom, pickupDate) {
     }
     return compareSheetDate(validFrom, pickupDate) <= 0;
 }
+/**
+ * Cena obowiązuje w dniu odbioru.
+ * Pusta `validUntil` = bez własnego końca. Wpisana data to ostatni dzień włącznie.
+ */
+function rateCoversPickup(validFrom, validUntil, pickupDate) {
+    if (!isOnOrBefore(validFrom, pickupDate)) {
+        return false;
+    }
+    if (validUntil === "") {
+        return true;
+    }
+    return compareSheetDate(pickupDate, validUntil) <= 0;
+}
 
 
 const PL_FOLD = {
@@ -1713,6 +1726,7 @@ function readWebAppUrl(search, stored, builtIn = "") {
 }
 
 
+
 const LOCALITY_SECOND_WORD = new Set([
     "gora",
     "sol",
@@ -1840,6 +1854,18 @@ function buildRateBody(input, mode, extra) {
         }
         odKiedy = sheet;
     }
+    const rawUntil = (input.until ?? "").trim();
+    let doKiedy = "";
+    if (rawUntil !== "") {
+        const sheet = isoToSheetDate(rawUntil);
+        if (sheet === null) {
+            return { ok: false, error: "date" };
+        }
+        doKiedy = sheet;
+    }
+    if (odKiedy !== "" && doKiedy !== "" && compareSheetDate(doKiedy, odKiedy) < 0) {
+        return { ok: false, error: "date" };
+    }
     return {
         ok: true,
         body: {
@@ -1849,6 +1875,7 @@ function buildRateBody(input, mode, extra) {
             kwotaPodjazd: input.pickup,
             kwotaWorek: input.bag,
             odKiedy,
+            doKiedy,
             ...(extra ?? {}),
         },
     };
@@ -3183,7 +3210,7 @@ function pickupDateBody(rows, iso, mode) {
         pickupDate,
         body: {
             action: "patchPickupDate",
-            dataOdbioru: pickupDate,
+            dataOdbioru: mode === "schedule" ? pickupDate.replaceAll(".", "-") : pickupDate,
             wiersze: rows.map((row) => ({
                 sheetName: row.sheetName,
                 sheetRow: row.sheetRow,
@@ -3509,6 +3536,14 @@ function readRateRow(value) {
     const validFrom = readText(value.validFrom);
     const pickupAmount = readGrosze(value.pickupAmount);
     const bagAmount = readGrosze(value.bagAmount);
+    let validUntil = "";
+    if (Object.prototype.hasOwnProperty.call(value, "validUntil")) {
+        const text = readText(value.validUntil);
+        if (text === null) {
+            return null;
+        }
+        validUntil = text;
+    }
     if (typeof sheetRow !== "number" ||
         !Number.isInteger(sheetRow) ||
         sheetRow < 2 ||
@@ -3527,7 +3562,15 @@ function readRateRow(value) {
             return null;
         }
     }
-    return { sheetRow, shop, contractor, pickupAmount, bagAmount, validFrom };
+    if (validUntil !== "") {
+        try {
+            parseSheetDate(validUntil);
+        }
+        catch {
+            return null;
+        }
+    }
+    return { sheetRow, shop, contractor, pickupAmount, bagAmount, validFrom, validUntil };
 }
 
 
@@ -3941,8 +3984,9 @@ function money(grosze) {
 
 /**
  * Który wiersz Bazy stawek obowiązuje w dniu odbioru.
- * Pusta data jest starsza niż każda wpisana. Wygrywa najpóźniejsza data nie późniejsza niż odbiór.
- * Dwa wiersze tej daty to remis, nie 0 zł. Starszy dublet, który przegrywa z późniejszą datą, nie blokuje.
+ * Pusta data początku jest starsza niż każda wpisana. Wygrywa najpóźniejsza data nie późniejsza niż odbiór.
+ * Puste „do kiedy” nie zamyka wiersza. Wpisana data to ostatni dzień włącznie.
+ * Dwa wiersze tej daty początku to remis, nie 0 zł. Starszy dublet, który przegrywa z późniejszą datą, nie blokuje.
  */
 function resolveRate(rates, shop, contractor, pickupDate) {
     parseSheetDate(pickupDate);
@@ -3950,7 +3994,7 @@ function resolveRate(rates, shop, contractor, pickupDate) {
         .map((rate, index) => ({ rate, index }))
         .filter((entry) => entry.rate.shop === shop &&
         entry.rate.contractor === contractor &&
-        isOnOrBefore(entry.rate.validFrom, pickupDate));
+        rateCoversPickup(entry.rate.validFrom, entry.rate.validUntil, pickupDate));
     if (matching.length === 0) {
         return { kind: "none" };
     }
@@ -6963,6 +7007,9 @@ function renderRatesDialog(model) {
         '<label class="field"><span>Od kiedy obowiązuje</span>' +
         `<input type="date" data-rate="from" data-keep="from" value="${escapeHtml(model.ratesFrom)}">` +
         '<span class="note">Puste znaczy od zawsze.</span></label>' +
+        '<label class="field"><span>Do kiedy obowiązuje</span>' +
+        `<input type="date" data-rate="until" data-keep="until" value="${escapeHtml(model.ratesUntil)}">` +
+        '<span class="note">Puste znaczy bez daty końca. Wpisana data to ostatni dzień włącznie.</span></label>' +
         `<p data-rates-message class="${messageClass}"${model.ratesMessage ? "" : " hidden"}>${escapeHtml(model.ratesMessage)}</p>` +
         '<div class="modal-actions">' +
         '<button type="button" class="btn-ghost" data-action="close-rates">Zamknij</button>' +
@@ -7242,6 +7289,7 @@ const VIEW = {
     ratesPickup: "",
     ratesBag: "",
     ratesFrom: "",
+    ratesUntil: "",
     ratesDays: "",
     ratesTarget: "stawki",
     ratesMessage: "",
@@ -8151,7 +8199,11 @@ function onInput(event) {
         typeRateField(el);
         return;
     }
-    if (el.dataset.rate === "pickup" || el.dataset.rate === "bag" || el.dataset.rate === "from" || el.dataset.rate === "days") {
+    if (el.dataset.rate === "pickup" ||
+        el.dataset.rate === "bag" ||
+        el.dataset.rate === "from" ||
+        el.dataset.rate === "until" ||
+        el.dataset.rate === "days") {
         if (el.dataset.rate === "pickup") {
             VIEW.ratesPickup = el.value;
         }
@@ -8160,6 +8212,9 @@ function onInput(event) {
         }
         else if (el.dataset.rate === "days") {
             VIEW.ratesDays = el.value;
+        }
+        else if (el.dataset.rate === "until") {
+            VIEW.ratesUntil = el.value;
         }
         else {
             VIEW.ratesFrom = el.value;
@@ -9136,6 +9191,7 @@ async function saveRates() {
         pickup: VIEW.ratesPickup,
         bag: VIEW.ratesBag,
         from: VIEW.ratesFrom,
+        until: VIEW.ratesUntil,
     };
     const built = VIEW.ratesTarget === "harmonogram"
         ? saveRateHarmonogramBody({ ...common, days: VIEW.ratesDays })
@@ -9171,6 +9227,7 @@ async function saveRates() {
         VIEW.ratesPickup = "";
         VIEW.ratesBag = "";
         VIEW.ratesFrom = "";
+        VIEW.ratesUntil = "";
         VIEW.ratesDays = "";
         VIEW.ratesMessage =
             VIEW.ratesTarget === "harmonogram" ? "Zapisano stawkę harmonogramu." : "Zapisano stawkę.";

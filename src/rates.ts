@@ -1,4 +1,4 @@
-import { compareSheetDate, isOnOrBefore, parseSheetDate } from "./sheetDate.js";
+import { compareSheetDate, parseSheetDate, rateCoversPickup } from "./sheetDate.js";
 import type { RateCandidate, RateRow, RateTie } from "./types.js";
 
 export type ResolvedRate =
@@ -8,8 +8,9 @@ export type ResolvedRate =
 
 /**
  * Który wiersz Bazy stawek obowiązuje w dniu odbioru.
- * Pusta data jest starsza niż każda wpisana. Wygrywa najpóźniejsza data nie późniejsza niż odbiór.
- * Dwa wiersze tej daty to remis, nie 0 zł. Starszy dublet, który przegrywa z późniejszą datą, nie blokuje.
+ * Pusta data początku jest starsza niż każda wpisana. Wygrywa najpóźniejsza data nie późniejsza niż odbiór.
+ * Puste „do kiedy” nie zamyka wiersza. Wpisana data to ostatni dzień włącznie.
+ * Dwa wiersze tej daty początku to remis, nie 0 zł. Starszy dublet, który przegrywa z późniejszą datą, nie blokuje.
  */
 export function resolveRate(
   rates: readonly RateRow[],
@@ -24,7 +25,7 @@ export function resolveRate(
       (entry) =>
         entry.rate.shop === shop &&
         entry.rate.contractor === contractor &&
-        isOnOrBefore(entry.rate.validFrom, pickupDate),
+        rateCoversPickup(entry.rate.validFrom, entry.rate.validUntil, pickupDate),
     );
 
   if (matching.length === 0) {

@@ -65,6 +65,7 @@ function rate(
     pickupAmount: 2_000,
     bagAmount: 1_000,
     validFrom: "",
+    validUntil: "",
     ...over,
   };
 }

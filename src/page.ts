@@ -173,6 +173,7 @@ const VIEW: RangeViewModel = {
   ratesPickup: "",
   ratesBag: "",
   ratesFrom: "",
+  ratesUntil: "",
   ratesDays: "",
   ratesTarget: "stawki",
   ratesMessage: "",
@@ -1173,13 +1174,21 @@ function onInput(event: Event): void {
     typeRateField(el);
     return;
   }
-  if (el.dataset.rate === "pickup" || el.dataset.rate === "bag" || el.dataset.rate === "from" || el.dataset.rate === "days") {
+  if (
+    el.dataset.rate === "pickup" ||
+    el.dataset.rate === "bag" ||
+    el.dataset.rate === "from" ||
+    el.dataset.rate === "until" ||
+    el.dataset.rate === "days"
+  ) {
     if (el.dataset.rate === "pickup") {
       VIEW.ratesPickup = el.value;
     } else if (el.dataset.rate === "bag") {
       VIEW.ratesBag = el.value;
     } else if (el.dataset.rate === "days") {
       VIEW.ratesDays = el.value;
+    } else if (el.dataset.rate === "until") {
+      VIEW.ratesUntil = el.value;
     } else {
       VIEW.ratesFrom = el.value;
     }
@@ -2248,6 +2257,7 @@ async function saveRates(): Promise<void> {
     pickup: VIEW.ratesPickup,
     bag: VIEW.ratesBag,
     from: VIEW.ratesFrom,
+    until: VIEW.ratesUntil,
   };
   const built =
     VIEW.ratesTarget === "harmonogram"
@@ -2290,6 +2300,7 @@ async function saveRates(): Promise<void> {
     VIEW.ratesPickup = "";
     VIEW.ratesBag = "";
     VIEW.ratesFrom = "";
+    VIEW.ratesUntil = "";
     VIEW.ratesDays = "";
     VIEW.ratesMessage =
       VIEW.ratesTarget === "harmonogram" ? "Zapisano stawkę harmonogramu." : "Zapisano stawkę.";

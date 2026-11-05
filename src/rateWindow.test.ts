@@ -59,6 +59,7 @@ describe("saveRateBody", () => {
         kwotaPodjazd: "",
         kwotaWorek: "0",
         odKiedy: "",
+        doKiedy: "",
       },
     });
   });
@@ -85,6 +86,39 @@ describe("saveRateBody", () => {
       error: "date",
     });
   });
+
+  it("test_saveRateBody_until_is_last_day_and_cannot_precede_from", () => {
+    const built = saveRateBody({
+      shop: "ul. A",
+      contractor: "GPW",
+      pickup: "20",
+      bag: "2",
+      from: "2026-09-01",
+      until: "2026-09-30",
+    });
+    expect(built).toEqual({
+      ok: true,
+      body: {
+        mode: "saveRate",
+        sklep: "ul. A",
+        podwykonawca: "GPW",
+        kwotaPodjazd: "20",
+        kwotaWorek: "2",
+        odKiedy: "01.09.2026",
+        doKiedy: "30.09.2026",
+      },
+    });
+    expect(
+      saveRateBody({
+        shop: "ul. A",
+        contractor: "GPW",
+        pickup: "1",
+        bag: "1",
+        from: "2026-09-10",
+        until: "2026-09-01",
+      }),
+    ).toEqual({ ok: false, error: "date" });
+  });
 });
 
 describe("saveRateHarmonogramBody", () => {
@@ -107,6 +141,7 @@ describe("saveRateHarmonogramBody", () => {
         kwotaPodjazd: "100",
         kwotaWorek: "0",
         odKiedy: "01.09.2026",
+        doKiedy: "",
         dniOdbiorow: "pn, cz",
       },
     });

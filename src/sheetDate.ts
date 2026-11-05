@@ -65,3 +65,17 @@ export function isOnOrBefore(validFrom: string, pickupDate: string): boolean {
   }
   return compareSheetDate(validFrom, pickupDate) <= 0;
 }
+
+/**
+ * Cena obowiązuje w dniu odbioru.
+ * Pusta `validUntil` = bez własnego końca. Wpisana data to ostatni dzień włącznie.
+ */
+export function rateCoversPickup(validFrom: string, validUntil: string, pickupDate: string): boolean {
+  if (!isOnOrBefore(validFrom, pickupDate)) {
+    return false;
+  }
+  if (validUntil === "") {
+    return true;
+  }
+  return compareSheetDate(pickupDate, validUntil) <= 0;
+}

@@ -39,6 +39,7 @@ function rate(over: Partial<SettlementRateRow> & { sheetRow: number; shop: strin
     pickupAmount: 2_000,
     bagAmount: 0,
     validFrom: "",
+    validUntil: "",
     ...over,
   };
 }

@@ -7,6 +7,7 @@ function rate(over: Partial<RateRow> & Pick<RateRow, "shop" | "contractor">): Ra
     pickupAmount: 2_000,
     bagAmount: 100,
     validFrom: "",
+    validUntil: "",
     ...over,
   };
 }
@@ -93,6 +94,48 @@ describe("resolveRate", () => {
         "10.09.2026",
       ),
     ).toEqual({ kind: "ok", pickupAmount: null, bagAmount: null });
+  });
+
+  it("test_resolveRate_validUntil_is_last_inclusive_day", () => {
+    const rates = [
+      rate({
+        shop: "A",
+        contractor: "gpw",
+        validFrom: "01.01.2026",
+        validUntil: "10.09.2026",
+        pickupAmount: 1_000,
+      }),
+    ];
+    expect(resolveRate(rates, "A", "gpw", "10.09.2026")).toEqual({
+      kind: "ok",
+      pickupAmount: 1_000,
+      bagAmount: 100,
+    });
+    expect(resolveRate(rates, "A", "gpw", "11.09.2026")).toEqual({ kind: "none" });
+  });
+
+  it("test_resolveRate_expired_later_row_falls_back_to_open_older", () => {
+    const rates = [
+      rate({ shop: "A", contractor: "gpw", validFrom: "", pickupAmount: 1_000, bagAmount: 10 }),
+      rate({
+        shop: "A",
+        contractor: "gpw",
+        validFrom: "01.06.2026",
+        validUntil: "31.08.2026",
+        pickupAmount: 3_000,
+        bagAmount: 50,
+      }),
+    ];
+    expect(resolveRate(rates, "A", "gpw", "15.07.2026")).toEqual({
+      kind: "ok",
+      pickupAmount: 3_000,
+      bagAmount: 50,
+    });
+    expect(resolveRate(rates, "A", "gpw", "10.09.2026")).toEqual({
+      kind: "ok",
+      pickupAmount: 1_000,
+      bagAmount: 10,
+    });
   });
 
   it("test_resolveRate_invalid_pickup_date_throws", () => {

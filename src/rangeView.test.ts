@@ -45,6 +45,7 @@ function model(over: Partial<RangeViewModel> = {}): RangeViewModel {
     ratesPickup: "",
     ratesBag: "",
     ratesFrom: "",
+    ratesUntil: "",
     ratesDays: "",
     ratesTarget: "stawki",
     ratesMessage: "",

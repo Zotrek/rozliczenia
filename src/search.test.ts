@@ -267,6 +267,7 @@ describe("buildSettlementRead_", () => {
         pickupAmount: 2_000,
         bagAmount: 1_050,
         validFrom: "",
+        validUntil: "",
       },
       {
         sheetRow: 4,
@@ -275,6 +276,7 @@ describe("buildSettlementRead_", () => {
         pickupAmount: 0,
         bagAmount: null,
         validFrom: "10.09.2026",
+        validUntil: "",
       },
     ]);
   });

@@ -1130,6 +1130,14 @@ function readRateRow(value: unknown): SettlementRateRow | null {
   const validFrom = readText(value.validFrom);
   const pickupAmount = readGrosze(value.pickupAmount);
   const bagAmount = readGrosze(value.bagAmount);
+  let validUntil = "";
+  if (Object.prototype.hasOwnProperty.call(value, "validUntil")) {
+    const text = readText(value.validUntil);
+    if (text === null) {
+      return null;
+    }
+    validUntil = text;
+  }
   if (
     typeof sheetRow !== "number" ||
     !Number.isInteger(sheetRow) ||
@@ -1149,5 +1157,12 @@ function readRateRow(value: unknown): SettlementRateRow | null {
       return null;
     }
   }
-  return { sheetRow, shop, contractor, pickupAmount, bagAmount, validFrom };
+  if (validUntil !== "") {
+    try {
+      parseSheetDate(validUntil);
+    } catch {
+      return null;
+    }
+  }
+  return { sheetRow, shop, contractor, pickupAmount, bagAmount, validFrom, validUntil };
 }

@@ -126,9 +126,9 @@ Klucz zapisu wiersza to numer wiersza arkusza (od 1, nagłówek jest w 1, dane o
 
 ### Baza stawek
 
-Zakładka po nazwie. Gdy jej nie ma, zakłada ją pierwszy zapis: mapa albo aplikacja. Kolumny: Sklep (adres), Podwykonawca (nazwa krótka), Kwota za podjazd, Kwota za worek, Od kiedy obowiązuje. Data w tej ostatniej kolumnie to tekst `dd.mm.yyyy`, ten sam zapis co data odbioru w rejestrze. Pusta = od zawsze. Porównanie jest po dacie kalendarzowej, nie po sortowaniu tekstu.
+Zakładka po nazwie. Gdy jej nie ma, zakłada ją pierwszy zapis: mapa albo aplikacja. Kolumny: Sklep (adres), Podwykonawca (nazwa krótka), Kwota za podjazd, Kwota za worek, Od kiedy obowiązuje, Do kiedy obowiązuje. Daty to tekst `dd.mm.yyyy`, ten sam zapis co data odbioru w rejestrze. Puste „od kiedy” = od zawsze. Puste „do kiedy” = bez własnego końca. Wpisane „do kiedy” to ostatni dzień włącznie. Porównanie jest po dacie kalendarzowej, nie po sortowaniu tekstu. Na istniejącej zakładce kolumna końca jest dopisywana na końcu, kolumny 1–5 zostają.
 
-Klucz odczytu: adres + nazwa krótka + data odbioru, nie dzień rozliczenia. Pusta data = od zawsze i jest starsza niż każda wpisana. Obowiązuje najpóźniejsza data nie późniejsza niż odbiór. Dwa wiersze z tą samą parą i tą samą datą to remis: kosztu nie ma, dopóki użytkownik nie wskaże wiersza. Wskazanie zostawia jeden wiersz i usuwa pozostałe z tym kluczem. To jedyne usuwanie stawki w tej wersji.
+Klucz odczytu: adres + nazwa krótka + data odbioru, nie dzień rozliczenia. Pusta data początku = od zawsze i jest starsza niż każda wpisana. Obowiązuje najpóźniejsza data początku nie późniejsza niż odbiór, o ile odbiór nie jest późniejszy niż „do kiedy”. Dwa wiersze z tą samą parą i tą samą datą początku to remis: kosztu nie ma, dopóki użytkownik nie wskaże wiersza. Wskazanie zostawia jeden wiersz i usuwa pozostałe z tym kluczem. To jedyne usuwanie stawki w tej wersji.
 
 Stawki trasy w tej zakładce nie ma.
 

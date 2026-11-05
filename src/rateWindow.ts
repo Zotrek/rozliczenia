@@ -1,4 +1,5 @@
 import { foldPl, isoToSheetDate } from "./range.js";
+import { compareSheetDate } from "./sheetDate.js";
 import type { ContractorListItem } from "./search.js";
 
 /** Adres z kolumny 2 rejestru i nazwa z kolumny Sklep. Zapis stawki używa adresu. */
@@ -134,6 +135,8 @@ type RateBodyInput = {
   pickup: string;
   bag: string;
   from: string;
+  /** Puste = bez własnego końca. ISO z pola daty albo już `dd.mm.yyyy`. */
+  until?: string;
 };
 
 type RateBodyResult = { ok: false; error: "shop" | "date" } | { ok: true; body: Record<string, string> };
@@ -157,6 +160,18 @@ function buildRateBody(
     }
     odKiedy = sheet;
   }
+  const rawUntil = (input.until ?? "").trim();
+  let doKiedy = "";
+  if (rawUntil !== "") {
+    const sheet = isoToSheetDate(rawUntil);
+    if (sheet === null) {
+      return { ok: false, error: "date" };
+    }
+    doKiedy = sheet;
+  }
+  if (odKiedy !== "" && doKiedy !== "" && compareSheetDate(doKiedy, odKiedy) < 0) {
+    return { ok: false, error: "date" };
+  }
   return {
     ok: true,
     body: {
@@ -166,6 +181,7 @@ function buildRateBody(
       kwotaPodjazd: input.pickup,
       kwotaWorek: input.bag,
       odKiedy,
+      doKiedy,
       ...(extra ?? {}),
     },
   };

@@ -46,6 +46,8 @@ export interface RateRow {
   bagAmount: Grosze | null;
   /** `dd.mm.yyyy` albo `""` = od zawsze. */
   validFrom: string;
+  /** `dd.mm.yyyy` albo `""` = bez własnego końca. Wpisana data to ostatni dzień włącznie. */
+  validUntil: string;
 }
 
 /**

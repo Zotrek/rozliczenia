@@ -197,15 +197,16 @@ Nowa zakładka w tym samym pliku, po nazwie **Baza stawek**. Nie ma tu stawki za
 | 3 | Kwota za podjazd | Stawka jednego podjazdu w tym sklepie u tego podwykonawcy |
 | 4 | Kwota za worek | Stawka jednego worka |
 | 5 | Od kiedy obowiązuje | Tekst `dd.mm.yyyy`, ten sam zapis co **Data odbioru** na Arkusz1. Od tej daty wiersz zastępuje starszą stawkę tej pary. Puste = od zawsze. Porównanie jest po dacie kalendarzowej, nie po sortowaniu tekstu |
+| 6 | Do kiedy obowiązuje | Tekst `dd.mm.yyyy`. Ostatni dzień włącznie. Puste = wiersz nie ma własnego końca. Dopisywana na końcu, bez przesuwania kolumn 1–5 |
 
 Ta sama para Sklep + Podwykonawca może mieć kilka wierszy, z różną datą. Sklep w tej parze to adres sklepu. Podwykonawca to nazwa krótka. Inna data to nowy wiersz, nie nadpisanie. Zapis przy jednym wierszu tej daty i remis przy dwóch są niżej.
 
 Który wiersz wchodzi w koszt, liczy się po **Data odbioru** na Arkusz1, nie po dniu rozliczenia. Trzeba trafić w dobry przedział, nie brać „najnowszej stawki w ogóle”.
 
-Każdy wiersz obowiązuje od swojej daty do dnia poprzedzającego następną datę tej samej pary. Pusta data zaczyna przedział od zawsze. Ostatni wiersz nie ma końca.
+Każdy wiersz obowiązuje od swojej daty „od kiedy”. Puste „do kiedy” zamyka go dopiero następna data tej samej pary, a ostatni taki wiersz zostaje otwarty. Wpisane „do kiedy” jest ostatnim dniem włącznie: po nim wiersz nie obowiązuje, także gdy nie ma nowszej stawki.
 
-- Do odbioru pasują tylko wiersze, których data jest pusta albo nie późniejsza niż data odbioru.
-- Z pasujących obowiązuje ten z najpóźniejszą datą. Pusta data jest starsza niż każda wpisana.
+- Do odbioru pasują tylko wiersze, których „od kiedy” jest puste albo nie późniejsze niż data odbioru, i których „do kiedy” jest puste albo nie wcześniejsze niż odbiór.
+- Z pasujących obowiązuje ten z najpóźniejszą datą „od kiedy”. Pusta data początku jest starsza niż każda wpisana.
 - Wiersz z datą późniejszą niż odbiór jeszcze nie obowiązuje.
 - Gdy żaden wiersz nie pasuje, pary na ten dzień nie ma.
 
@@ -274,6 +275,7 @@ Pola zapisu:
 - Kwota za podjazd
 - Kwota za worek
 - Od kiedy obowiązuje — tekst `dd.mm.yyyy`, jak **Data odbioru**. Puste znaczy od zawsze
+- Do kiedy obowiązuje — tekst `dd.mm.yyyy`. Puste znaczy bez własnego końca. Wpisana data to ostatni dzień włącznie i nie może być wcześniejsza niż „od kiedy”
 
 Klucz wiersza to adres sklepu + nazwa krótka podwykonawcy + data obowiązywania. Gdy taki wiersz jest jeden, ta sama trójka nadpisuje kwoty. Gdy jest ich więcej, zapisu w jeden z nich nie ma: remis rozstrzyga użytkownik przy rozliczeniu. Inna data tej samej pary dopisuje kolejny wiersz, na przykład 100 zł teraz i 150 zł od 10.10.2026.
 

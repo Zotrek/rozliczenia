@@ -72,6 +72,8 @@ export interface RangeViewModel {
   ratesPickup: string;
   ratesBag: string;
   ratesFrom: string;
+  /** Puste = bez własnego końca. Ostatni dzień włącznie, gdy wpisane. */
+  ratesUntil: string;
   /** Dni transportu (tylko Baza cen harmonogram), np. pn, cz. */
   ratesDays: string;
   /** Zakładka okna stawek. */
@@ -469,6 +471,9 @@ export function renderRatesDialog(model: RangeViewModel): string {
     '<label class="field"><span>Od kiedy obowiązuje</span>' +
     `<input type="date" data-rate="from" data-keep="from" value="${escapeHtml(model.ratesFrom)}">` +
     '<span class="note">Puste znaczy od zawsze.</span></label>' +
+    '<label class="field"><span>Do kiedy obowiązuje</span>' +
+    `<input type="date" data-rate="until" data-keep="until" value="${escapeHtml(model.ratesUntil)}">` +
+    '<span class="note">Puste znaczy bez daty końca. Wpisana data to ostatni dzień włącznie.</span></label>' +
     `<p data-rates-message class="${messageClass}"${model.ratesMessage ? "" : " hidden"}>${escapeHtml(model.ratesMessage)}</p>` +
     '<div class="modal-actions">' +
     '<button type="button" class="btn-ghost" data-action="close-rates">Zamknij</button>' +

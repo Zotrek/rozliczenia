@@ -686,6 +686,7 @@ describe("route edits and commits", () => {
     expect(writeError("name")).toBe(STATEMENT_ERROR.routeName);
     expect(writeError("invoice")).toBe(STATEMENT_ERROR.invoice);
     expect(writeError("selection")).toBe(STATEMENT_ERROR.selection);
+    expect(writeError("busy")).toBe(STATEMENT_ERROR.busy);
     expect(writeError("unknown")).toBe(STATEMENT_ERROR.write);
     const statement = currentStatement(base);
     expect(lineHasTie(statement.lines[0])).toBe(false);

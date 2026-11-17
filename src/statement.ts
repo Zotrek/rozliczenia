@@ -36,6 +36,7 @@ export const STATEMENT_ERROR = {
   badBags: "Liczba worków jest niepoprawna.",
   badDate: "Data odbioru jest niepoprawna.",
   write: "Zapis nie doszedł.",
+  busy: "Inny zapis jeszcze trwa. To kliknięcie nic nie zmieniło — spróbuj za chwilę.",
   stale: "Wiersz się zmienił. Szukaj jeszcze raz.",
   refresh: "Zapisano, ale nie udało się odświeżyć listy.",
   partial: "Część wierszy nie weszła w zapis.",
@@ -902,6 +903,9 @@ export function writeError(code: unknown): string {
   }
   if (code === "selection") {
     return STATEMENT_ERROR.selection;
+  }
+  if (code === "busy") {
+    return STATEMENT_ERROR.busy;
   }
   return STATEMENT_ERROR.write;
 }

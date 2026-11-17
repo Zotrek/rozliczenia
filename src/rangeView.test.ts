@@ -452,3 +452,12 @@ describe("contractor picker", () => {
     expect(css).toMatch(/\[data-picker-list\] \{[^}]*position: absolute/);
   });
 });
+
+describe("invoice edit layout", () => {
+  it("test_statement_under_invoice_keeps_a_selectable_list", () => {
+    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "app.css"), "utf8");
+    expect(css).toContain(".statement:has(.focused-invoice) > .table-wrap");
+    expect(css).toMatch(/\.statement:has\(\.focused-invoice\) > \.table-wrap \{[^}]*min-height: 16rem/);
+    expect(css).toMatch(/\.statement:has\(\.focused-invoice\) \{[^}]*overflow: auto/);
+  });
+});

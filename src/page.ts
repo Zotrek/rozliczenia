@@ -237,13 +237,25 @@ function fieldByKeep(root: ParentNode, keep: string): HTMLInputElement | null {
     root.querySelector(`[data-filter="${keep}"]`)) as HTMLInputElement | null;
 }
 
-/** Przewinięcie listy zestawienia. Przebudowa HTML tworzy nowy kontener i bez tego wraca na górę. */
-function readListScroll(): { top: number; left: number } | null {
-  const wrap = document.querySelector(".table-wrap");
-  if (!(wrap instanceof HTMLElement)) {
-    return null;
-  }
-  return { top: wrap.scrollTop, left: wrap.scrollLeft };
+/**
+ * Przewinięcie listy zestawienia, bloku pozycji faktury i strony.
+ * Przebudowa HTML tworzy nowe kontenery. Jeden `.table-wrap` to za mało:
+ * przy edycji faktury pierwszy jest w karcie, a lista nierozliczonych jest drugi.
+ */
+function readListScroll(): {
+  page: number;
+  wraps: { top: number; left: number }[];
+  invoice: number | null;
+} {
+  const wraps = [...document.querySelectorAll(".table-wrap")].flatMap((wrap) =>
+    wrap instanceof HTMLElement ? [{ top: wrap.scrollTop, left: wrap.scrollLeft }] : [],
+  );
+  const invoiceBox = document.querySelector(".focused-invoice");
+  return {
+    page: document.scrollingElement?.scrollTop ?? 0,
+    wraps,
+    invoice: invoiceBox instanceof HTMLElement ? invoiceBox.scrollTop : null,
+  };
 }
 
 let listScrollGen = 0;
@@ -299,18 +311,33 @@ function writeStatsScroll(top: number | null): void {
   });
 }
 
-function writeListScroll(scroll: { top: number; left: number } | null): void {
+function writeListScroll(
+  scroll: { page: number; wraps: { top: number; left: number }[]; invoice: number | null } | null,
+): void {
   if (!scroll) {
     return;
   }
   armScrollRestore();
   const apply = (): void => {
-    const wrap = document.querySelector(".table-wrap");
-    if (!(wrap instanceof HTMLElement)) {
-      return;
+    const wraps = document.querySelectorAll(".table-wrap");
+    wraps.forEach((wrap, index) => {
+      const saved = scroll.wraps[index];
+      if (!saved || !(wrap instanceof HTMLElement)) {
+        return;
+      }
+      wrap.scrollTop = saved.top;
+      wrap.scrollLeft = saved.left;
+    });
+    if (scroll.invoice != null) {
+      const box = document.querySelector(".focused-invoice");
+      if (box instanceof HTMLElement) {
+        box.scrollTop = scroll.invoice;
+      }
     }
-    wrap.scrollTop = scroll.top;
-    wrap.scrollLeft = scroll.left;
+    const page = document.scrollingElement;
+    if (page) {
+      page.scrollTop = scroll.page;
+    }
   };
   apply();
   const gen = ++listScrollGen;
@@ -356,6 +383,10 @@ function paint(keep?: string): void {
   const start = current?.selectionStart ?? null;
   const end = current?.selectionEnd ?? null;
   root.innerHTML = renderApp(VIEW);
+  writeListScroll(scroll);
+  writeStatsScroll(statsScroll);
+  placePickupMenu();
+  writeMenuScroll(menuScroll);
   if (keep) {
     const next = fieldByKeep(root, keep);
     if (next) {
@@ -364,14 +395,6 @@ function paint(keep?: string): void {
         next.setSelectionRange(start, end);
       }
     }
-  }
-  writeListScroll(scroll);
-  writeStatsScroll(statsScroll);
-  placePickupMenu();
-  writeMenuScroll(menuScroll);
-  const focused = root.querySelector(".invoice-card.is-focus");
-  if (focused instanceof HTMLElement) {
-    focused.scrollIntoView({ block: "nearest" });
   }
   syncCommentChrome();
   syncInvoiceComment();
@@ -1148,7 +1171,15 @@ function onInput(event: Event): void {
   if (el.dataset.edit === "invoice") {
     VIEW.statement = { ...VIEW.statement, invoice: el.value };
     VIEW.status = "";
-    paint("invoice");
+    document.querySelector(".statement > p.status-block")?.remove();
+    const approve = document.querySelector('[data-action="approve"]');
+    if (approve instanceof HTMLButtonElement) {
+      const statement = currentStatement(VIEW.statement);
+      approve.disabled = !canPressApprove(
+        el.value,
+        selectedLineCount(statement, VIEW.statement.selected),
+      );
+    }
     return;
   }
   if (el.dataset.draft === "route-name" || el.dataset.draft === "route-rate") {

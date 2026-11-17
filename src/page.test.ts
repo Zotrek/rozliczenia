@@ -137,11 +137,18 @@ describe("page wiring", () => {
     expect(paint.lastIndexOf("writeListScroll(scroll)")).toBeGreaterThan(htmlAt);
     expect(paint.lastIndexOf("writeMenuScroll(menuScroll)")).toBeGreaterThan(htmlAt);
     expect(paint).toContain("preventScroll: true");
+    expect(paint).not.toContain("scrollIntoView");
+    expect(paint.indexOf("preventScroll: true")).toBeGreaterThan(paint.indexOf("writeListScroll(scroll)"));
     const read = functionBody("readListScroll");
     const write = functionBody("writeListScroll");
-    expect(read).toContain(".table-wrap");
+    expect(read).toContain('querySelectorAll(".table-wrap")');
+    expect(read).toContain(".focused-invoice");
+    expect(read).toContain("scrollingElement");
     expect(read).toContain("scrollTop");
     expect(read).toContain("scrollLeft");
+    expect(write).toContain('querySelectorAll(".table-wrap")');
+    expect(write).toContain(".focused-invoice");
+    expect(write).toContain("scrollingElement");
     expect(write).toContain("scrollTop");
     expect(write).toContain("scrollLeft");
     expect(write).toContain("requestAnimationFrame");
@@ -184,6 +191,17 @@ describe("page wiring", () => {
     expect(change).toContain("toggleSelected(");
     expect(change).toContain("applyNoStartDate(");
     expect(change).toContain("commitEdit(");
+  });
+
+  it("test_page_onInput_invoice_number_updates_approve_without_repainting", () => {
+    const input = functionBody("onInput");
+    const start = input.indexOf('el.dataset.edit === "invoice"');
+    const end = input.indexOf('el.dataset.draft === "route-name"', start);
+    const branch = input.slice(start, end);
+    expect(branch).toContain("canPressApprove(");
+    expect(branch).toContain("approve.disabled");
+    expect(branch).toContain("selectedLineCount(");
+    expect(branch).not.toContain("paint(");
   });
 
   it("test_page_onInput_keeps_contractor_picker_without_full_paint", () => {

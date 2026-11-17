@@ -227,8 +227,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .picker-empty { margin: 4px 0 0; }
 .statement {
   height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: #fff;
 }
 .top {
@@ -563,7 +565,13 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
   border-color: var(--teal);
   box-shadow: 0 0 0 2px var(--teal-soft);
 }
-.focused-invoice { padding-bottom: 4px; }
+.focused-invoice {
+  flex: 0 1 auto;
+  max-height: 42%;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 4px;
+}
 .invoice-card .note { margin: 0; padding: 10px 14px 12px; }
 .invoice-head {
   display: flex;

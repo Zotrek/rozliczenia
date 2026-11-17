@@ -1043,7 +1043,7 @@ describe("approve", () => {
     expect(register.cell(3, 18)).toBe(0.01);
   });
 
-  it("test_approve_did_not_happen_writes_only_column_18", () => {
+  it("test_approve_did_not_happen_writes_only_column_10", () => {
     const { register } = fresh();
     seedRegister(register, 2);
     seedRegister(register, 3, { 1: 16 });
@@ -1068,10 +1068,7 @@ describe("approve", () => {
     expect(register.cell(2, 18)).toBe("111");
     expect(register.cell(3, 10)).toBe("nie");
     expect(register.cell(3, 15)).toBe("");
-    expect(register.writes).toEqual([
-      { row: 2, col: 10, numRows: 1, numCols: 1 },
-      { row: 3, col: 10, numRows: 1, numCols: 1 },
-    ]);
+    expect(register.writes).toEqual([{ row: 2, col: 10, numRows: 2, numCols: 1 }]);
   });
 
   it("test_approve_route_writes_each_selected_shop_and_leaves_the_rest", () => {

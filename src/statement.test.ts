@@ -505,7 +505,7 @@ describe("readSettlement", () => {
     const read = readSettlement({
       ok: true,
       rows: [row({ sheetRow: 2, bagCount: null, routeRate: null, pickupRate: null, bagRate: null, invoiceComment: "folia" })],
-      rates: [rate({ sheetRow: 8, shop: "Sklepowa 1", validFrom: "" })],
+      rates: [rate({ sheetRow: 8, shop: "Sklepowa 1", validFrom: "", routeAmount: 15_000 })],
     });
     expect(read.ok).toBe(true);
     if (read.ok) {
@@ -513,6 +513,7 @@ describe("readSettlement", () => {
       expect(read.rows[0].pickupRate).toBeNull();
       expect(read.rows[0].invoiceComment).toBe("folia");
       expect(read.rates[0].sheetRow).toBe(8);
+      expect(read.rates[0].routeAmount).toBe(15_000);
     }
   });
 });

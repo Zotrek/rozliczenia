@@ -322,6 +322,22 @@ th {
   color: var(--muted);
 }
 th.num, td.num { text-align: right; }
+.rate-noted {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: 100%;
+}
+.rate-noted input { box-shadow: inset 0 -2px 0 var(--orange-deep); }
+abbr.rate-drift {
+  flex: none;
+  color: var(--orange-deep);
+  font-weight: 750;
+  text-decoration: none;
+  cursor: help;
+  border-bottom: 1px dotted var(--orange-deep);
+}
 th.c, td.c { text-align: center; }
 th.c .col-check {
   display: flex;

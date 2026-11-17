@@ -1168,5 +1168,13 @@ function readRateRow(value: unknown): SettlementRateRow | null {
       return null;
     }
   }
-  return { sheetRow, shop, contractor, pickupAmount, bagAmount, validFrom, validUntil };
+  const row = { sheetRow, shop, contractor, pickupAmount, bagAmount, validFrom, validUntil };
+  if (!Object.prototype.hasOwnProperty.call(value, "routeAmount")) {
+    return row;
+  }
+  const routeAmount = readGrosze(value.routeAmount);
+  if (routeAmount === undefined) {
+    return null;
+  }
+  return { ...row, routeAmount };
 }

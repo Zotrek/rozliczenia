@@ -54,7 +54,9 @@ function screen(
 
 describe("renderStatement", () => {
   it("test_renderStatement_leg_amount_has_header_between_kind_and_bags", () => {
-    const html = renderStatement(screen([row({ sheetRow: 2, pickupRate: 14_000 })], [rate({ sheetRow: 2, shop: "Sklepowa 1" })]));
+    const html = renderStatement(
+      screen([row({ sheetRow: 2, pickupRate: 14_000 })], [rate({ sheetRow: 2, shop: "Sklepowa 1", pickupAmount: 14_000 })]),
+    );
     expect(html).toContain("Podjazd/Trasa");
     expect(html).toContain("Kwota podjazdu/trasy");
     expect(html).toContain("Liczba worków");
@@ -328,6 +330,52 @@ describe("renderStatement", () => {
     expect(html).toContain('data-xl-menu');
     expect(html).toContain("Filtr: Sklep");
     expect(html).toContain("Zaznacz widoczne jako rozliczone");
+  });
+
+  it("test_renderStatement_marks_sheet_rate_when_catalog_amount_differs", () => {
+    const html = renderStatement(
+      screen(
+        [row({ sheetRow: 2, pickupRate: 17_500, bagRate: 1_000 })],
+        [rate({ sheetRow: 2, shop: "Sklepowa 1", pickupAmount: 3_000, bagAmount: 1_000 })],
+      ),
+    );
+    const rowHtml = html.slice(html.indexOf('data-kind="plain"'), html.indexOf("</tr>", html.indexOf('data-kind="plain"')));
+    expect(rowHtml).toContain('data-edit="pickup"');
+    expect(rowHtml).toContain('value="175,00"');
+    expect(rowHtml).toContain('class="rate-drift"');
+    expect(rowHtml).toContain(`Stawka w bazie stawek jest inna: ${formatPln(3_000)}`);
+    expect(rowHtml.split('class="rate-drift"').length - 1).toBe(1);
+  });
+
+  it("test_renderStatement_skips_mark_when_sheet_or_catalog_rate_is_empty", () => {
+    const emptySheet = renderStatement(
+      screen(
+        [row({ sheetRow: 2, pickupRate: null, bagRate: null })],
+        [rate({ sheetRow: 2, shop: "Sklepowa 1", pickupAmount: 3_000, bagAmount: 500 })],
+      ),
+    );
+    expect(emptySheet).not.toContain("rate-drift");
+    const emptyCatalog = renderStatement(
+      screen(
+        [row({ sheetRow: 2, pickupRate: 2_000, bagRate: 500 })],
+        [rate({ sheetRow: 2, shop: "Sklepowa 1", pickupAmount: null, bagAmount: null })],
+      ),
+    );
+    expect(emptyCatalog).not.toContain("rate-drift");
+  });
+
+  it("test_renderStatement_marks_route_rate_when_catalog_route_differs", () => {
+    const html = renderStatement(
+      screen(
+        [row({ sheetRow: 2, address: "A", routeName: "trasa", routeRate: 30_000, pickupRate: 0, bagRate: 0 })],
+        [rate({ sheetRow: 9, shop: "A", pickupAmount: 0, bagAmount: 0, routeAmount: 15_000 })],
+      ),
+    );
+    const routeHtml = html.slice(html.indexOf('data-kind="route"'), html.indexOf("</tr>", html.indexOf('data-kind="route"')));
+    expect(routeHtml).toContain('data-edit="route-rate"');
+    expect(routeHtml).toContain('value="300,00"');
+    expect(routeHtml).toContain(`Stawka w bazie stawek jest inna: ${formatPln(15_000)}`);
+    expect(routeHtml.split('class="rate-drift"').length - 1).toBe(1);
   });
 });
 

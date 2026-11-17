@@ -1,4 +1,5 @@
 import { lineKey, rowKey, sumSelected } from "./engine.js";
+import { sheetRateDrift, soleCatalogRate } from "./rates.js";
 import { escapeHtml } from "./html.js";
 import {
   allPicked,
@@ -23,6 +24,7 @@ import { columnBar, renderColumnFilterMenu } from "./statsView.js";
 import {
   canPressApprove,
   currentStatement,
+  findRow,
   formatAmountInput,
   formatPln,
   routeSelectionKey,
@@ -39,7 +41,7 @@ import {
   statementSortPhrase,
   visibleStatementLines,
 } from "./statementTable.js";
-import type { Grosze, RateTie, ShopCost, Statement, StatementLine } from "./types.js";
+import type { Grosze, RateTie, RegisterRow, ShopCost, Statement, StatementLine } from "./types.js";
 
 const DASH = '<span class="muted">—</span>';
 const STATEMENT_FUNNEL =
@@ -187,12 +189,18 @@ function plainRow(screen: StatementScreen, shop: ShopCost, targets: readonly Com
   const legKind = shop.tie || dead ? DASH : `<span class="tag">podjazd</span>`;
   const legAmount = shop.tie
     ? DASH
-    : dead
-      ? money(shop.legAmount, true)
-      : amountInput(shop, "pickup", state.pickupAmount, shop.legAmount, "Zmiana kwoty za podjazd tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
+    : withDrift(
+        dead
+          ? money(shop.legAmount, true)
+          : amountInput(shop, "pickup", state.pickupAmount, shop.legAmount, "Zmiana kwoty za podjazd tylko na tym ekranie — nie w rejestrze ani w Bazie stawek"),
+        driftValues(screen, [shop], "pickup"),
+      );
   const bagCell = shop.tie
     ? DASH
-    : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
+    : withDrift(
+        amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie — nie w rejestrze ani w Bazie stawek"),
+        driftValues(screen, [shop], "bag"),
+      );
   const target = targets.find((item) => item.key === commentKey(shop));
   return (
     `<tr class="${joinClass(rowClass(dead, checked, "plain"), shopCommentClass(target, screen))}" data-kind="plain">` +
@@ -235,25 +243,32 @@ function routeRow(
         line.routeName,
       )
     : DASH;
+  const happenedShops = line.shops.filter((shop) => shop.happened);
   const bagRate =
     line.bagRate === null || !anchor
       ? DASH
-      : amountInput(
-          anchor,
-          "bag-rate-route",
-          undefined,
-          line.bagRate,
-          "Jedna kwota, bo każdy adres, który się odbył, ma tę samą. Zmiana tylko na tym ekranie.",
-          line.routeName,
+      : withDrift(
+          amountInput(
+            anchor,
+            "bag-rate-route",
+            undefined,
+            line.bagRate,
+            "Jedna kwota, bo każdy adres, który się odbył, ma tę samą. Zmiana tylko na tym ekranie.",
+            line.routeName,
+          ),
+          driftValues(screen, happenedShops, "bag"),
         );
   const rateInput = anchor
-    ? amountInput(
-        anchor,
-        "route-rate",
-        undefined,
-        line.routeRate,
-        "Zapis od razu do Stawka za trasę. Kolumny 16 i 17 dopiero przy Zatwierdź",
-        line.routeName,
+    ? withDrift(
+        amountInput(
+          anchor,
+          "route-rate",
+          undefined,
+          line.routeRate,
+          "Zapis od razu do Stawka za trasę. Kolumny 16 i 17 dopiero przy Zatwierdź",
+          line.routeName,
+        ),
+        driftValues(screen, line.shops, "route"),
       )
     : DASH;
   const shops = targets.filter((item) => item.routeName === line.routeName);
@@ -288,7 +303,10 @@ function childRow(
   const state = screen.screenByRow[rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName)] ?? {};
   const bagCell = shop.tie || sharedBagRate
     ? DASH
-    : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie zapisuje kolumn rejestru ani Bazy stawek.");
+    : withDrift(
+        amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie zapisuje kolumn rejestru ani Bazy stawek."),
+        driftValues(screen, [shop], "bag"),
+      );
   const target = targets.find((item) => item.key === commentKey(shop));
   return (
     `<tr class="${joinClass(rowClass(dead, false, "child"), shopCommentClass(target, screen))}" data-kind="child">` +
@@ -516,6 +534,42 @@ function sheetDateInputValue(text: string): string {
 function bagCountInput(shop: ShopCost, title: string): string {
   const shown = shop.bagCount === null ? "" : String(shop.bagCount);
   return `<input type="text" inputmode="numeric" data-edit="bags" ${ref(shop)} value="${escapeHtml(shown)}" title="${escapeHtml(title)}" autocomplete="off">`;
+}
+
+type RateKind = "pickup" | "bag" | "route";
+
+function registerOf(screen: StatementScreen, shop: ShopCost): RegisterRow | null {
+  return findRow(screen.rows, shop.sheetRow, shop.transportNumber, shop.sheetName);
+}
+
+function driftValues(screen: StatementScreen, shops: readonly ShopCost[], kind: RateKind): Grosze[] {
+  const out: Grosze[] = [];
+  for (const shop of shops) {
+    const row = registerOf(screen, shop);
+    if (!row) {
+      continue;
+    }
+    const catalog = soleCatalogRate(screen.rates, row.address, row.contractor, row.pickupDate);
+    if (!catalog) {
+      continue;
+    }
+    const sheet = kind === "pickup" ? row.pickupRate : kind === "bag" ? row.bagRate : row.routeRate;
+    const baza = kind === "pickup" ? catalog.pickupAmount : kind === "bag" ? catalog.bagAmount : catalog.routeAmount;
+    const drift = sheetRateDrift(sheet, baza);
+    if (drift !== null && !out.includes(drift)) {
+      out.push(drift);
+    }
+  }
+  return out;
+}
+
+function withDrift(input: string, drifts: readonly Grosze[]): string {
+  if (drifts.length === 0) {
+    return input;
+  }
+  const title = `Stawka w bazie stawek jest inna: ${drifts.map((value) => formatPln(value)).join(", ")}`;
+  const safe = escapeHtml(title);
+  return `<span class="rate-noted">${input}<abbr class="rate-drift" title="${safe}" aria-label="${safe}">!</abbr></span>`;
 }
 
 function amountInput(

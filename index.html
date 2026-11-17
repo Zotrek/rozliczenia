@@ -330,6 +330,22 @@ th {
   color: var(--muted);
 }
 th.num, td.num { text-align: right; }
+.rate-noted {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: 100%;
+}
+.rate-noted input { box-shadow: inset 0 -2px 0 var(--orange-deep); }
+abbr.rate-drift {
+  flex: none;
+  color: var(--orange-deep);
+  font-weight: 750;
+  text-decoration: none;
+  cursor: help;
+  border-bottom: 1px dotted var(--orange-deep);
+}
 th.c, td.c { text-align: center; }
 th.c .col-check {
   display: flex;
@@ -3574,7 +3590,15 @@ function readRateRow(value) {
             return null;
         }
     }
-    return { sheetRow, shop, contractor, pickupAmount, bagAmount, validFrom, validUntil };
+    const row = { sheetRow, shop, contractor, pickupAmount, bagAmount, validFrom, validUntil };
+    if (!Object.prototype.hasOwnProperty.call(value, "routeAmount")) {
+        return row;
+    }
+    const routeAmount = readGrosze(value.routeAmount);
+    if (routeAmount === undefined) {
+        return null;
+    }
+    return { ...row, routeAmount };
 }
 
 
@@ -3992,7 +4016,7 @@ function money(grosze) {
  * Puste „do kiedy” nie zamyka wiersza. Wpisana data to ostatni dzień włącznie.
  * Dwa wiersze tej daty początku to remis, nie 0 zł. Starszy dublet, który przegrywa z późniejszą datą, nie blokuje.
  */
-function resolveRate(rates, shop, contractor, pickupDate) {
+function coveringWinners(rates, shop, contractor, pickupDate) {
     parseSheetDate(pickupDate);
     const matching = rates
         .map((rate, index) => ({ rate, index }))
@@ -4000,7 +4024,7 @@ function resolveRate(rates, shop, contractor, pickupDate) {
         entry.rate.contractor === contractor &&
         rateCoversPickup(entry.rate.validFrom, entry.rate.validUntil, pickupDate));
     if (matching.length === 0) {
-        return { kind: "none" };
+        return [];
     }
     let bestFrom = matching[0].rate.validFrom;
     for (const entry of matching) {
@@ -4008,7 +4032,14 @@ function resolveRate(rates, shop, contractor, pickupDate) {
             bestFrom = entry.rate.validFrom;
         }
     }
-    const winners = matching.filter((entry) => entry.rate.validFrom === bestFrom);
+    return matching.filter((entry) => entry.rate.validFrom === bestFrom);
+}
+function resolveRate(rates, shop, contractor, pickupDate) {
+    const winners = coveringWinners(rates, shop, contractor, pickupDate);
+    if (winners.length === 0) {
+        return { kind: "none" };
+    }
+    const bestFrom = winners[0].rate.validFrom;
     if (winners.length > 1) {
         const candidates = winners.map((entry) => ({
             index: entry.index,
@@ -4026,6 +4057,18 @@ function resolveRate(rates, shop, contractor, pickupDate) {
         pickupAmount: winners[0].rate.pickupAmount,
         bagAmount: winners[0].rate.bagAmount,
     };
+}
+/** Jedna obowiązująca stawka. Brak pary i remis nie dają kwoty do porównania. */
+function soleCatalogRate(rates, shop, contractor, pickupDate) {
+    const winners = coveringWinners(rates, shop, contractor, pickupDate);
+    return winners.length === 1 ? winners[0].rate : null;
+}
+/** Kwota z bazy, gdy arkusz i baza mają wpis i te wpisy się różnią. Puste i zero równe zeru nie ostrzegają. */
+function sheetRateDrift(sheet, baza) {
+    if (sheet === null || baza == null || sheet === baza) {
+        return null;
+    }
+    return baza;
 }
 
 
@@ -6076,6 +6119,7 @@ function isBlank(text) {
 
 
 
+
 const DASH = '<span class="muted">—</span>';
 const STATEMENT_FUNNEL = '<svg viewBox="0 0 16 16" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M1.5 2.5h13l-5 6.1V13l-3 1.1V8.6z"/></svg>';
 function renderStatement(screen, status = "", options = {}) {
@@ -6199,12 +6243,12 @@ function plainRow(screen, shop, targets) {
     const legKind = shop.tie || dead ? DASH : `<span class="tag">podjazd</span>`;
     const legAmount = shop.tie
         ? DASH
-        : dead
+        : withDrift(dead
             ? money(shop.legAmount, true)
-            : amountInput(shop, "pickup", state.pickupAmount, shop.legAmount, "Zmiana kwoty za podjazd tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
+            : amountInput(shop, "pickup", state.pickupAmount, shop.legAmount, "Zmiana kwoty za podjazd tylko na tym ekranie — nie w rejestrze ani w Bazie stawek"), driftValues(screen, [shop], "pickup"));
     const bagCell = shop.tie
         ? DASH
-        : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie — nie w rejestrze ani w Bazie stawek");
+        : withDrift(amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Zmiana kwoty za worek tylko na tym ekranie — nie w rejestrze ani w Bazie stawek"), driftValues(screen, [shop], "bag"));
     const target = targets.find((item) => item.key === commentKey(shop));
     return (`<tr class="${joinClass(rowClass(dead, checked, "plain"), shopCommentClass(target, screen))}" data-kind="plain">` +
         `<td class="c">${lineBox(line, checked)}</td>` +
@@ -6234,11 +6278,12 @@ function routeRow(screen, line, targets) {
     const date = anchor
         ? dateInput(anchor, "route-date", line.date ?? "", "Zapis od razu. Ta data wchodzi na każdy sklep tej trasy w zestawieniu.", line.routeName)
         : DASH;
+    const happenedShops = line.shops.filter((shop) => shop.happened);
     const bagRate = line.bagRate === null || !anchor
         ? DASH
-        : amountInput(anchor, "bag-rate-route", undefined, line.bagRate, "Jedna kwota, bo każdy adres, który się odbył, ma tę samą. Zmiana tylko na tym ekranie.", line.routeName);
+        : withDrift(amountInput(anchor, "bag-rate-route", undefined, line.bagRate, "Jedna kwota, bo każdy adres, który się odbył, ma tę samą. Zmiana tylko na tym ekranie.", line.routeName), driftValues(screen, happenedShops, "bag"));
     const rateInput = anchor
-        ? amountInput(anchor, "route-rate", undefined, line.routeRate, "Zapis od razu do Stawka za trasę. Kolumny 16 i 17 dopiero przy Zatwierdź", line.routeName)
+        ? withDrift(amountInput(anchor, "route-rate", undefined, line.routeRate, "Zapis od razu do Stawka za trasę. Kolumny 16 i 17 dopiero przy Zatwierdź", line.routeName), driftValues(screen, line.shops, "route"))
         : DASH;
     const shops = targets.filter((item) => item.routeName === line.routeName);
     const pickedShops = shops.filter((item) => screen.commentPicks[item.key] === true).length;
@@ -6264,7 +6309,7 @@ function childRow(screen, shop, sharedBagRate, targets) {
     const state = screen.screenByRow[rowKey(shop.sheetRow, shop.transportNumber, shop.sheetName)] ?? {};
     const bagCell = shop.tie || sharedBagRate
         ? DASH
-        : amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie zapisuje kolumn rejestru ani Bazy stawek.");
+        : withDrift(amountInput(shop, "bag-rate", state.bagAmount, shop.bagRate, "Kwota tego adresu, tylko ten ekran. Nie zapisuje kolumn rejestru ani Bazy stawek."), driftValues(screen, [shop], "bag"));
     const target = targets.find((item) => item.key === commentKey(shop));
     return (`<tr class="${joinClass(rowClass(dead, false, "child"), shopCommentClass(target, screen))}" data-kind="child">` +
         "<td></td>" +
@@ -6446,6 +6491,37 @@ function sheetDateInputValue(text) {
 function bagCountInput(shop, title) {
     const shown = shop.bagCount === null ? "" : String(shop.bagCount);
     return `<input type="text" inputmode="numeric" data-edit="bags" ${ref(shop)} value="${escapeHtml(shown)}" title="${escapeHtml(title)}" autocomplete="off">`;
+}
+function registerOf(screen, shop) {
+    return findRow(screen.rows, shop.sheetRow, shop.transportNumber, shop.sheetName);
+}
+function driftValues(screen, shops, kind) {
+    const out = [];
+    for (const shop of shops) {
+        const row = registerOf(screen, shop);
+        if (!row) {
+            continue;
+        }
+        const catalog = soleCatalogRate(screen.rates, row.address, row.contractor, row.pickupDate);
+        if (!catalog) {
+            continue;
+        }
+        const sheet = kind === "pickup" ? row.pickupRate : kind === "bag" ? row.bagRate : row.routeRate;
+        const baza = kind === "pickup" ? catalog.pickupAmount : kind === "bag" ? catalog.bagAmount : catalog.routeAmount;
+        const drift = sheetRateDrift(sheet, baza);
+        if (drift !== null && !out.includes(drift)) {
+            out.push(drift);
+        }
+    }
+    return out;
+}
+function withDrift(input, drifts) {
+    if (drifts.length === 0) {
+        return input;
+    }
+    const title = `Stawka w bazie stawek jest inna: ${drifts.map((value) => formatPln(value)).join(", ")}`;
+    const safe = escapeHtml(title);
+    return `<span class="rate-noted">${input}<abbr class="rate-drift" title="${safe}" aria-label="${safe}">!</abbr></span>`;
 }
 function amountInput(shop, edit, override, shown, title, routeName) {
     const value = override === null ? "" : override !== undefined ? formatAmountInput(override) : shown === null ? "" : formatAmountInput(shown);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveRate } from "./rates.js";
+import { resolveRate, sheetRateDrift, soleCatalogRate } from "./rates.js";
 import type { RateRow } from "./types.js";
 
 function rate(over: Partial<RateRow> & Pick<RateRow, "shop" | "contractor">): RateRow {
@@ -142,5 +142,34 @@ describe("resolveRate", () => {
     expect(() => resolveRate([rate({ shop: "A", contractor: "gpw" })], "A", "gpw", "2026-09-10")).toThrow(
       /dd\.mm\.yyyy/,
     );
+  });
+});
+
+describe("sheetRateDrift", () => {
+  it("test_sheetRateDrift_marks_only_two_different_written_amounts", () => {
+    expect(sheetRateDrift(17_500, 3_000)).toBe(3_000);
+    expect(sheetRateDrift(0, 500)).toBe(500);
+    expect(sheetRateDrift(2_000, 2_000)).toBeNull();
+    expect(sheetRateDrift(null, 2_000)).toBeNull();
+    expect(sheetRateDrift(2_000, null)).toBeNull();
+    expect(sheetRateDrift(2_000, undefined)).toBeNull();
+  });
+
+  it("test_soleCatalogRate_returns_the_one_covering_row_and_skips_a_tie", () => {
+    const day = "10.09.2026";
+    const one = rate({ shop: "A", contractor: "gpw", routeAmount: 15_000 });
+    expect(soleCatalogRate([one], "A", "gpw", day)).toBe(one);
+    expect(
+      soleCatalogRate(
+        [
+          rate({ shop: "A", contractor: "gpw", validFrom: "01.01.2026", pickupAmount: 1_000 }),
+          rate({ shop: "A", contractor: "gpw", validFrom: "01.01.2026", pickupAmount: 2_000 }),
+        ],
+        "A",
+        "gpw",
+        day,
+      ),
+    ).toBeNull();
+    expect(soleCatalogRate([one], "B", "gpw", day)).toBeNull();
   });
 });

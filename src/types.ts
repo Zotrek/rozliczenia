@@ -44,6 +44,11 @@ export interface RateRow {
   pickupAmount: Grosze | null;
   /** Grosze. null = puste pole. */
   bagAmount: Grosze | null;
+  /**
+   * Cena za trasę z Bazy cen harmonogram. Brak pola = ta baza nie ma stawki trasy.
+   * null = komórka pusta.
+   */
+  routeAmount?: Grosze | null;
   /** `dd.mm.yyyy` albo `""` = od zawsze. */
   validFrom: string;
   /** `dd.mm.yyyy` albo `""` = bez własnego końca. Wpisana data to ostatni dzień włącznie. */

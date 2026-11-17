@@ -1,5 +1,5 @@
 import { compareSheetDate, parseSheetDate, rateCoversPickup } from "./sheetDate.js";
-import type { RateCandidate, RateRow, RateTie } from "./types.js";
+import type { Grosze, RateCandidate, RateRow, RateTie } from "./types.js";
 
 export type ResolvedRate =
   | { kind: "none" }
@@ -12,12 +12,12 @@ export type ResolvedRate =
  * Puste „do kiedy” nie zamyka wiersza. Wpisana data to ostatni dzień włącznie.
  * Dwa wiersze tej daty początku to remis, nie 0 zł. Starszy dublet, który przegrywa z późniejszą datą, nie blokuje.
  */
-export function resolveRate(
+function coveringWinners(
   rates: readonly RateRow[],
   shop: string,
   contractor: string,
   pickupDate: string,
-): ResolvedRate {
+): { rate: RateRow; index: number }[] {
   parseSheetDate(pickupDate);
   const matching = rates
     .map((rate, index) => ({ rate, index }))
@@ -29,7 +29,7 @@ export function resolveRate(
     );
 
   if (matching.length === 0) {
-    return { kind: "none" };
+    return [];
   }
 
   let bestFrom = matching[0].rate.validFrom;
@@ -39,7 +39,21 @@ export function resolveRate(
     }
   }
 
-  const winners = matching.filter((entry) => entry.rate.validFrom === bestFrom);
+  return matching.filter((entry) => entry.rate.validFrom === bestFrom);
+}
+
+export function resolveRate(
+  rates: readonly RateRow[],
+  shop: string,
+  contractor: string,
+  pickupDate: string,
+): ResolvedRate {
+  const winners = coveringWinners(rates, shop, contractor, pickupDate);
+  if (winners.length === 0) {
+    return { kind: "none" };
+  }
+
+  const bestFrom = winners[0].rate.validFrom;
   if (winners.length > 1) {
     const candidates: RateCandidate[] = winners.map((entry) => ({
       index: entry.index,
@@ -58,4 +72,23 @@ export function resolveRate(
     pickupAmount: winners[0].rate.pickupAmount,
     bagAmount: winners[0].rate.bagAmount,
   };
+}
+
+/** Jedna obowiązująca stawka. Brak pary i remis nie dają kwoty do porównania. */
+export function soleCatalogRate(
+  rates: readonly RateRow[],
+  shop: string,
+  contractor: string,
+  pickupDate: string,
+): RateRow | null {
+  const winners = coveringWinners(rates, shop, contractor, pickupDate);
+  return winners.length === 1 ? winners[0].rate : null;
+}
+
+/** Kwota z bazy, gdy arkusz i baza mają wpis i te wpisy się różnią. Puste i zero równe zeru nie ostrzegają. */
+export function sheetRateDrift(sheet: Grosze | null, baza: Grosze | null | undefined): Grosze | null {
+  if (sheet === null || baza == null || sheet === baza) {
+    return null;
+  }
+  return baza;
 }

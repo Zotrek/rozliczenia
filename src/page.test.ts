@@ -351,6 +351,14 @@ describe("buildPage bundle", () => {
     const script = html.slice(html.lastIndexOf("<script>") + "<script>".length, html.lastIndexOf("</script>"));
     expect(() => new Function(script)).not.toThrow();
   });
+
+  it("test_buildPage_invoice_edit_register_row_is_not_overwritten", () => {
+    const html = buildPage();
+    const declarations = html.match(/function registerOf\(/g) ?? [];
+    expect(declarations).toHaveLength(1);
+    expect(html).toContain("editedRegisterRow(item)");
+    expect(html).toContain("function editedRegisterRow(");
+  });
 });
 
 describe("error cards", () => {

@@ -3668,7 +3668,7 @@ function assess(rows, draft) {
     const staying = parsed.filter((item) => !item.detached);
     const costs = invalid
         ? new Map()
-        : shopCosts(staying.map((item) => registerOf(item)));
+        : shopCosts(staying.map((item) => editedRegisterRow(item)));
     const lines = {};
     const wiersze = [];
     let total = 0;
@@ -3778,7 +3778,7 @@ function readAmount(text, sheet) {
     const value = parsed.kind === "empty" ? null : parsed.value;
     return { bad: false, text, value, changed: value !== sheet };
 }
-function registerOf(item) {
+function editedRegisterRow(item) {
     return {
         sheetName: item.row.sheetName,
         sheetRow: item.row.sheetRow,

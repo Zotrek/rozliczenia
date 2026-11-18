@@ -126,7 +126,7 @@ function assess(rows: readonly SettledInvoiceRow[], draft: InvoiceEditDraft): As
   const staying = parsed.filter((item) => !item.detached);
   const costs = invalid
     ? new Map<string, ShopCost>()
-    : shopCosts(staying.map((item) => registerOf(item)));
+    : shopCosts(staying.map((item) => editedRegisterRow(item)));
   const lines: Record<string, InvoiceEditLine> = {};
   const wiersze: Record<string, unknown>[] = [];
   let total = 0;
@@ -252,7 +252,7 @@ function readAmount(text: string | undefined, sheet: Grosze | null): AmountRead 
   return { bad: false, text, value, changed: value !== sheet };
 }
 
-function registerOf(item: ParsedInvoiceRow): RegisterRow {
+function editedRegisterRow(item: ParsedInvoiceRow): RegisterRow {
   return {
     sheetName: item.row.sheetName,
     sheetRow: item.row.sheetRow,

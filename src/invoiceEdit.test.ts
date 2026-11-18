@@ -168,6 +168,38 @@ describe("invoiceEditBody", () => {
     expect(rows).toHaveLength(2);
     expect(rows.every((item) => item.stawkaTrasy === "150.00" && item.koszt === 7_500)).toBe(true);
     expect(built.body.numerFaktury).toBe("FV/1");
+    expect(built.body.nowyNumer).toBeUndefined();
+  });
+
+  it("test_invoiceEditBody_number_change_renames_every_shop_that_stays", () => {
+    const shops = [row(), row({ sheetRow: 3, transportNumber: "11", shopName: "Sklep B" })];
+    const draft = { ...emptyInvoiceEdit(), number: " FV/9 " };
+    const face = invoiceEditFace(shops, draft, "FV/1");
+    expect(face.dirty).toBe(true);
+    expect(face.invalid).toBe(false);
+    expect(face.total).toBe(23_000);
+    const built = invoiceEditBody(shops, draft, "FV/1");
+    expect(built).toEqual({
+      ok: true,
+      unchanged: false,
+      body: {
+        action: "patchInvoiceEdit",
+        numerFaktury: "FV/1",
+        nowyNumer: "FV/9",
+        wiersze: [
+          { sheetName: "Arkusz1", sheetRow: 2, transportNumber: "10", tylkoNumer: true },
+          { sheetName: "Arkusz1", sheetRow: 3, transportNumber: "11", tylkoNumer: true },
+        ],
+      },
+    });
+    expect(invoiceEditBody(shops, { ...draft, number: "  " }, "FV/1")).toEqual({
+      ok: false,
+      error: "Wpisz numer faktury.",
+    });
+    expect(invoiceEditBody(shops, { ...draft, number: "=FV/9" }, "FV/1")).toEqual({
+      ok: false,
+      error: "Numer faktury jest niepoprawny.",
+    });
   });
 });
 
@@ -181,6 +213,9 @@ describe("renderFocusedInvoice", () => {
     expect(html).toContain("odepnij sklep");
     expect(html).toContain('data-action="save-invoice-edit" disabled');
     expect(html).toContain("Zapisz zmiany");
+    expect(html).toContain("Kwota faktury");
+    expect(html).toContain('data-edit="invoice-number"');
+    expect(html).toContain('value="FV/1"');
     expect(html).not.toContain('data-edit="invoice-route-rate"');
     const dirty = renderFocusedInvoice(
       [row()],

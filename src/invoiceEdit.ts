@@ -17,6 +17,8 @@ export interface InvoiceEditDraft {
   /** Po nazwie trasy. Jedna kwota dla sklepów tej trasy na tej fakturze. */
   routeRate: Record<string, string>;
   detached: Record<string, true>;
+  /** null = pole nietknięte, na ekranie stoi numer z otwarcia. */
+  number: string | null;
   notice: string;
   status: string;
 }
@@ -47,6 +49,8 @@ export interface InvoiceEditFace {
 
 const BAG_ERROR = "Liczba worków jest niepoprawna.";
 const RATE_ERROR = "Stawka jest niepoprawna.";
+const NUMBER_EMPTY = "Wpisz numer faktury.";
+const NUMBER_BAD = "Numer faktury jest niepoprawny.";
 
 export function emptyInvoiceEdit(): InvoiceEditDraft {
   return {
@@ -55,16 +59,51 @@ export function emptyInvoiceEdit(): InvoiceEditDraft {
     bagRate: {},
     routeRate: {},
     detached: {},
+    number: null,
     notice: "",
     status: "",
   };
 }
 
+/** Tekst w polu numeru. Nietknięte pole pokazuje numer, z którym fakturę otwarto. */
+export function invoiceNumberText(draft: InvoiceEditDraft, invoice: string): string {
+  return draft.number === null ? invoice.trim() : draft.number;
+}
+
+export type InvoiceNumberRead =
+  | { ok: true; changed: boolean; next: string }
+  | { ok: false; error: string };
+
+/** Nowy numer wobec numeru z otwarcia. Pusty albo zaczynający się od = + @ nie schodzi do arkusza. */
+export function readInvoiceNumber(draft: InvoiceEditDraft, invoice: string): InvoiceNumberRead {
+  const next = invoiceNumberText(draft, invoice).trim();
+  const changed = next !== invoice.trim();
+  if (!changed) {
+    return { ok: true, changed: false, next };
+  }
+  if (next === "") {
+    return { ok: false, error: NUMBER_EMPTY };
+  }
+  if (/^[=+@]/.test(next)) {
+    return { ok: false, error: NUMBER_BAD };
+  }
+  return { ok: true, changed: true, next };
+}
+
 export function invoiceEditFace(
   rows: readonly SettledInvoiceRow[],
   draft: InvoiceEditDraft,
+  invoice = "",
 ): InvoiceEditFace {
-  return assess(rows, draft).face;
+  const face = assess(rows, draft).face;
+  const number = readInvoiceNumber(draft, invoice);
+  if (!number.ok) {
+    return { ...face, dirty: false, invalid: true, error: face.error || number.error };
+  }
+  if (number.changed && !face.invalid) {
+    return { ...face, dirty: true };
+  }
+  return face;
 }
 
 export function invoiceEditBody(
@@ -76,11 +115,16 @@ export function invoiceEditBody(
   | { ok: false; error: string }
   | { ok: true; unchanged: true }
   | { ok: true; unchanged: false; body: Record<string, unknown> } {
+  const number = readInvoiceNumber(draft, invoice);
+  if (!number.ok) {
+    return { ok: false, error: number.error };
+  }
   const assessed = assess(rows, draft);
   if (assessed.face.invalid) {
     return { ok: false, error: assessed.face.error };
   }
-  if (!assessed.face.dirty || assessed.wiersze.length === 0) {
+  const wiersze = number.changed ? withNumberRows(rows, draft, assessed.wiersze) : assessed.wiersze;
+  if (wiersze.length === 0) {
     return { ok: true, unchanged: true };
   }
   return {
@@ -89,10 +133,38 @@ export function invoiceEditBody(
     body: {
       action: "patchInvoiceEdit",
       numerFaktury: invoice.trim(),
-      wiersze: assessed.wiersze,
+      ...(number.changed ? { nowyNumer: number.next } : {}),
+      wiersze,
       ...(mode === "schedule" ? { tryb: "harmonogram" } : {}),
     },
   };
+}
+
+/** Pozycje, które zostają, a nie mają innego zapisu, dostają samą zmianę numeru. */
+function withNumberRows(
+  rows: readonly SettledInvoiceRow[],
+  draft: InvoiceEditDraft,
+  wiersze: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const written = new Set(
+    wiersze.map((item) =>
+      rowKey(Number(item.sheetRow), String(item.transportNumber ?? ""), String(item.sheetName ?? "")),
+    ),
+  );
+  const extra: Record<string, unknown>[] = [];
+  for (const row of rows) {
+    const key = rowKey(row.sheetRow, row.transportNumber, row.sheetName);
+    if (draft.detached[key] === true || written.has(key)) {
+      continue;
+    }
+    extra.push({
+      sheetName: row.sheetName,
+      sheetRow: row.sheetRow,
+      transportNumber: row.transportNumber,
+      tylkoNumer: true,
+    });
+  }
+  return extra.length === 0 ? wiersze : [...wiersze, ...extra];
 }
 
 interface AmountRead {

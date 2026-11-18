@@ -573,23 +573,6 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
   border-color: var(--teal);
   box-shadow: 0 0 0 2px var(--teal-soft);
 }
-.focused-invoice {
-  flex: 0 1 auto;
-  max-height: 42%;
-  min-height: 0;
-  overflow: auto;
-  padding-bottom: 4px;
-}
-/* Karta faktury, komentarz i stopka biorą wysokość z góry.
-   Lista nierozliczonych ma bazę 0 i min-height 0, więc zostaje kreska:
-   wierszy nie widać i checkboxów nie da się zaznaczyć. */
-.statement:has(.focused-invoice) {
-  overflow: auto;
-}
-.statement:has(.focused-invoice) > .table-wrap {
-  flex: 1 0 16rem;
-  min-height: 16rem;
-}
 .invoice-card .note { margin: 0; padding: 10px 14px 12px; }
 .invoice-head {
   display: flex;
@@ -614,6 +597,8 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
   padding: 10px 14px 12px;
   border-top: 1px solid var(--line);
 }
+.invoice-save .invoice-number { flex: 1 1 16rem; margin: 0; }
+.invoice-save .stat { margin-left: auto; }
 .invoice-save .note { flex: 1 1 18rem; padding: 0; }
 .invoice-save .err, .invoice-save .notice { flex: 1 1 100%; margin: 0; }
 .invoice-save .btn-teal { width: auto; margin-top: 0; }
@@ -3623,6 +3608,8 @@ function readRateRow(value) {
 
 const BAG_ERROR = "Liczba worków jest niepoprawna.";
 const RATE_ERROR = "Stawka jest niepoprawna.";
+const NUMBER_EMPTY = "Wpisz numer faktury.";
+const NUMBER_BAD = "Numer faktury jest niepoprawny.";
 function emptyInvoiceEdit() {
     return {
         bags: {},
@@ -3630,19 +3617,52 @@ function emptyInvoiceEdit() {
         bagRate: {},
         routeRate: {},
         detached: {},
+        number: null,
         notice: "",
         status: "",
     };
 }
-function invoiceEditFace(rows, draft) {
-    return assess(rows, draft).face;
+/** Tekst w polu numeru. Nietknięte pole pokazuje numer, z którym fakturę otwarto. */
+function invoiceNumberText(draft, invoice) {
+    return draft.number === null ? invoice.trim() : draft.number;
+}
+/** Nowy numer wobec numeru z otwarcia. Pusty albo zaczynający się od = + @ nie schodzi do arkusza. */
+function readInvoiceNumber(draft, invoice) {
+    const next = invoiceNumberText(draft, invoice).trim();
+    const changed = next !== invoice.trim();
+    if (!changed) {
+        return { ok: true, changed: false, next };
+    }
+    if (next === "") {
+        return { ok: false, error: NUMBER_EMPTY };
+    }
+    if (/^[=+@]/.test(next)) {
+        return { ok: false, error: NUMBER_BAD };
+    }
+    return { ok: true, changed: true, next };
+}
+function invoiceEditFace(rows, draft, invoice = "") {
+    const face = assess(rows, draft).face;
+    const number = readInvoiceNumber(draft, invoice);
+    if (!number.ok) {
+        return { ...face, dirty: false, invalid: true, error: face.error || number.error };
+    }
+    if (number.changed && !face.invalid) {
+        return { ...face, dirty: true };
+    }
+    return face;
 }
 function invoiceEditBody(rows, draft, invoice, mode) {
+    const number = readInvoiceNumber(draft, invoice);
+    if (!number.ok) {
+        return { ok: false, error: number.error };
+    }
     const assessed = assess(rows, draft);
     if (assessed.face.invalid) {
         return { ok: false, error: assessed.face.error };
     }
-    if (!assessed.face.dirty || assessed.wiersze.length === 0) {
+    const wiersze = number.changed ? withNumberRows(rows, draft, assessed.wiersze) : assessed.wiersze;
+    if (wiersze.length === 0) {
         return { ok: true, unchanged: true };
     }
     return {
@@ -3651,10 +3671,29 @@ function invoiceEditBody(rows, draft, invoice, mode) {
         body: {
             action: "patchInvoiceEdit",
             numerFaktury: invoice.trim(),
-            wiersze: assessed.wiersze,
+            ...(number.changed ? { nowyNumer: number.next } : {}),
+            wiersze,
             ...(mode === "schedule" ? { tryb: "harmonogram" } : {}),
         },
     };
+}
+/** Pozycje, które zostają, a nie mają innego zapisu, dostają samą zmianę numeru. */
+function withNumberRows(rows, draft, wiersze) {
+    const written = new Set(wiersze.map((item) => rowKey(Number(item.sheetRow), String(item.transportNumber ?? ""), String(item.sheetName ?? ""))));
+    const extra = [];
+    for (const row of rows) {
+        const key = rowKey(row.sheetRow, row.transportNumber, row.sheetName);
+        if (draft.detached[key] === true || written.has(key)) {
+            continue;
+        }
+        extra.push({
+            sheetName: row.sheetName,
+            sheetRow: row.sheetRow,
+            transportNumber: row.transportNumber,
+            tylkoNumer: true,
+        });
+    }
+    return extra.length === 0 ? wiersze : [...wiersze, ...extra];
 }
 function assess(rows, draft) {
     const parsed = rows.map((row) => parseRow(row, draft));
@@ -3841,19 +3880,26 @@ function moneyText(grosze) {
 
 
 const INVOICE_DASH = '<span class="muted">—</span>';
-function renderInvoiceList(rows, focus = null, comment = emptyInvoiceComment()) {
+function renderInvoiceList(rows, focus = null, comment = emptyInvoiceComment(), edit = emptyInvoiceEdit()) {
     const visible = focus === null ? rows : rowsOfInvoice(rows, focus);
     const groups = groupSettledInvoices(visible);
     if (groups.length === 0) {
         return emptyInvoices(focus);
     }
-    const note = '<p class="note invoice-note">Podgląd. Kwoty są z arkusza. Tych pozycji nie da się tu zmienić ani cofnąć. ' +
-        "Komentarz przy pozycji zmieniasz w jej polu. Wspólny tekst dla kilku pozycji wpisujesz na dole.</p>";
+    const one = focus !== null;
+    const note = one
+        ? '<p class="note invoice-note">Podgląd tej faktury. Pozycji i kwot nie zmienisz. Numer zmieniasz na dole. ' +
+            "Komentarz przy pozycji zapisuje się po wyjściu z pola.</p>"
+        : '<p class="note invoice-note">Podgląd. Kwoty są z arkusza. Tych pozycji nie da się tu zmienić ani cofnąć. ' +
+            "Komentarz przy pozycji zmieniasz w jej polu. Wspólny tekst dla kilku pozycji wpisujesz na dole.</p>";
     const notice = comment.notice
         ? `<p class="notice" role="status" data-out="invoice-comment-notice">${escapeHtml(comment.notice)}</p>`
         : "";
-    return (`<div class="invoice-body">${note}${notice}${groups.map((group) => renderGroup(group, focus, comment)).join("")}</div>` +
-        invoiceComposer(visible, comment));
+    const cards = groups
+        .map((group, index) => renderGroup(group, comment, !one, one && index === 0 ? invoicePreviewFoot(group, edit) : ""))
+        .join("");
+    const foot = one ? "" : invoiceComposer(visible, comment);
+    return `<div class="invoice-body">${note}${notice}${cards}</div>${foot}`;
 }
 /** Jedna faktura na zestawieniu: pozycje już rozliczone, bez komentarza i bez zaznaczania. */
 function renderFocusedInvoice(rows, focus, notice = "", edit = emptyInvoiceEdit()) {
@@ -3871,20 +3917,13 @@ function renderFocusedInvoice(rows, focus, notice = "", edit = emptyInvoiceEdit(
             "<p class=\"note\">W tym zakresie nie ma rozliczonych odbiorów tej faktury.</p></section>");
     }
     const group = groups[0];
-    const face = invoiceEditFace(group.rows, edit);
+    const face = invoiceEditFace(group.rows, edit, group.invoice);
     const total = face.total == null ? INVOICE_DASH : escapeHtml(formatPln(face.total));
     const leaving = face.leaving > 0 ? ` · ${face.leaving} do odpięcia` : "";
     const status = edit.status || face.error;
-    const statusHtml = status
-        ? `<p class="err" data-out="invoice-edit-status">${escapeHtml(status)}</p>`
-        : "";
-    const noticeHtml = edit.notice
-        ? `<p class="notice" role="status">${escapeHtml(edit.notice)}</p>`
-        : "";
-    const saveDisabled = !face.dirty || face.invalid ? " disabled" : "";
     return (`<section class="invoice-card is-focus" data-invoice="${escapeHtml(group.invoice)}">` +
         '<header class="invoice-head">' +
-        `<strong>${escapeHtml(group.label)}</strong>` +
+        `<strong>${escapeHtml(invoiceNumberText(edit, group.invoice).trim() || group.label)}</strong>` +
         `<span>${escapeHtml(invoiceCountLabel(group.rows.length - face.leaving))}${escapeHtml(leaving)} · ${total}</span>` +
         "</header>" +
         '<div class="table-wrap"><table><thead><tr>' +
@@ -3892,13 +3931,49 @@ function renderFocusedInvoice(rows, focus, notice = "", edit = emptyInvoiceEdit(
         '<th class="num">Liczba worków</th><th class="num">Stawka podjazdu</th><th class="num">Stawka za worek</th>' +
         '<th class="num">Stawka trasy</th><th class="num">Koszt odbioru</th><th class="num">Koszt na worek</th><th></th>' +
         `</tr></thead><tbody>${group.rows.map((row) => focusedLine(row, face.lines[rowKey(row.sheetRow, row.transportNumber, row.sheetName)])).join("")}</tbody></table></div>` +
-        '<footer class="invoice-save">' +
-        '<p class="note">Odepnij sklep zdejmuje go z faktury. Worki i stawki zostają, sklep wraca do nierozliczonych. ' +
-        "Na trasie koszt bierze udział w stawce trasy. Do arkusza schodzi dopiero po Zapisz zmiany.</p>" +
+        invoiceFoot({
+            invoice: group.invoice,
+            total: face.total,
+            edit,
+            saveDisabled: !face.dirty || face.invalid,
+            status,
+            notice: edit.notice,
+            note: "Kwota faktury jest sumą kosztów pozycji, które zostają. Nowy numer schodzi na te pozycje po Zapisz zmiany. " +
+                "Odepnij sklep zdejmuje go z faktury. Worki i stawki zostają, sklep wraca do nierozliczonych.",
+        }) +
+        "</section>");
+}
+function invoicePreviewFoot(group, edit) {
+    const face = invoiceEditFace(group.rows, edit, group.invoice);
+    return invoiceFoot({
+        invoice: group.invoice,
+        total: group.total,
+        edit,
+        saveDisabled: !face.dirty || face.invalid,
+        status: edit.status || face.error,
+        notice: edit.notice,
+        note: "Kwota faktury jest sumą kosztów tych pozycji. Nowy numer schodzi na nie po Zapisz zmiany.",
+    });
+}
+function invoiceFoot(options) {
+    const statusHtml = options.status
+        ? `<p class="err" data-out="invoice-edit-status">${escapeHtml(options.status)}</p>`
+        : "";
+    const noticeHtml = options.notice
+        ? `<p class="notice" role="status">${escapeHtml(options.notice)}</p>`
+        : "";
+    const amount = options.total == null ? INVOICE_DASH : escapeHtml(formatPln(options.total));
+    const off = options.saveDisabled ? " disabled" : "";
+    return ('<footer class="invoice-save">' +
+        '<label class="field invoice-number"><span>Numer faktury</span>' +
+        `<input type="text" data-edit="invoice-number" data-keep="invoice-number" value="${escapeHtml(invoiceNumberText(options.edit, options.invoice))}" ` +
+        'autocomplete="off" aria-label="Numer faktury"></label>' +
+        `<div class="stat"><span>Kwota faktury</span><b data-out="invoice-total">${amount}</b></div>` +
+        `<p class="note">${options.note}</p>` +
         statusHtml +
         noticeHtml +
-        `<button type="button" class="btn-teal" data-action="save-invoice-edit"${saveDisabled}>Zapisz zmiany</button>` +
-        "</footer></section>");
+        `<button type="button" class="btn-teal" data-action="save-invoice-edit"${off}>Zapisz zmiany</button>` +
+        "</footer>");
 }
 function emptyInvoices(focus) {
     if (focus !== null) {
@@ -3962,33 +4037,36 @@ function detachControl(row, detached, label) {
 function invoiceKeep(kind, row) {
     return `inv-${kind}-${row.sheetRow}-${encodeURIComponent(row.transportNumber)}-${encodeURIComponent(row.sheetName)}`;
 }
-function renderGroup(group, focus, comment) {
+function renderGroup(group, comment, selectable, foot = "") {
     const total = group.total == null ? INVOICE_DASH : escapeHtml(formatPln(group.total));
-    const on = focus !== null && group.invoice === focus.trim();
-    return (`<section class="invoice-card${on ? " is-focus" : ""}" data-invoice="${escapeHtml(group.invoice)}">` +
+    const pick = selectable ? '<th class="c">Zaznacz</th>' : "";
+    return (`<section class="invoice-card${selectable ? "" : " is-focus"}" data-invoice="${escapeHtml(group.invoice)}">` +
         '<header class="invoice-head">' +
         `<strong>${escapeHtml(group.label)}</strong>` +
         `<span>${escapeHtml(invoiceCountLabel(group.rows.length))} · ${total}</span>` +
         "</header>" +
         '<div class="table-wrap"><table><thead><tr>' +
-        '<th class="c">Zaznacz</th>' +
+        pick +
         "<th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th><th>Trasa</th>" +
         '<th class="num">Liczba worków</th><th class="num">Koszt odbioru</th><th class="num">Koszt na worek</th>' +
         '<th class="comment-col wrap">Komentarz do faktury</th>' +
-        `</tr></thead><tbody>${group.rows.map((row) => renderRow(row, comment)).join("")}</tbody></table></div></section>`);
+        `</tr></thead><tbody>${group.rows.map((row) => renderRow(row, comment, selectable)).join("")}</tbody></table></div>${foot}</section>`);
 }
-function renderRow(row, comment) {
+function renderRow(row, comment, selectable) {
     const key = rowKey(row.sheetRow, row.transportNumber, row.sheetName);
     const textValue = comment.comments[key] ?? "";
-    const picked = comment.picks[key] === true;
-    const overwrite = willOverwrite(textValue, picked, comment.draft);
+    const picked = selectable && comment.picks[key] === true;
+    const overwrite = selectable && willOverwrite(textValue, picked, comment.draft);
     const classes = [
         row.routeName.trim() === "" ? "" : "is-child",
         overwrite ? "will-overwrite" : picked ? "is-picked" : "",
     ].filter(Boolean);
     const label = row.shopName.trim() === "" ? row.address : row.shopName;
+    const box = selectable
+        ? `<td class="c"><input type="checkbox" data-invoice-pick="1" ${ref(row)}${picked ? " checked" : ""} aria-label="${escapeHtml(`Zaznacz ${label} do wspólnego komentarza`)}"></td>`
+        : "";
     return (`<tr${classes.length ? ` class="${classes.join(" ")}"` : ""}>` +
-        `<td class="c"><input type="checkbox" data-invoice-pick="1" ${ref(row)}${picked ? " checked" : ""} aria-label="${escapeHtml(`Zaznacz ${label} do wspólnego komentarza`)}"></td>` +
+        box +
         `<td>${text(row.transportNumber)}</td>` +
         `<td class="adres">${text(addressWithCommaAfterLocality(row.address))}</td>` +
         `<td>${text(row.shopName)}</td>` +
@@ -5534,8 +5612,9 @@ function periodPickupsBlock(model) {
         pager("pickups", paged) +
         '<p class="note" style="margin: 10px 12px 12px;">' +
         "Wartość faktury to suma kosztów odbioru z arkusza dla tego numeru, u tego podwykonawcy i w tym okresie. " +
-        "Podgląd pokazuje tylko tę fakturę i nic nie zapisuje. " +
-        "Edycja otwiera zestawienie nierozliczonych, wpisuje ten numer i na górze pokazuje pozycje tej faktury. " +
+        "Podgląd i edycja pokazują tylko pozycje tej faktury, bez zaznaczania i bez dopisywania odbiorów. " +
+        "Na dole jest kwota tej faktury. Numer da się zmienić. " +
+        "Edycja pozwala też zmienić worki, stawki i odpiąć sklep. " +
         "W Harmonogramie link jest też przy nierozliczonym wierszu. " +
         "Harmonogram: liczba worków = liczba wierszy w „odebrane z harmonogramu” dla sklepu i dnia. " +
         `Lista pokazuje po ${STATS_PAGE_SIZE} pozycji na stronę.</p>`);
@@ -6748,7 +6827,7 @@ function ledgerTable(model) {
         "Każdy wiersz to jeden numer faktury u jednego podwykonawcy i w jednym sposobie odbioru. " +
         "Lista jest od najnowszej daty zatwierdzenia. Faktury sprzed tej daty są na końcu. " +
         "Okres dotyczy daty odbioru, więc stare faktury bez daty zatwierdzenia też widać. " +
-        "Podgląd nic nie zapisuje. Edycja otwiera zestawienie z tym numerem. " +
+        "Podgląd i edycja otwierają tylko tę fakturę. Na dole jest jej kwota, a numer da się zmienić. " +
         `Po ${LEDGER_PAGE_SIZE} pozycji na stronę.</p>`);
 }
 function ledgerLinks(row) {
@@ -7049,37 +7128,35 @@ function renderStatementScreen(model) {
         `<div class="range"><span>${escapeHtml(modeLabel(model.mode))}</span><strong>${escapeHtml(label)}</strong></div>` +
         back +
         "</div>" +
-        focusedInvoiceBlock(model) +
         renderStatement(model.statement, model.status, { allowApprove: true }) +
-        "</div>");
-}
-function focusedInvoiceBlock(model) {
-    if ((model.workReturn !== "stats" && model.workReturn !== "ledger") || model.invoiceFocus === null) {
-        return "";
-    }
-    return ('<div class="focused-invoice">' +
-        '<p class="note invoice-note">Pozycje tej faktury. Możesz odpiąć sklep, zmienić liczbę worków i stawki — zapis po Zapisz zmiany. Niżej są nierozliczone odbiory — możesz dopisać je tym samym numerem.</p>' +
-        renderFocusedInvoice(model.invoices, model.invoiceFocus, model.invoiceNotice, model.invoiceEdit) +
         "</div>");
 }
 function renderInvoicesScreen(model) {
     const label = model.applied ? rangeLabel(model.applied) : "";
     const status = model.status ? `<p class="err status-block">${escapeHtml(model.status)}</p>` : "";
+    const editing = model.invoiceEditing && model.invoiceFocus !== null;
+    const note = editing
+        ? '<p class="note invoice-note">Pozycje tej faktury. Możesz zmienić numer, odpiąć sklep, zmienić liczbę worków i stawki. Zapis po Zapisz zmiany.</p>'
+        : "";
+    const body = editing
+        ? note + renderFocusedInvoice(model.invoices, model.invoiceFocus ?? "", model.invoiceNotice, model.invoiceEdit)
+        : renderInvoiceList(model.invoices, model.invoiceFocus, model.invoiceComment ?? emptyInvoiceComment(), model.invoiceEdit);
     return ('<div class="statement" data-screen="invoices"><div class="top">' +
-        invoiceHeading(model.invoiceFocus, label) +
+        invoiceHeading(model.invoiceFocus, label, editing) +
         (model.workReturn === "ledger" ? ledgerReturnButton() : statsReturnButton()) +
         "</div>" +
         status +
-        renderInvoiceList(model.invoices, model.invoiceFocus, model.invoiceComment ?? emptyInvoiceComment()) +
+        body +
         "</div>");
 }
-function invoiceHeading(focus, label) {
+function invoiceHeading(focus, label, editing) {
     if (focus === null) {
         return `<div class="range"><span>Podgląd rozliczonych</span><strong>${escapeHtml(label)}</strong></div>`;
     }
     const name = invoiceFocusLabel(focus);
     const range = label === "" ? name : `${name} · ${label}`;
-    return `<div class="range"><span>Podgląd faktury</span><strong>${escapeHtml(range)}</strong></div>`;
+    const title = editing ? "Edycja faktury" : "Podgląd faktury";
+    return `<div class="range"><span>${title}</span><strong>${escapeHtml(range)}</strong></div>`;
 }
 function renderRatesDialog(model) {
     const messageClass = model.ratesMessageOk ? "note" : "err";
@@ -7374,6 +7451,7 @@ const VIEW = {
     invoiceFocus: null,
     invoiceNotice: "",
     invoiceEdit: emptyInvoiceEdit(),
+    invoiceEditing: false,
     workReturn: "range",
     searched: false,
     loadKind: "logo",
@@ -7432,9 +7510,8 @@ function fieldByKeep(root, keep) {
         root.querySelector(`[data-filter="${keep}"]`));
 }
 /**
- * Przewinięcie listy zestawienia, bloku pozycji faktury i strony.
- * Przebudowa HTML tworzy nowe kontenery. Jeden `.table-wrap` to za mało:
- * przy edycji faktury pierwszy jest w karcie, a lista nierozliczonych jest drugi.
+ * Przewinięcie tabel na ekranie i strony.
+ * Przebudowa HTML tworzy nowe kontenery, więc scrollTop trzeba przenieść.
  */
 function readListScroll() {
     const wraps = [...document.querySelectorAll(".table-wrap")].flatMap((wrap) => wrap instanceof HTMLElement ? [{ top: wrap.scrollTop, left: wrap.scrollLeft }] : []);
@@ -7736,10 +7813,8 @@ async function runSearch() {
     VIEW.error = "";
     VIEW.loading = true;
     VIEW.loadKind = "logo";
-    VIEW.loadMessage =
-        VIEW.workReturn === "stats" && VIEW.invoiceFocus !== null
-            ? "Szukam tej faktury i nierozliczonych odbiorów…"
-            : "Szukam nierozliczonych odbiorów…";
+    VIEW.invoiceEditing = false;
+    VIEW.loadMessage = "Szukam nierozliczonych odbiorów…";
     paint();
     try {
         const response = await fetch(webAppUrl(webapp, searchParams(started)));
@@ -7763,28 +7838,7 @@ async function runSearch() {
         VIEW.statement = freshStatement(read.rows, read.rates);
         VIEW.invoiceNotice = "";
         VIEW.invoiceEdit = emptyInvoiceEdit();
-        if (VIEW.workReturn === "stats" && VIEW.invoiceFocus !== null) {
-            VIEW.statement = { ...VIEW.statement, invoice: VIEW.invoiceFocus };
-            try {
-                const invoiceRead = await loadInvoiceRows(started);
-                if (invoiceRead.ok) {
-                    VIEW.invoices = rowsOfInvoice(invoiceRead.rows, VIEW.invoiceFocus);
-                    VIEW.invoiceComment = invoiceCommentFromSheet(VIEW.invoiceComment, VIEW.invoices);
-                }
-                else {
-                    VIEW.invoices = [];
-                    if (!invoiceRead.silent) {
-                        VIEW.invoiceNotice = invoiceRead.error;
-                        reportFailure("ROZ-E-INVOICES", "page.ts runSearch", "Odczyt pozycji tej faktury nie doszedł.", "Zestawienie nierozliczonych jest. Pozycji tej faktury na górze nie ma.", invoiceRead.detail);
-                    }
-                }
-            }
-            catch (err) {
-                VIEW.invoices = [];
-                VIEW.invoiceNotice = "Odczyt pozycji tej faktury nie doszedł.";
-                reportFailure("ROZ-E-INVOICES", "page.ts runSearch", "Odczyt pozycji tej faktury nie doszedł.", "Zestawienie nierozliczonych jest. Pozycji tej faktury na górze nie ma.", { technical: err });
-            }
-        }
+        VIEW.invoiceEditing = false;
         VIEW.status = "";
         VIEW.stats = { ...VIEW.stats, status: "" };
         VIEW.ratesOpen = false;
@@ -7854,7 +7908,7 @@ function armPickupWork(el) {
     VIEW.invoiceNotice = "";
     return true;
 }
-async function runInvoices() {
+async function runInvoices(editing = false) {
     const started = startSearch(fieldsForSearch({
         contractor: VIEW.contractor,
         from: VIEW.from,
@@ -7874,7 +7928,8 @@ async function runInvoices() {
     VIEW.error = "";
     VIEW.loading = true;
     VIEW.loadKind = "logo";
-    VIEW.loadMessage = "Szukam rozliczonych faktur…";
+    VIEW.invoiceEditing = editing && VIEW.invoiceFocus !== null;
+    VIEW.loadMessage = VIEW.invoiceEditing ? "Szukam pozycji tej faktury…" : "Szukam rozliczonych faktur…";
     paint();
     try {
         const read = await loadInvoiceRows(started);
@@ -7927,16 +7982,23 @@ function onClick(event) {
     else if (action === "search") {
         VIEW.workReturn = "range";
         VIEW.invoiceFocus = null;
+        VIEW.invoiceEditing = false;
         void runSearch();
     }
     else if (action === "invoice-preview") {
         if (armPickupWork(el)) {
-            void runInvoices();
+            void runInvoices(false);
         }
     }
     else if (action === "invoice-edit") {
         if (armPickupWork(el)) {
-            void runSearch();
+            if (VIEW.invoiceFocus === null) {
+                VIEW.invoiceEditing = false;
+                void runSearch();
+            }
+            else {
+                void runInvoices(true);
+            }
         }
     }
     else if (action === "back") {
@@ -8275,6 +8337,11 @@ function onInput(event) {
     if (el.dataset.keep === "ledger-number") {
         VIEW.ledger = { ...VIEW.ledger, invoiceQuery: el.value, page: 1 };
         paint("ledger-number");
+        return;
+    }
+    if (el.dataset.edit === "invoice-number") {
+        VIEW.invoiceEdit = { ...VIEW.invoiceEdit, number: el.value, status: "", notice: "" };
+        paint(el.dataset.keep);
         return;
     }
     if (el.dataset.edit === "invoice-bags" ||
@@ -9448,6 +9515,10 @@ async function saveInvoiceEdit() {
             : skipped > 0
                 ? "Część pozycji nie weszła. Lista jest odświeżona."
                 : "Zapisano zmiany faktury.";
+        const renamed = typeof built.body.nowyNumer === "string" ? built.body.nowyNumer : "";
+        if (renamed !== "" && saved > 0) {
+            VIEW.invoiceFocus = renamed;
+        }
         if (VIEW.applied && VIEW.invoiceFocus !== null) {
             const read = await loadInvoiceRows(VIEW.applied);
             if (read.ok) {

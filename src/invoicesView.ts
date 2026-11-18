@@ -3,6 +3,7 @@ import { escapeHtml } from "./html.js";
 import {
   emptyInvoiceEdit,
   invoiceEditFace,
+  invoiceNumberText,
   type InvoiceEditDraft,
   type InvoiceEditLine,
 } from "./invoiceEdit.js";
@@ -35,25 +36,32 @@ export function renderInvoiceList(
   rows: readonly SettledInvoiceRow[],
   focus: string | null = null,
   comment: InvoiceCommentDraft = emptyInvoiceComment(),
+  edit: InvoiceEditDraft = emptyInvoiceEdit(),
 ): string {
   const visible = focus === null ? rows : rowsOfInvoice(rows, focus);
   const groups = groupSettledInvoices(visible);
   if (groups.length === 0) {
     return emptyInvoices(focus);
   }
-  const note =
-    '<p class="note invoice-note">Podgląd. Kwoty są z arkusza. Tych pozycji nie da się tu zmienić ani cofnąć. ' +
-    "Komentarz przy pozycji zmieniasz w jej polu. Wspólny tekst dla kilku pozycji wpisujesz na dole.</p>";
+  const one = focus !== null;
+  const note = one
+    ? '<p class="note invoice-note">Podgląd tej faktury. Pozycji i kwot nie zmienisz. Numer zmieniasz na dole. ' +
+      "Komentarz przy pozycji zapisuje się po wyjściu z pola.</p>"
+    : '<p class="note invoice-note">Podgląd. Kwoty są z arkusza. Tych pozycji nie da się tu zmienić ani cofnąć. ' +
+      "Komentarz przy pozycji zmieniasz w jej polu. Wspólny tekst dla kilku pozycji wpisujesz na dole.</p>";
   const notice = comment.notice
     ? `<p class="notice" role="status" data-out="invoice-comment-notice">${escapeHtml(comment.notice)}</p>`
     : "";
-  return (
-    `<div class="invoice-body">${note}${notice}${groups.map((group) => renderGroup(group, focus, comment)).join("")}</div>` +
-    invoiceComposer(visible, comment)
-  );
+  const cards = groups
+    .map((group, index) =>
+      renderGroup(group, comment, !one, one && index === 0 ? invoicePreviewFoot(group, edit) : ""),
+    )
+    .join("");
+  const foot = one ? "" : invoiceComposer(visible, comment);
+  return `<div class="invoice-body">${note}${notice}${cards}</div>${foot}`;
 }
 
-/** Jedna faktura na zestawieniu: pozycje już rozliczone, bez komentarza i bez zaznaczania. */
+/** Edycja jednej faktury: pozycje już rozliczone, bez zaznaczania i bez listy nierozliczonych. */
 export function renderFocusedInvoice(
   rows: readonly SettledInvoiceRow[],
   focus: string,
@@ -78,21 +86,14 @@ export function renderFocusedInvoice(
     );
   }
   const group = groups[0];
-  const face = invoiceEditFace(group.rows, edit);
+  const face = invoiceEditFace(group.rows, edit, group.invoice);
   const total = face.total == null ? INVOICE_DASH : escapeHtml(formatPln(face.total));
   const leaving = face.leaving > 0 ? ` · ${face.leaving} do odpięcia` : "";
   const status = edit.status || face.error;
-  const statusHtml = status
-    ? `<p class="err" data-out="invoice-edit-status">${escapeHtml(status)}</p>`
-    : "";
-  const noticeHtml = edit.notice
-    ? `<p class="notice" role="status">${escapeHtml(edit.notice)}</p>`
-    : "";
-  const saveDisabled = !face.dirty || face.invalid ? " disabled" : "";
   return (
     `<section class="invoice-card is-focus" data-invoice="${escapeHtml(group.invoice)}">` +
     '<header class="invoice-head">' +
-    `<strong>${escapeHtml(group.label)}</strong>` +
+    `<strong>${escapeHtml(invoiceNumberText(edit, group.invoice).trim() || group.label)}</strong>` +
     `<span>${escapeHtml(invoiceCountLabel(group.rows.length - face.leaving))}${escapeHtml(leaving)} · ${total}</span>` +
     "</header>" +
     '<div class="table-wrap"><table><thead><tr>' +
@@ -100,13 +101,65 @@ export function renderFocusedInvoice(
     '<th class="num">Liczba worków</th><th class="num">Stawka podjazdu</th><th class="num">Stawka za worek</th>' +
     '<th class="num">Stawka trasy</th><th class="num">Koszt odbioru</th><th class="num">Koszt na worek</th><th></th>' +
     `</tr></thead><tbody>${group.rows.map((row) => focusedLine(row, face.lines[rowKey(row.sheetRow, row.transportNumber, row.sheetName)])).join("")}</tbody></table></div>` +
+    invoiceFoot({
+      invoice: group.invoice,
+      total: face.total,
+      edit,
+      saveDisabled: !face.dirty || face.invalid,
+      status,
+      notice: edit.notice,
+      note:
+        "Kwota faktury jest sumą kosztów pozycji, które zostają. Nowy numer schodzi na te pozycje po Zapisz zmiany. " +
+        "Odepnij sklep zdejmuje go z faktury. Worki i stawki zostają, sklep wraca do nierozliczonych.",
+    }) +
+    "</section>"
+  );
+}
+
+function invoicePreviewFoot(
+  group: ReturnType<typeof groupSettledInvoices>[number],
+  edit: InvoiceEditDraft,
+): string {
+  const face = invoiceEditFace(group.rows, edit, group.invoice);
+  return invoiceFoot({
+    invoice: group.invoice,
+    total: group.total,
+    edit,
+    saveDisabled: !face.dirty || face.invalid,
+    status: edit.status || face.error,
+    notice: edit.notice,
+    note: "Kwota faktury jest sumą kosztów tych pozycji. Nowy numer schodzi na nie po Zapisz zmiany.",
+  });
+}
+
+function invoiceFoot(options: {
+  invoice: string;
+  total: number | null;
+  edit: InvoiceEditDraft;
+  saveDisabled: boolean;
+  status: string;
+  notice: string;
+  note: string;
+}): string {
+  const statusHtml = options.status
+    ? `<p class="err" data-out="invoice-edit-status">${escapeHtml(options.status)}</p>`
+    : "";
+  const noticeHtml = options.notice
+    ? `<p class="notice" role="status">${escapeHtml(options.notice)}</p>`
+    : "";
+  const amount = options.total == null ? INVOICE_DASH : escapeHtml(formatPln(options.total));
+  const off = options.saveDisabled ? " disabled" : "";
+  return (
     '<footer class="invoice-save">' +
-    '<p class="note">Odepnij sklep zdejmuje go z faktury. Worki i stawki zostają, sklep wraca do nierozliczonych. ' +
-    "Na trasie koszt bierze udział w stawce trasy. Do arkusza schodzi dopiero po Zapisz zmiany.</p>" +
+    '<label class="field invoice-number"><span>Numer faktury</span>' +
+    `<input type="text" data-edit="invoice-number" data-keep="invoice-number" value="${escapeHtml(invoiceNumberText(options.edit, options.invoice))}" ` +
+    'autocomplete="off" aria-label="Numer faktury"></label>' +
+    `<div class="stat"><span>Kwota faktury</span><b data-out="invoice-total">${amount}</b></div>` +
+    `<p class="note">${options.note}</p>` +
     statusHtml +
     noticeHtml +
-    `<button type="button" class="btn-teal" data-action="save-invoice-edit"${saveDisabled}>Zapisz zmiany</button>` +
-    "</footer></section>"
+    `<button type="button" class="btn-teal" data-action="save-invoice-edit"${off}>Zapisz zmiany</button>` +
+    "</footer>"
   );
 }
 
@@ -199,39 +252,43 @@ function invoiceKeep(kind: string, row: SettledInvoiceRow): string {
 
 function renderGroup(
   group: ReturnType<typeof groupSettledInvoices>[number],
-  focus: string | null,
   comment: InvoiceCommentDraft,
+  selectable: boolean,
+  foot = "",
 ): string {
   const total = group.total == null ? INVOICE_DASH : escapeHtml(formatPln(group.total));
-  const on = focus !== null && group.invoice === focus.trim();
+  const pick = selectable ? '<th class="c">Zaznacz</th>' : "";
   return (
-    `<section class="invoice-card${on ? " is-focus" : ""}" data-invoice="${escapeHtml(group.invoice)}">` +
+    `<section class="invoice-card${selectable ? "" : " is-focus"}" data-invoice="${escapeHtml(group.invoice)}">` +
     '<header class="invoice-head">' +
     `<strong>${escapeHtml(group.label)}</strong>` +
     `<span>${escapeHtml(invoiceCountLabel(group.rows.length))} · ${total}</span>` +
     "</header>" +
     '<div class="table-wrap"><table><thead><tr>' +
-    '<th class="c">Zaznacz</th>' +
+    pick +
     "<th>Numer protokołu</th><th>Adres</th><th>Sklep</th><th>Data</th><th>Trasa</th>" +
     '<th class="num">Liczba worków</th><th class="num">Koszt odbioru</th><th class="num">Koszt na worek</th>' +
     '<th class="comment-col wrap">Komentarz do faktury</th>' +
-    `</tr></thead><tbody>${group.rows.map((row) => renderRow(row, comment)).join("")}</tbody></table></div></section>`
+    `</tr></thead><tbody>${group.rows.map((row) => renderRow(row, comment, selectable)).join("")}</tbody></table></div>${foot}</section>`
   );
 }
 
-function renderRow(row: SettledInvoiceRow, comment: InvoiceCommentDraft): string {
+function renderRow(row: SettledInvoiceRow, comment: InvoiceCommentDraft, selectable: boolean): string {
   const key = rowKey(row.sheetRow, row.transportNumber, row.sheetName);
   const textValue = comment.comments[key] ?? "";
-  const picked = comment.picks[key] === true;
-  const overwrite = willOverwrite(textValue, picked, comment.draft);
+  const picked = selectable && comment.picks[key] === true;
+  const overwrite = selectable && willOverwrite(textValue, picked, comment.draft);
   const classes = [
     row.routeName.trim() === "" ? "" : "is-child",
     overwrite ? "will-overwrite" : picked ? "is-picked" : "",
   ].filter(Boolean);
   const label = row.shopName.trim() === "" ? row.address : row.shopName;
+  const box = selectable
+    ? `<td class="c"><input type="checkbox" data-invoice-pick="1" ${ref(row)}${picked ? " checked" : ""} aria-label="${escapeHtml(`Zaznacz ${label} do wspólnego komentarza`)}"></td>`
+    : "";
   return (
     `<tr${classes.length ? ` class="${classes.join(" ")}"` : ""}>` +
-    `<td class="c"><input type="checkbox" data-invoice-pick="1" ${ref(row)}${picked ? " checked" : ""} aria-label="${escapeHtml(`Zaznacz ${label} do wspólnego komentarza`)}"></td>` +
+    box +
     `<td>${text(row.transportNumber)}</td>` +
     `<td class="adres">${text(addressWithCommaAfterLocality(row.address))}</td>` +
     `<td>${text(row.shopName)}</td>` +

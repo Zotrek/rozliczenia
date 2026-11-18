@@ -565,23 +565,6 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
   border-color: var(--teal);
   box-shadow: 0 0 0 2px var(--teal-soft);
 }
-.focused-invoice {
-  flex: 0 1 auto;
-  max-height: 42%;
-  min-height: 0;
-  overflow: auto;
-  padding-bottom: 4px;
-}
-/* Karta faktury, komentarz i stopka biorą wysokość z góry.
-   Lista nierozliczonych ma bazę 0 i min-height 0, więc zostaje kreska:
-   wierszy nie widać i checkboxów nie da się zaznaczyć. */
-.statement:has(.focused-invoice) {
-  overflow: auto;
-}
-.statement:has(.focused-invoice) > .table-wrap {
-  flex: 1 0 16rem;
-  min-height: 16rem;
-}
 .invoice-card .note { margin: 0; padding: 10px 14px 12px; }
 .invoice-head {
   display: flex;
@@ -606,6 +589,8 @@ th.wrap { white-space: normal; min-width: 7.5rem; line-height: 1.25; }
   padding: 10px 14px 12px;
   border-top: 1px solid var(--line);
 }
+.invoice-save .invoice-number { flex: 1 1 16rem; margin: 0; }
+.invoice-save .stat { margin-left: auto; }
 .invoice-save .note { flex: 1 1 18rem; padding: 0; }
 .invoice-save .err, .invoice-save .notice { flex: 1 1 100%; margin: 0; }
 .invoice-save .btn-teal { width: auto; margin-top: 0; }

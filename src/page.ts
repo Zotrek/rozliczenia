@@ -160,6 +160,7 @@ const VIEW: RangeViewModel = {
   invoiceFocus: null,
   invoiceNotice: "",
   invoiceEdit: emptyInvoiceEdit(),
+  invoiceEditing: false,
   workReturn: "range",
   searched: false,
   loadKind: "logo",
@@ -238,9 +239,8 @@ function fieldByKeep(root: ParentNode, keep: string): HTMLInputElement | null {
 }
 
 /**
- * Przewinięcie listy zestawienia, bloku pozycji faktury i strony.
- * Przebudowa HTML tworzy nowe kontenery. Jeden `.table-wrap` to za mało:
- * przy edycji faktury pierwszy jest w karcie, a lista nierozliczonych jest drugi.
+ * Przewinięcie tabel na ekranie i strony.
+ * Przebudowa HTML tworzy nowe kontenery, więc scrollTop trzeba przenieść.
  */
 function readListScroll(): {
   page: number;
@@ -606,10 +606,8 @@ async function runSearch(): Promise<void> {
   VIEW.error = "";
   VIEW.loading = true;
   VIEW.loadKind = "logo";
-  VIEW.loadMessage =
-    VIEW.workReturn === "stats" && VIEW.invoiceFocus !== null
-      ? "Szukam tej faktury i nierozliczonych odbiorów…"
-      : "Szukam nierozliczonych odbiorów…";
+  VIEW.invoiceEditing = false;
+  VIEW.loadMessage = "Szukam nierozliczonych odbiorów…";
   paint();
   try {
     const response = await fetch(webAppUrl(webapp, searchParams(started)));
@@ -645,38 +643,7 @@ async function runSearch(): Promise<void> {
     VIEW.statement = freshStatement(read.rows, read.rates);
     VIEW.invoiceNotice = "";
     VIEW.invoiceEdit = emptyInvoiceEdit();
-    if (VIEW.workReturn === "stats" && VIEW.invoiceFocus !== null) {
-      VIEW.statement = { ...VIEW.statement, invoice: VIEW.invoiceFocus };
-      try {
-        const invoiceRead = await loadInvoiceRows(started);
-        if (invoiceRead.ok) {
-          VIEW.invoices = rowsOfInvoice(invoiceRead.rows, VIEW.invoiceFocus);
-          VIEW.invoiceComment = invoiceCommentFromSheet(VIEW.invoiceComment, VIEW.invoices);
-        } else {
-          VIEW.invoices = [];
-          if (!invoiceRead.silent) {
-            VIEW.invoiceNotice = invoiceRead.error;
-            reportFailure(
-              "ROZ-E-INVOICES",
-              "page.ts runSearch",
-              "Odczyt pozycji tej faktury nie doszedł.",
-              "Zestawienie nierozliczonych jest. Pozycji tej faktury na górze nie ma.",
-              invoiceRead.detail,
-            );
-          }
-        }
-      } catch (err) {
-        VIEW.invoices = [];
-        VIEW.invoiceNotice = "Odczyt pozycji tej faktury nie doszedł.";
-        reportFailure(
-          "ROZ-E-INVOICES",
-          "page.ts runSearch",
-          "Odczyt pozycji tej faktury nie doszedł.",
-          "Zestawienie nierozliczonych jest. Pozycji tej faktury na górze nie ma.",
-          { technical: err },
-        );
-      }
-    }
+    VIEW.invoiceEditing = false;
     VIEW.status = "";
     VIEW.stats = { ...VIEW.stats, status: "" };
     VIEW.ratesOpen = false;
@@ -752,7 +719,7 @@ function armPickupWork(el: HTMLElement): boolean {
   return true;
 }
 
-async function runInvoices(): Promise<void> {
+async function runInvoices(editing = false): Promise<void> {
   const started = startSearch(
     fieldsForSearch({
       contractor: VIEW.contractor,
@@ -776,7 +743,8 @@ async function runInvoices(): Promise<void> {
   VIEW.error = "";
   VIEW.loading = true;
   VIEW.loadKind = "logo";
-  VIEW.loadMessage = "Szukam rozliczonych faktur…";
+  VIEW.invoiceEditing = editing && VIEW.invoiceFocus !== null;
+  VIEW.loadMessage = VIEW.invoiceEditing ? "Szukam pozycji tej faktury…" : "Szukam rozliczonych faktur…";
   paint();
   try {
     const read = await loadInvoiceRows(started);
@@ -841,14 +809,20 @@ function onClick(event: MouseEvent): void {
   } else if (action === "search") {
     VIEW.workReturn = "range";
     VIEW.invoiceFocus = null;
+    VIEW.invoiceEditing = false;
     void runSearch();
   } else if (action === "invoice-preview") {
     if (armPickupWork(el)) {
-      void runInvoices();
+      void runInvoices(false);
     }
   } else if (action === "invoice-edit") {
     if (armPickupWork(el)) {
-      void runSearch();
+      if (VIEW.invoiceFocus === null) {
+        VIEW.invoiceEditing = false;
+        void runSearch();
+      } else {
+        void runInvoices(true);
+      }
     }
   } else if (action === "back") {
     VIEW.screen = screenAfterWorkBack(VIEW.workReturn);
@@ -1157,6 +1131,11 @@ function onInput(event: Event): void {
   if (el.dataset.keep === "ledger-number") {
     VIEW.ledger = { ...VIEW.ledger, invoiceQuery: el.value, page: 1 };
     paint("ledger-number");
+    return;
+  }
+  if (el.dataset.edit === "invoice-number") {
+    VIEW.invoiceEdit = { ...VIEW.invoiceEdit, number: el.value, status: "", notice: "" };
+    paint(el.dataset.keep);
     return;
   }
   if (
@@ -2457,6 +2436,10 @@ async function saveInvoiceEdit(): Promise<void> {
         : skipped > 0
           ? "Część pozycji nie weszła. Lista jest odświeżona."
           : "Zapisano zmiany faktury.";
+    const renamed = typeof built.body.nowyNumer === "string" ? built.body.nowyNumer : "";
+    if (renamed !== "" && saved > 0) {
+      VIEW.invoiceFocus = renamed;
+    }
     if (VIEW.applied && VIEW.invoiceFocus !== null) {
       const read = await loadInvoiceRows(VIEW.applied);
       if (read.ok) {

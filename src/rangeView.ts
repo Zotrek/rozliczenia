@@ -53,8 +53,10 @@ export interface RangeViewModel {
   invoiceFocus: string | null;
   /** Odczyt pozycji wybranej faktury przy edycji nie doszedł. */
   invoiceNotice: string;
-  /** Worki, stawki i odpięcie sklepu na edycji faktury. Zapis po przycisku. */
+  /** Worki, stawki, numer i odpięcie sklepu na edycji faktury. Zapis po przycisku. */
   invoiceEdit: InvoiceEditDraft;
+  /** Edycja konkretnej faktury: tylko jej pozycje, bez zestawienia nierozliczonych. */
+  invoiceEditing: boolean;
   /** Dokąd wraca wstecz z podglądu albo z zestawienia otwartego Edycją. */
   workReturn: "range" | "stats" | "ledger";
   /** Udane Szukaj. Dopiero wtedy Zestawienie w pasku prowadzi do ostatniego wyniku. */
@@ -391,20 +393,7 @@ function renderStatementScreen(model: RangeViewModel): string {
     `<div class="range"><span>${escapeHtml(modeLabel(model.mode))}</span><strong>${escapeHtml(label)}</strong></div>` +
     back +
     "</div>" +
-    focusedInvoiceBlock(model) +
     renderStatement(model.statement, model.status, { allowApprove: true }) +
-    "</div>"
-  );
-}
-
-function focusedInvoiceBlock(model: RangeViewModel): string {
-  if ((model.workReturn !== "stats" && model.workReturn !== "ledger") || model.invoiceFocus === null) {
-    return "";
-  }
-  return (
-    '<div class="focused-invoice">' +
-    '<p class="note invoice-note">Pozycje tej faktury. Możesz odpiąć sklep, zmienić liczbę worków i stawki — zapis po Zapisz zmiany. Niżej są nierozliczone odbiory — możesz dopisać je tym samym numerem.</p>' +
-    renderFocusedInvoice(model.invoices, model.invoiceFocus, model.invoiceNotice, model.invoiceEdit) +
     "</div>"
   );
 }
@@ -412,24 +401,37 @@ function focusedInvoiceBlock(model: RangeViewModel): string {
 function renderInvoicesScreen(model: RangeViewModel): string {
   const label = model.applied ? rangeLabel(model.applied) : "";
   const status = model.status ? `<p class="err status-block">${escapeHtml(model.status)}</p>` : "";
+  const editing = model.invoiceEditing && model.invoiceFocus !== null;
+  const note = editing
+    ? '<p class="note invoice-note">Pozycje tej faktury. Możesz zmienić numer, odpiąć sklep, zmienić liczbę worków i stawki. Zapis po Zapisz zmiany.</p>'
+    : "";
+  const body = editing
+    ? note + renderFocusedInvoice(model.invoices, model.invoiceFocus ?? "", model.invoiceNotice, model.invoiceEdit)
+    : renderInvoiceList(
+        model.invoices,
+        model.invoiceFocus,
+        model.invoiceComment ?? emptyInvoiceComment(),
+        model.invoiceEdit,
+      );
   return (
     '<div class="statement" data-screen="invoices"><div class="top">' +
-    invoiceHeading(model.invoiceFocus, label) +
+    invoiceHeading(model.invoiceFocus, label, editing) +
     (model.workReturn === "ledger" ? ledgerReturnButton() : statsReturnButton()) +
     "</div>" +
     status +
-    renderInvoiceList(model.invoices, model.invoiceFocus, model.invoiceComment ?? emptyInvoiceComment()) +
+    body +
     "</div>"
   );
 }
 
-function invoiceHeading(focus: string | null, label: string): string {
+function invoiceHeading(focus: string | null, label: string, editing: boolean): string {
   if (focus === null) {
     return `<div class="range"><span>Podgląd rozliczonych</span><strong>${escapeHtml(label)}</strong></div>`;
   }
   const name = invoiceFocusLabel(focus);
   const range = label === "" ? name : `${name} · ${label}`;
-  return `<div class="range"><span>Podgląd faktury</span><strong>${escapeHtml(range)}</strong></div>`;
+  const title = editing ? "Edycja faktury" : "Podgląd faktury";
+  return `<div class="range"><span>${title}</span><strong>${escapeHtml(range)}</strong></div>`;
 }
 
 export function renderRatesDialog(model: RangeViewModel): string {

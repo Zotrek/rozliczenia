@@ -1470,6 +1470,41 @@ describe("patchInvoiceEdit", () => {
     expect(register.cell(2, 16)).toBe(90);
     expect(register.cell(2, 17)).toBe(22.5);
   });
+
+  it("test_patchInvoiceEdit_renames_invoice_and_leaves_cost", () => {
+    const { register } = fresh();
+    seedRegister(register, 2, { 9: 3, 15: "tak", 16: "FV/1", 17: 115, 18: 38.33 });
+    seedRegister(register, 3, { 1: 16, 15: "tak", 16: "FV/1", 17: 20, 18: 10 });
+
+    const result = postToSheet({
+      action: "patchInvoiceEdit",
+      numerFaktury: "FV/1",
+      nowyNumer: "FV/9",
+      wiersze: [
+        { sheetRow: 2, transportNumber: "15", tylkoNumer: true },
+        { sheetRow: 3, transportNumber: "16", tylkoNumer: true },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.pominiete).toEqual([]);
+    expect(register.cell(2, 16)).toBe("FV/9");
+    expect(register.cell(3, 16)).toBe("FV/9");
+    expect(register.cell(2, 9)).toBe(3);
+    expect(register.cell(2, 11)).toBe("trasa-a");
+    expect(register.cell(2, 15)).toBe("tak");
+    expect(register.cell(2, 17)).toBe(115);
+    expect(register.cell(2, 18)).toBe(38.33);
+
+    const rejected = postToSheet({
+      action: "patchInvoiceEdit",
+      numerFaktury: "FV/9",
+      nowyNumer: "=FV",
+      wiersze: [{ sheetRow: 2, transportNumber: "15", tylkoNumer: true }],
+    });
+    expect(rejected).toEqual({ ok: false, error: "invoice" });
+    expect(register.cell(2, 16)).toBe("FV/9");
+  });
 });
 
 describe("zapis w transport-log.gs", () => {

@@ -92,7 +92,7 @@ describe("page wiring", () => {
       expect(click).toContain(`action === "${action}"`);
     }
     expect(click).toContain("runSearch()");
-    expect(click).toContain("runInvoices()");
+    expect(click).toContain("runInvoices(");
     expect(click).toContain("goMenu(");
     expect(click).not.toContain('action === "stats-back"');
     expect(click).toContain("runStats()");
@@ -231,10 +231,13 @@ describe("page wiring", () => {
     expect(load).toContain("invoiceParams(");
     expect(load).toContain("readSettledInvoices(");
     expect(functionBody("armPickupWork")).toContain("sheetToIsoDate(");
-    const search = functionBody("runSearch");
-    expect(search).toContain("invoice: VIEW.invoiceFocus");
-    expect(search).toContain("loadInvoiceRows(");
-    expect(search).toContain("rowsOfInvoice(");
+    const edit = functionBody("onClick");
+    expect(edit).toContain("runInvoices(true)");
+    expect(edit).toContain("VIEW.invoiceFocus === null");
+    const invoices = functionBody("runInvoices");
+    expect(invoices).toContain("VIEW.invoiceEditing");
+    expect(invoices).toContain("rowsOfInvoice(");
+    expect(functionBody("runSearch")).not.toContain("loadInvoiceRows(");
   });
 
   it("test_page_menu_keeps_statement_and_loaded_stats", () => {

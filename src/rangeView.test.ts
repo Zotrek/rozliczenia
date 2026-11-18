@@ -33,6 +33,7 @@ function model(over: Partial<RangeViewModel> = {}): RangeViewModel {
     invoiceFocus: null,
     invoiceNotice: "",
     invoiceEdit: emptyInvoiceEdit(),
+    invoiceEditing: false,
     workReturn: "range",
     searched: false,
     addresses: [],
@@ -250,7 +251,7 @@ describe("renderApp", () => {
     expect(html).not.toContain('data-screen="range"');
   });
 
-  it("test_renderApp_statement_from_stats_shows_only_the_chosen_invoice", () => {
+  it("test_renderApp_invoice_edit_shows_only_that_invoice", () => {
     const invoices = [
       {
         sheetName: "Arkusz1",
@@ -285,24 +286,27 @@ describe("renderApp", () => {
     ];
     const html = renderApp(
       model({
-        screen: "statement",
+        screen: "invoices",
         applied: APPLIED,
-        searched: true,
         workReturn: "stats",
         invoiceFocus: "FV/1",
+        invoiceEditing: true,
         invoices,
       }),
     );
-    expect(html).toContain('data-screen="statement"');
+    expect(html).toContain('data-screen="invoices"');
     expect(html).toContain("← Statystyki");
-    expect(html).toContain('class="is-on" data-action="nav" data-place="statement"');
+    expect(html).toContain('class="is-on" data-action="nav" data-place="stats"');
+    expect(html).toContain("Edycja faktury");
     expect(html).toContain("Pozycje tej faktury");
     expect(html).toContain("Sklep A");
+    expect(html).toContain("Kwota faktury");
+    expect(html).toContain("150,00");
+    expect(html).toContain('data-edit="invoice-number"');
     expect(html).not.toContain("Sklep Obcy");
-    const openSchedule = renderApp(
-      model({ screen: "statement", applied: APPLIED, workReturn: "stats", invoices }),
-    );
-    expect(openSchedule).not.toContain("Pozycje tej faktury");
+    expect(html).not.toContain("pozycje w zestawieniu");
+    expect(html).not.toContain('data-toggle="checked"');
+    expect(html).not.toContain("Zatwierdź");
   });
 
   it("test_renderApp_escapes_contractor_word_data", () => {
@@ -454,10 +458,17 @@ describe("contractor picker", () => {
 });
 
 describe("invoice edit layout", () => {
-  it("test_statement_under_invoice_keeps_a_selectable_list", () => {
-    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "app.css"), "utf8");
-    expect(css).toContain(".statement:has(.focused-invoice) > .table-wrap");
-    expect(css).toMatch(/\.statement:has\(\.focused-invoice\) > \.table-wrap \{[^}]*min-height: 16rem/);
-    expect(css).toMatch(/\.statement:has\(\.focused-invoice\) \{[^}]*overflow: auto/);
+  it("test_invoice_edit_screen_has_no_unsettled_list", () => {
+    const html = renderApp(
+      model({
+        screen: "invoices",
+        invoiceFocus: "FV/1",
+        invoiceEditing: true,
+        invoices: [],
+      }),
+    );
+    expect(html).toContain("Edycja faktury");
+    expect(html).not.toContain("pozycje w zestawieniu");
+    expect(html).not.toContain('data-action="approve"');
   });
 });

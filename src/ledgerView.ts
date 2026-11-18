@@ -241,7 +241,7 @@ function ledgerTable(model: LedgerViewModel): string {
     "Każdy wiersz to jeden numer faktury u jednego podwykonawcy i w jednym sposobie odbioru. " +
     "Lista jest od najnowszej daty zatwierdzenia. Faktury sprzed tej daty są na końcu. " +
     "Okres dotyczy daty odbioru, więc stare faktury bez daty zatwierdzenia też widać. " +
-    "Podgląd nic nie zapisuje. Edycja otwiera zestawienie z tym numerem. " +
+    "Podgląd i edycja otwierają tylko tę fakturę. Na dole jest jej kwota, a numer da się zmienić. " +
     `Po ${LEDGER_PAGE_SIZE} pozycji na stronę.</p>`
   );
 }

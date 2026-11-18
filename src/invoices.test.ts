@@ -127,6 +127,10 @@ describe("renderInvoiceList", () => {
     expect(html).toContain("FV/1");
     expect(html).toContain("Sklep A");
     expect(html).toContain("is-focus");
+    expect(html).toContain("Kwota faktury");
+    expect(html).toContain("150,00");
+    expect(html).toContain('data-edit="invoice-number"');
+    expect(html).not.toContain("data-invoice-pick");
     expect(html).not.toContain("FV/2");
     expect(html).not.toContain("Sklep Obcy");
   });

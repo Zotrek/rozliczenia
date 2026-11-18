@@ -1010,8 +1010,9 @@ function periodPickupsBlock(model: StatsViewModel): string {
     pager("pickups", paged) +
     '<p class="note" style="margin: 10px 12px 12px;">' +
     "Wartość faktury to suma kosztów odbioru z arkusza dla tego numeru, u tego podwykonawcy i w tym okresie. " +
-    "Podgląd pokazuje tylko tę fakturę i nic nie zapisuje. " +
-    "Edycja otwiera zestawienie nierozliczonych, wpisuje ten numer i na górze pokazuje pozycje tej faktury. " +
+    "Podgląd i edycja pokazują tylko pozycje tej faktury, bez zaznaczania i bez dopisywania odbiorów. " +
+    "Na dole jest kwota tej faktury. Numer da się zmienić. " +
+    "Edycja pozwala też zmienić worki, stawki i odpiąć sklep. " +
     "W Harmonogramie link jest też przy nierozliczonym wierszu. " +
     "Harmonogram: liczba worków = liczba wierszy w „odebrane z harmonogramu” dla sklepu i dnia. " +
     `Lista pokazuje po ${STATS_PAGE_SIZE} pozycji na stronę.</p>`

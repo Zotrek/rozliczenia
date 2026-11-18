@@ -1,7 +1,7 @@
 # SPECIFICATION.md — Rozliczanie kosztów odbiorów
 
 > **Status:** Faza 1 — specyfikacja biznesowa  
-> **Ostatnia aktualizacja:** 2026-10-29  
+> **Ostatnia aktualizacja:** 2026-11-18  
 > **Właściciel:** Zespół Zwrotka  
 > **Źródło:** Wytyczne „Aplikacja do rozliczania kosztów odbiorów” + doprecyzowanie względem rejestru transportów Arkusz-mapa + makiety `rozliczenia/docs/makiety-tabeli.html` i `rozliczenia/docs/makiety-statystyki.html`
 
@@ -17,7 +17,7 @@ Aplikacja nie służy do wpisywania odbiorów. Dane odbioru powstają przy gener
 
 **Dlaczego to robimy?**
 
-Koszt podjazdu, worków i trasy ma być liczony z danych już zapisanych przy protokole (w tym snapshot stawek podjazdu i worka w rejestrze). Bez przepisywania sklepu, daty, worków i numeru protokołu do drugiego miejsca. Wypełniona **Stawka za trasę**, **Stawka za podjazd** albo **Stawka za worek** jest kwotą rozliczenia, w Harmonogramie i na Na zgłoszenie. Szukaj jej nie czyści. Gdy w bazie na ten dzień stoi inna niepusta kwota, zestawienie zostawia kwotę z arkusza i stawia przy niej wykrzyknik. Najechanie pokazuje stawkę z bazy. W Harmonogramie pusta stawka podjazdu albo worka przy Szukaj dostaje aktualną stawkę z Bazy cen harmonogram. Szczegóły: [Harmonogram — stawki i liczba worków](#harmonogram--stawki-i-liczba-worków).
+Koszt podjazdu, worków i trasy ma być liczony z danych już zapisanych przy protokole (w tym snapshot stawek podjazdu i worka w rejestrze). Bez przepisywania sklepu, daty, worków i numeru protokołu do drugiego miejsca. Wypełniona **Stawka za trasę**, **Stawka za podjazd** albo **Stawka za worek** jest kwotą rozliczenia, w Harmonogramie i na Na zgłoszenie. Szukaj jej nie czyści. Gdy w bazie na ten dzień stoi inna wpisana kwota, zestawienie zostawia kwotę z arkusza i stawia przy niej wykrzyknik. Gdzie stoi i kiedy milczy: [Wykrzyknik przy stawce](#wykrzyknik-przy-stawce). W Harmonogramie pusta stawka podjazdu albo worka przy Szukaj dostaje aktualną stawkę z Bazy cen harmonogram. Szczegóły: [Harmonogram — stawki i liczba worków](#harmonogram--stawki-i-liczba-worków).
 
 ---
 
@@ -266,7 +266,7 @@ Zapis protokołu dopisuje jeden wiersz na zakładkę miesięczną Na zgłoszenie
 
 ## Arkusz-mapa — baza stawek
 
-Stawki podjazdu i worka użytkownik wprowadza i edytuje na mapie, w tym samym panelu co lista podwykonawców i poprawa adresu („Dodaj do listy / popraw adres”), oraz w aplikacji rozliczeń. Zasady zapisu są wspólne. Stawki trasy tu nie ma. Ta kwota jest przy protokole i da się ją zmienić na zestawieniu rozliczeń.
+Stawki podjazdu i worka użytkownik wprowadza i edytuje na mapie, w tym samym panelu co lista podwykonawców i poprawa adresu („Dodaj do listy / popraw adres”), oraz w aplikacji rozliczeń. Zasady zapisu są wspólne. Stawki trasy tu nie ma. Ta kwota jest przy protokole i da się ją zmienić na zestawieniu rozliczeń. Zestawienie Na zgłoszenie nie porównuje jej z tą bazą.
 
 Pola zapisu:
 
@@ -318,6 +318,14 @@ Pięć widoków aplikacji + okno Bazy stawek. Tabeli na Zakresie nie ma. Na Zest
 Opcji **tylko za liczbę worków** nie ma. Nie stoi pod nazwą sklepu, nie ma jej w kolumnie i nie ma jej na trasie. Gdy podjazd nie jest naliczany, w Kwota podjazdu/trasy wpisuje się 0 zł.
 
 Kolumny tabeli, od lewej: Rozliczone, Numer protokołu, Adres, Sklep, Data, Podjazd/Trasa, Kwota podjazdu/trasy, Liczba worków, Kwota za worek, Suma za worki, Razem, transport się odbył. Komórka bez wartości pokazuje „—”. Na odbiorze zwykłym Razem to całość kosztu ostatecznego. Na wierszu trasy nazwa trasy jest w Adres, Razem to stawka raz plus worki, a „—” jest w Numer protokołu, Sklep i transport się odbył. Adresy są pogrubione. Nazwy sklepów nie. W Podjazd/Trasa stoi znacznik podjazd albo trasa. Kwota jest w osobnej kolumnie obok.
+
+### Wykrzyknik przy stawce
+
+Zestawienie pokazuje kwotę z arkusza. Przy polu stoi **!**, gdy na ten dzień baza ma inną wpisaną kwotę. Pole i wykrzyknik są podkreślone. Najechanie pokazuje na przykład: „Stawka w bazie stawek jest inna: 30,00 zł”. Wykrzyknik nic nie zapisuje i kwoty w polu nie podmienia.
+
+Znacznik jest przy podjeździe i przy worku, w Harmonogramie i na Na zgłoszenie. Przy podjeździe stoi na odbiorze zwykłym. Przy worku stoi na odbiorze zwykłym i na wierszu trasy, gdy każdy adres, który się odbył, ma tę samą kwotę worka. Przy trasie znacznik jest tylko w Harmonogramie, bo tylko Baza cen harmonogram ma cenę trasy. Baza stawek tej ceny nie niesie, więc na Na zgłoszenie trasa wykrzyknika nie dostaje.
+
+Pusta komórka po którejkolwiek stronie nie dostaje wykrzyknika. Dwie takie same kwoty też nie. Zero jest wpisem: zero wobec innej kwoty dostaje znacznik, zero wobec zera nie. Remis w bazie nie daje kwoty do porównania, więc znacznika nie ma.
 
 Na każdej kolumnie tej tabeli, także na **Komentarz do faktury**, jest ten sam lejek co przy odbiorach w Statystykach i przy Ewidencji: lista wartości, szukanie, sortowanie, OK, wyczyść jedną kolumnę, wyczyść wszystko. Filtr i sort są tylko na ekranie. Do arkusza nie schodzą. Podjazd zostaje, gdy jego komórki pasują do wszystkich włączonych filtrów. Trasa zostaje, gdy pasuje wiersz trasy albo któryś jej sklep. Po rozwinięciu widać sklepy spełniające filtr. Filtr „trasa” pokazuje całą trasę. Puste komórki na liście filtra to „—”. Suma zestawienia i suma zaznaczonych liczą całe rozliczenie, także wiersze schowane filtrem. Checkbox w nagłówku kolumny Rozliczone przy włączonym filtrze zaznacza tylko widoczne pozycje. Zaznaczenie schowanych wierszy zostaje. Ten sam lejek jest na zestawieniu Na zgłoszenie i Harmonogram.
 
@@ -474,7 +482,7 @@ W trakcie zapisu poniżej 10 000 zł widać to samo pulsujące logo co przy każ
 
 Dotyczy zakładek `Harmonogram {Miesiąc} {Rok}` i legacy `zestawienie z harmonogramu`. Rejestr Na zgłoszenie zostaje przy regułach z [rejestru Na zgłoszenie](#rejestr-na-zgłoszenie-miesięczne--arkusz1) i z [tabeli odbioru zwykłego](#tabela--odbiór-zwykły): snapshot z chwili protokołu, zmiana kwoty na ekranie nie wraca do kolumny stawki ani do Bazy stawek, a **Koszt odbioru** po Zatwierdź się nie zmienia.
 
-**Szukaj.** Zestawienie bierze nierozliczone wiersze rejestru Harmonogram tego podwykonawcy i tego zakresu dat. Zapis stawek dotyczy tylko tych wierszy, nie całej zakładki. Szukaj bierze datę tak jak sync zestawienia. Wypełniona **Stawka za trasę** (kolumna 11), **Stawka za podjazd** (kolumna 12) albo **Stawka za worek** (kolumna 13) zostaje w arkuszu i jest kwotą w aplikacji. Zero jest wpisem, nie pustką. Pusta **Stawka za podjazd** i pusta **Stawka za worek** dostają stawkę z **Bazy cen harmonogram** obowiązującą na datę odbioru: adres i podwykonawca, najpóźniejsza data nie późniejsza niż odbiór. Pusta data w Bazie cen to „od zawsze” i jest starsza niż każda wpisana. Remis tej samej daty zostawia pierwszy wiersz w kolejności zakładki. „Tak jak sync” dotyczy całego wyboru daty, nie tylko dwóch wierszy z jedną datą. Para, której każda data jest późniejsza niż odbiór, jest tym samym co brak pary: pusta komórka zostaje pusta, wypełnionej Szukaj nie czyści. **Trasa** zostaje. Wiersz z **Rozliczony** `tak` i wiersz z **transport się odbył** `nie` nie wchodzą do zestawienia i kolumn nie dostają. Baza cen się od tego nie zmienia. `saveRateHarmonogram` pustą datę pomija (`resolveHarmonogramSnapshot_` przeskakuje `\u0000`) i nadal przepisuje też trasę. Szukaj tego pominięcia nie kopiuje. Sync mapki zostaje przy swoim przepisywaniu trasy: dalej pomija rozliczone, nie czyści zakładki i nadal sam przepisuje też trasę na nierozliczonych.
+**Szukaj.** Zestawienie bierze nierozliczone wiersze rejestru Harmonogram tego podwykonawcy i tego zakresu dat. Zapis stawek dotyczy tylko tych wierszy, nie całej zakładki. Szukaj bierze datę tak jak sync zestawienia. Wypełniona **Stawka za trasę** (kolumna 11), **Stawka za podjazd** (kolumna 12) albo **Stawka za worek** (kolumna 13) zostaje w arkuszu i jest kwotą w aplikacji. Zero jest wpisem, nie pustką. Odczyt Bazy cen niesie też cenę trasy. Wykrzyknik przy stawce trasy korzysta z tej ceny. Bez niej porównania trasy nie ma. [Wykrzyknik przy stawce](#wykrzyknik-przy-stawce). Pusta **Stawka za podjazd** i pusta **Stawka za worek** dostają stawkę z **Bazy cen harmonogram** obowiązującą na datę odbioru: adres i podwykonawca, najpóźniejsza data nie późniejsza niż odbiór. Pusta data w Bazie cen to „od zawsze” i jest starsza niż każda wpisana. Remis tej samej daty zostawia pierwszy wiersz w kolejności zakładki. „Tak jak sync” dotyczy całego wyboru daty, nie tylko dwóch wierszy z jedną datą. Para, której każda data jest późniejsza niż odbiór, jest tym samym co brak pary: pusta komórka zostaje pusta, wypełnionej Szukaj nie czyści. **Trasa** zostaje. Wiersz z **Rozliczony** `tak` i wiersz z **transport się odbył** `nie` nie wchodzą do zestawienia i kolumn nie dostają. Baza cen się od tego nie zmienia. `saveRateHarmonogram` pustą datę pomija (`resolveHarmonogramSnapshot_` przeskakuje `\u0000`) i nadal przepisuje też trasę. Szukaj tego pominięcia nie kopiuje. Sync mapki zostaje przy swoim przepisywaniu trasy: dalej pomija rozliczone, nie czyści zakładki i nadal sam przepisuje też trasę na nierozliczonych.
 
 Kolumny Harmonogramu, bez numeru transportowego: **Ilość worków** 8, **Stawka za podjazd** 12, **Stawka za worek** 13, **Koszt odbioru** 16, **Koszt odbioru per worek** 17, **Data zatwierdzenia** 21. Numery 17 i 18 w rejestrze Na zgłoszenie to inne pola.
 

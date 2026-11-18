@@ -516,6 +516,18 @@ describe("readSettlement", () => {
       expect(read.rates[0].routeAmount).toBe(15_000);
     }
   });
+
+  it("test_readSettlement_leaves_route_price_absent_when_the_catalog_omits_it", () => {
+    const read = readSettlement({
+      ok: true,
+      rows: [row({ sheetRow: 2 })],
+      rates: [rate({ sheetRow: 8, shop: "Sklepowa 1", pickupAmount: 2_000, bagAmount: 500 })],
+    });
+    expect(read.ok).toBe(true);
+    if (read.ok) {
+      expect(Object.prototype.hasOwnProperty.call(read.rates[0], "routeAmount")).toBe(false);
+    }
+  });
 });
 
 describe("labels and parsers", () => {

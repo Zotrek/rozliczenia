@@ -364,6 +364,81 @@ describe("renderStatement", () => {
     expect(emptyCatalog).not.toContain("rate-drift");
   });
 
+  it("test_renderStatement_marks_bag_rate_when_catalog_bag_differs", () => {
+    const html = renderStatement(
+      screen(
+        [row({ sheetRow: 2, pickupRate: 2_000, bagRate: 1_000 })],
+        [rate({ sheetRow: 2, shop: "Sklepowa 1", pickupAmount: 2_000, bagAmount: 500 })],
+      ),
+    );
+    const rowHtml = html.slice(html.indexOf('data-kind="plain"'), html.indexOf("</tr>", html.indexOf('data-kind="plain"')));
+    const pickupHtml = rowHtml.slice(rowHtml.indexOf('data-edit="pickup"'), rowHtml.indexOf('data-edit="bag-rate"'));
+    const bagHtml = rowHtml.slice(rowHtml.indexOf('data-edit="bag-rate"'));
+    expect(pickupHtml).toContain('value="20,00"');
+    expect(pickupHtml).not.toContain("rate-drift");
+    expect(bagHtml).toContain('value="10,00"');
+    expect(bagHtml).toContain(`Stawka w bazie stawek jest inna: ${formatPln(500)}`);
+    expect(bagHtml.split('class="rate-drift"').length - 1).toBe(1);
+  });
+
+  it("test_renderStatement_marks_zero_sheet_rate_when_catalog_differs", () => {
+    const html = renderStatement(
+      screen(
+        [row({ sheetRow: 2, pickupRate: 0, bagRate: 2_000 })],
+        [rate({ sheetRow: 2, shop: "Sklepowa 1", pickupAmount: 3_000, bagAmount: 2_000 })],
+      ),
+    );
+    const rowHtml = html.slice(html.indexOf('data-kind="plain"'), html.indexOf("</tr>", html.indexOf('data-kind="plain"')));
+    const pickupHtml = rowHtml.slice(rowHtml.indexOf('data-edit="pickup"'), rowHtml.indexOf('data-edit="bag-rate"'));
+    expect(pickupHtml).toContain('value="0,00"');
+    expect(pickupHtml).toContain(`Stawka w bazie stawek jest inna: ${formatPln(3_000)}`);
+    expect(rowHtml.split('class="rate-drift"').length - 1).toBe(1);
+  });
+
+  it("test_renderStatement_marks_route_bag_rate_when_catalog_bag_differs", () => {
+    const html = renderStatement(
+      screen(
+        [row({ sheetRow: 2, address: "A", routeName: "trasa", routeRate: 30_000, pickupRate: 0, bagRate: 1_000 })],
+        [rate({ sheetRow: 9, shop: "A", pickupAmount: 0, bagAmount: 500, routeAmount: 30_000 })],
+      ),
+    );
+    const routeHtml = html.slice(html.indexOf('data-kind="route"'), html.indexOf("</tr>", html.indexOf('data-kind="route"')));
+    const routeRateHtml = routeHtml.slice(routeHtml.indexOf('data-edit="route-rate"'), routeHtml.indexOf('data-edit="bag-rate-route"'));
+    const bagHtml = routeHtml.slice(routeHtml.indexOf('data-edit="bag-rate-route"'));
+    expect(routeRateHtml).toContain('value="300,00"');
+    expect(routeRateHtml).not.toContain("rate-drift");
+    expect(bagHtml).toContain('value="10,00"');
+    expect(bagHtml).toContain(`Stawka w bazie stawek jest inna: ${formatPln(500)}`);
+    expect(bagHtml.split('class="rate-drift"').length - 1).toBe(1);
+  });
+
+  it("test_renderStatement_skips_mark_when_catalog_rates_tie", () => {
+    const html = renderStatement(
+      screen(
+        [row({ sheetRow: 3, address: "A", pickupRate: 2_000, bagRate: 500 })],
+        [
+          rate({ sheetRow: 5, shop: "A", validFrom: "01.01.2026", pickupAmount: 1_000, bagAmount: 100 }),
+          rate({ sheetRow: 6, shop: "A", validFrom: "01.01.2026", pickupAmount: 3_000, bagAmount: 200 }),
+        ],
+      ),
+    );
+    expect(html).toContain('value="20,00"');
+    expect(html).not.toContain("rate-drift");
+  });
+
+  it("test_renderStatement_skips_route_mark_when_catalog_has_no_route_price", () => {
+    const html = renderStatement(
+      screen(
+        [row({ sheetRow: 2, address: "A", routeName: "trasa", routeRate: 30_000, pickupRate: 2_000, bagRate: 500 })],
+        [rate({ sheetRow: 9, shop: "A", pickupAmount: 2_000, bagAmount: 500 })],
+      ),
+    );
+    const routeHtml = html.slice(html.indexOf('data-kind="route"'), html.indexOf("</tr>", html.indexOf('data-kind="route"')));
+    expect(routeHtml).toContain('data-edit="route-rate"');
+    expect(routeHtml).toContain('value="300,00"');
+    expect(routeHtml).not.toContain("rate-drift");
+  });
+
   it("test_renderStatement_marks_route_rate_when_catalog_route_differs", () => {
     const html = renderStatement(
       screen(

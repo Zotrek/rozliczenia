@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — Rozliczenia
 
-> **Status:** Zatwierdzone 2026-09-19; uzupełnienie Statystyk 2026-09-23; Ewidencja i lejek zestawienia 2026-10-29. Kolejność prac jest w [`PLAN.md`](PLAN.md).  
-> **Ostatnia aktualizacja:** 2026-10-29  
+> **Status:** Zatwierdzone 2026-09-19; uzupełnienie Statystyk 2026-09-23; Ewidencja i lejek zestawienia 2026-10-29; wykrzyknik stawek 2026-11-18. Kolejność prac jest w [`PLAN.md`](PLAN.md).  
+> **Ostatnia aktualizacja:** 2026-11-18  
 > **Na podstawie:** `rozliczenia/docs/SPECIFICATION.md`, makiety `makiety-tabeli.html` i `makiety-statystyki.html`  
 > **Wzorzec wdrożenia:** Arkusz-mapa i Druga Mila (strona + Apps Script + ten sam plik Google). Nie Symfony, nie Vue, nie PostgreSQL.
 
@@ -74,7 +74,7 @@ flowchart LR
 
 Podział odpowiedzialności:
 
-- **Przeglądarka** liczy koszt, grupuje trasy, trzyma stan ekranu, który nie ma kolumny: przekreślenie „transport się nie odbył” przed zatwierdzeniem, podgląd stawki podjazdu i worka innej niż w bazie, lejek i sort zestawienia. Podjazd 0 zł wpisuje się w kwotę podjazdu. Osobnej opcji „tylko za liczbę worków” nie ma. Na Statystykach agreguje KPI i rankingi (czyste funkcje TS + Vitest). Ewidencja czyta ten sam `settlementStats` co Statystyki.
+- **Przeglądarka** liczy koszt, grupuje trasy, trzyma stan ekranu, który nie ma kolumny: przekreślenie „transport się nie odbył” przed zatwierdzeniem, wykrzyknik przy stawce innej niż w bazie, lejek i sort zestawienia. Kwota w polu zostaje z arkusza. Podjazd i worek porównuje w obu trybach. Trasę tylko w Harmonogramie, bo tylko ten odczyt niesie cenę trasy. Pusta strona albo dwie takie same kwoty milczą. Zero jest wpisem. Podjazd 0 zł wpisuje się w kwotę podjazdu. Osobnej opcji „tylko za liczbę worków” nie ma. Na Statystykach agreguje KPI i rankingi (czyste funkcje TS + Vitest). Ewidencja czyta ten sam `settlementStats` co Statystyki.
 - **Apps Script** jest jedynym miejscem zapisu. Przy Zatwierdź nie liczy kosztu na nowo z bazy: zapisuje to, co ekran już policzył, po sprawdzeniu, że wiersz wolno ruszyć. W Harmonogramie Szukaj uzupełnia puste stawki podjazdu i worka z Bazy cen harmonogram. Wypełniona stawka trasy, podjazdu albo worka zostaje, w Harmonogramie i na Na zgłoszenie. Edycja liczby worków na rozliczonym wierszu przelicza koszt z kolumn tego wiersza. Odczyt Statystyk i Ewidencji nic nie zapisuje. Lejek zestawienia do arkusza nie schodzi.
 - **Arkusz** jest stanem trwałym. Po Zatwierdź koszt odbioru i koszt na worek się nie przeliczają. Wyjątek: edycja **Ilość worków** na rozliczonym wierszu Harmonogramu.
 
@@ -168,7 +168,7 @@ Nowe akcje obok istniejących (`modalData`, `listReferenceData`, zapis protokoł
 
 | Akcja | Kierunek | Co robi |
 |-------|----------|---------|
-| `settlementSearch` | GET lub POST | Podwykonawca (nazwa krótka), data od (albo brak), data do. Zwraca wiersze rejestru w zakresie, które nie mają Rozliczony `tak` i nie mają transport `nie`, plus pasujące wiersze Bazy stawek. Każdy wiersz rejestru niesie numer wiersza arkusza i numer z kolumny 1. Wypełniona **Stawka za trasę**, **Stawka za podjazd** albo **Stawka za worek** idzie do odpowiedzi i nie jest czyszczona, w Harmonogramie i na Na zgłoszenie. `tryb=harmonogram`: przed odpowiedzią puste **Stawka za podjazd** i **Stawka za worek** dostają stawkę z Bazy cen harmonogram, tylko na wierszach tego zestawienia. Brak pary zostawia pustą komórkę. Ta sama data: pierwszy wiersz, nie remis. **Trasa** zostaje. Rozliczonych i transport `nie` nie rusza. To jest zapis pustych kolumn 12–13, nie sam odczyt |
+| `settlementSearch` | GET lub POST | Podwykonawca (nazwa krótka), data od (albo brak), data do. Zwraca wiersze rejestru w zakresie, które nie mają Rozliczony `tak` i nie mają transport `nie`, plus pasujące wiersze Bazy stawek. Każdy wiersz rejestru niesie numer wiersza arkusza i numer z kolumny 1. Wypełniona **Stawka za trasę**, **Stawka za podjazd** albo **Stawka za worek** idzie do odpowiedzi i nie jest czyszczona, w Harmonogramie i na Na zgłoszenie. Wiersz Bazy stawek ma podjazd i worek, bez ceny trasy. `tryb=harmonogram`: przed odpowiedzią puste **Stawka za podjazd** i **Stawka za worek** dostają stawkę z Bazy cen harmonogram, tylko na wierszach tego zestawienia. Brak pary zostawia pustą komórkę. Ta sama data: pierwszy wiersz, nie remis. **Trasa** zostaje. Wiersz Bazy cen niesie też `routeAmount` (cena trasy w groszach; pusta komórka to `null`, zero zostaje zerem). Rozliczonych i transport `nie` nie rusza. To jest zapis pustych kolumn 12–13, nie sam odczyt. Porównanie z kolumnami arkusza i wykrzyknik zostają na ekranie |
 | `settlementInvoices` | GET lub POST | Ten sam zakres co `settlementSearch`. Tylko wiersze z Rozliczony `tak`, z numerem faktury i kosztem z arkusza (Na zgłoszenie: kolumny 16–18, Harmonogram: 15–17). `tryb=harmonogram` czyta rejestr harmonogramu. **Bez zapisu**, bez locka |
 | `settlementStats` | GET | Odczyt pod Statystyki: rozliczone w zakresie dat + nierozliczone (backlog / problemy ze stawkami); **worki Harmonogram** z `odebrane z harmonogramu` (`mode: schedule`); pola P/Q/I, numer faktury, status, data, podwykonawca, adres, snapshoty; dane do remisów. **Bez zapisu**, bez locka |
 | `listContractors` | GET | Lista podwykonawców: Nazwa i Dane do Worda. Można oprzeć na `listReferenceData`, jeśli pola już tam są |

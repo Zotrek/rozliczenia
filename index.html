@@ -3901,7 +3901,7 @@ function renderInvoiceList(rows, focus = null, comment = emptyInvoiceComment(), 
     const foot = one ? "" : invoiceComposer(visible, comment);
     return `<div class="invoice-body">${note}${notice}${cards}</div>${foot}`;
 }
-/** Jedna faktura na zestawieniu: pozycje już rozliczone, bez komentarza i bez zaznaczania. */
+/** Edycja jednej faktury: pozycje już rozliczone, bez zaznaczania i bez listy nierozliczonych. */
 function renderFocusedInvoice(rows, focus, notice = "", edit = emptyInvoiceEdit()) {
     const label = invoiceFocusLabel(focus);
     const key = focus.trim();

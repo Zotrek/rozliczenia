@@ -149,6 +149,7 @@ describe("sheetRateDrift", () => {
   it("test_sheetRateDrift_marks_only_two_different_written_amounts", () => {
     expect(sheetRateDrift(17_500, 3_000)).toBe(3_000);
     expect(sheetRateDrift(0, 500)).toBe(500);
+    expect(sheetRateDrift(0, 0)).toBeNull();
     expect(sheetRateDrift(2_000, 2_000)).toBeNull();
     expect(sheetRateDrift(null, 2_000)).toBeNull();
     expect(sheetRateDrift(2_000, null)).toBeNull();

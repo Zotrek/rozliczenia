@@ -122,7 +122,7 @@ export function pickupCellText(row: PeriodPickup, key: PickupColumnKey): string 
     return row.settled ? "Tak" : "Nie";
   }
   if (key === "invoiceNumber") {
-    return invoiceNumberText(row.invoice);
+    return shownInvoiceNumber(row.invoice);
   }
   return row.invoiceValue === null ? "—" : formatPln(row.invoiceValue);
 }
@@ -169,7 +169,7 @@ export function visiblePeriodPickups(
 /** Tekst komórki faktury, ten sam w tabeli i na liście filtra. */
 export function invoiceCellText(row: PeriodInvoice, key: InvoiceColumnKey): string {
   if (key === "name") {
-    return invoiceNumberText(row.invoice);
+    return shownInvoiceNumber(row.invoice);
   }
   if (key === "contractor") {
     return row.contractor;
@@ -1019,13 +1019,13 @@ function periodPickupsBlock(model: StatsViewModel): string {
   );
 }
 
-function invoiceNumberText(invoice: string): string {
+function shownInvoiceNumber(invoice: string): string {
   const number = invoice.trim();
   return number === "" ? "—" : number;
 }
 
 function invoiceNumberCell(row: StatsReport["periodPickups"][number]): string {
-  const label = escapeHtml(invoiceNumberText(row.invoice));
+  const label = escapeHtml(shownInvoiceNumber(row.invoice));
   const links = invoiceLinks(row);
   if (links === "") {
     return `<td>${label}</td>`;

@@ -362,6 +362,13 @@ describe("buildPage bundle", () => {
     expect(html).toContain("editedRegisterRow(item)");
     expect(html).toContain("function editedRegisterRow(");
   });
+
+  it("test_buildPage_invoice_number_text_keeps_the_edit_signature", () => {
+    const html = buildPage();
+    const declarations = html.match(/function invoiceNumberText\(/g) ?? [];
+    expect(declarations).toHaveLength(1);
+    expect(html).toContain("function invoiceNumberText(draft, invoice)");
+  });
 });
 
 describe("error cards", () => {

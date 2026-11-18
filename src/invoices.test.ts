@@ -130,6 +130,7 @@ describe("renderInvoiceList", () => {
     expect(html).toContain("Kwota faktury");
     expect(html).toContain("150,00");
     expect(html).toContain('data-edit="invoice-number"');
+    expect(html).not.toContain("Nowy numer schodzi na nie po Zapisz zmiany.");
     expect(html).not.toContain("data-invoice-pick");
     expect(html).not.toContain("FV/2");
     expect(html).not.toContain("Sklep Obcy");

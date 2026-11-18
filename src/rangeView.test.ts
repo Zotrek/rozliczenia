@@ -299,6 +299,7 @@ describe("renderApp", () => {
     expect(html).toContain('class="is-on" data-action="nav" data-place="stats"');
     expect(html).toContain("Edycja faktury");
     expect(html).toContain("Pozycje tej faktury");
+    expect(html).toMatch(/class="invoice-body"[\s\S]*Pozycje tej faktury[\s\S]*class="invoice-card is-focus"/);
     expect(html).toContain("Sklep A");
     expect(html).toContain("Kwota faktury");
     expect(html).toContain("150,00");
@@ -468,6 +469,7 @@ describe("invoice edit layout", () => {
       }),
     );
     expect(html).toContain("Edycja faktury");
+    expect(html).toMatch(/class="invoice-body"[\s\S]*class="invoice-card is-focus"/);
     expect(html).not.toContain("pozycje w zestawieniu");
     expect(html).not.toContain('data-action="approve"');
   });

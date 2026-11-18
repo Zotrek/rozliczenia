@@ -246,15 +246,18 @@ function readListScroll(): {
   page: number;
   wraps: { top: number; left: number }[];
   invoice: number | null;
+  invoiceBody: number | null;
 } {
   const wraps = [...document.querySelectorAll(".table-wrap")].flatMap((wrap) =>
     wrap instanceof HTMLElement ? [{ top: wrap.scrollTop, left: wrap.scrollLeft }] : [],
   );
   const invoiceBox = document.querySelector(".focused-invoice");
+  const invoiceBody = document.querySelector(".invoice-body");
   return {
     page: document.scrollingElement?.scrollTop ?? 0,
     wraps,
     invoice: invoiceBox instanceof HTMLElement ? invoiceBox.scrollTop : null,
+    invoiceBody: invoiceBody instanceof HTMLElement ? invoiceBody.scrollTop : null,
   };
 }
 
@@ -312,7 +315,12 @@ function writeStatsScroll(top: number | null): void {
 }
 
 function writeListScroll(
-  scroll: { page: number; wraps: { top: number; left: number }[]; invoice: number | null } | null,
+  scroll: {
+    page: number;
+    wraps: { top: number; left: number }[];
+    invoice: number | null;
+    invoiceBody: number | null;
+  } | null,
 ): void {
   if (!scroll) {
     return;
@@ -332,6 +340,12 @@ function writeListScroll(
       const box = document.querySelector(".focused-invoice");
       if (box instanceof HTMLElement) {
         box.scrollTop = scroll.invoice;
+      }
+    }
+    if (scroll.invoiceBody != null) {
+      const body = document.querySelector(".invoice-body");
+      if (body instanceof HTMLElement) {
+        body.scrollTop = scroll.invoiceBody;
       }
     }
     const page = document.scrollingElement;

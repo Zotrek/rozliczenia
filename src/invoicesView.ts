@@ -128,7 +128,7 @@ function invoicePreviewFoot(
     saveDisabled: !face.dirty || face.invalid,
     status: edit.status || face.error,
     notice: edit.notice,
-    note: "Kwota faktury jest sumą kosztów tych pozycji. Nowy numer schodzi na nie po Zapisz zmiany.",
+    note: "",
   });
 }
 
@@ -149,13 +149,14 @@ function invoiceFoot(options: {
     : "";
   const amount = options.total == null ? INVOICE_DASH : escapeHtml(formatPln(options.total));
   const off = options.saveDisabled ? " disabled" : "";
+  const noteHtml = options.note === "" ? "" : `<p class="note">${options.note}</p>`;
   return (
     '<footer class="invoice-save">' +
     '<label class="field invoice-number"><span>Numer faktury</span>' +
     `<input type="text" data-edit="invoice-number" data-keep="invoice-number" value="${escapeHtml(invoiceNumberText(options.edit, options.invoice))}" ` +
     'autocomplete="off" aria-label="Numer faktury"></label>' +
     `<div class="stat"><span>Kwota faktury</span><b data-out="invoice-total">${amount}</b></div>` +
-    `<p class="note">${options.note}</p>` +
+    noteHtml +
     statusHtml +
     noticeHtml +
     `<button type="button" class="btn-teal" data-action="save-invoice-edit"${off}>Zapisz zmiany</button>` +

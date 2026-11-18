@@ -143,11 +143,13 @@ describe("page wiring", () => {
     const write = functionBody("writeListScroll");
     expect(read).toContain('querySelectorAll(".table-wrap")');
     expect(read).toContain(".focused-invoice");
+    expect(read).toContain(".invoice-body");
     expect(read).toContain("scrollingElement");
     expect(read).toContain("scrollTop");
     expect(read).toContain("scrollLeft");
     expect(write).toContain('querySelectorAll(".table-wrap")');
     expect(write).toContain(".focused-invoice");
+    expect(write).toContain(".invoice-body");
     expect(write).toContain("scrollingElement");
     expect(write).toContain("scrollTop");
     expect(write).toContain("scrollLeft");

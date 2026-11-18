@@ -3952,7 +3952,7 @@ function invoicePreviewFoot(group, edit) {
         saveDisabled: !face.dirty || face.invalid,
         status: edit.status || face.error,
         notice: edit.notice,
-        note: "Kwota faktury jest sumą kosztów tych pozycji. Nowy numer schodzi na nie po Zapisz zmiany.",
+        note: "",
     });
 }
 function invoiceFoot(options) {
@@ -3964,12 +3964,13 @@ function invoiceFoot(options) {
         : "";
     const amount = options.total == null ? INVOICE_DASH : escapeHtml(formatPln(options.total));
     const off = options.saveDisabled ? " disabled" : "";
+    const noteHtml = options.note === "" ? "" : `<p class="note">${options.note}</p>`;
     return ('<footer class="invoice-save">' +
         '<label class="field invoice-number"><span>Numer faktury</span>' +
         `<input type="text" data-edit="invoice-number" data-keep="invoice-number" value="${escapeHtml(invoiceNumberText(options.edit, options.invoice))}" ` +
         'autocomplete="off" aria-label="Numer faktury"></label>' +
         `<div class="stat"><span>Kwota faktury</span><b data-out="invoice-total">${amount}</b></div>` +
-        `<p class="note">${options.note}</p>` +
+        noteHtml +
         statusHtml +
         noticeHtml +
         `<button type="button" class="btn-teal" data-action="save-invoice-edit"${off}>Zapisz zmiany</button>` +
@@ -7139,7 +7140,7 @@ function renderInvoicesScreen(model) {
         ? '<p class="note invoice-note">Pozycje tej faktury. Możesz zmienić numer, odpiąć sklep, zmienić liczbę worków i stawki. Zapis po Zapisz zmiany.</p>'
         : "";
     const body = editing
-        ? note + renderFocusedInvoice(model.invoices, model.invoiceFocus ?? "", model.invoiceNotice, model.invoiceEdit)
+        ? `<div class="invoice-body">${note}${renderFocusedInvoice(model.invoices, model.invoiceFocus ?? "", model.invoiceNotice, model.invoiceEdit)}</div>`
         : renderInvoiceList(model.invoices, model.invoiceFocus, model.invoiceComment ?? emptyInvoiceComment(), model.invoiceEdit);
     return ('<div class="statement" data-screen="invoices"><div class="top">' +
         invoiceHeading(model.invoiceFocus, label, editing) +
@@ -7516,10 +7517,12 @@ function fieldByKeep(root, keep) {
 function readListScroll() {
     const wraps = [...document.querySelectorAll(".table-wrap")].flatMap((wrap) => wrap instanceof HTMLElement ? [{ top: wrap.scrollTop, left: wrap.scrollLeft }] : []);
     const invoiceBox = document.querySelector(".focused-invoice");
+    const invoiceBody = document.querySelector(".invoice-body");
     return {
         page: document.scrollingElement?.scrollTop ?? 0,
         wraps,
         invoice: invoiceBox instanceof HTMLElement ? invoiceBox.scrollTop : null,
+        invoiceBody: invoiceBody instanceof HTMLElement ? invoiceBody.scrollTop : null,
     };
 }
 let listScrollGen = 0;
@@ -7588,6 +7591,12 @@ function writeListScroll(scroll) {
             const box = document.querySelector(".focused-invoice");
             if (box instanceof HTMLElement) {
                 box.scrollTop = scroll.invoice;
+            }
+        }
+        if (scroll.invoiceBody != null) {
+            const body = document.querySelector(".invoice-body");
+            if (body instanceof HTMLElement) {
+                body.scrollTop = scroll.invoiceBody;
             }
         }
         const page = document.scrollingElement;

@@ -108,9 +108,7 @@ export function renderFocusedInvoice(
       saveDisabled: !face.dirty || face.invalid,
       status,
       notice: edit.notice,
-      note:
-        "Kwota faktury jest sumą kosztów pozycji, które zostają. Nowy numer schodzi na te pozycje po Zapisz zmiany. " +
-        "Odepnij sklep zdejmuje go z faktury. Worki i stawki zostają, sklep wraca do nierozliczonych.",
+      note: "",
     }) +
     "</section>"
   );

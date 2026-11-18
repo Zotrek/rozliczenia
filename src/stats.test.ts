@@ -23,6 +23,7 @@ import {
   listZeroBagPickups,
   listPeriodPickups,
   listPeriodInvoices,
+  renameInvoiceInReport,
   monthOptionLabel,
   previousQuarterOptions,
   previousQuarterPeriod,
@@ -30,6 +31,9 @@ import {
   rateGapLabel,
   statsPeriodKindLabel,
   timeBucketGranularity,
+  type PeriodInvoice,
+  type PeriodPickup,
+  type StatsReport,
   type StatsRow,
 } from "./stats.js";
 
@@ -1106,6 +1110,106 @@ describe("aggregateContractorRanks / listZeroBagPickups", () => {
         statsRow({ sheetRow: 3, settled: false, bagCount: 4, mode: "schedule" }),
       ]).count,
     ).toBe(1);
+  });
+});
+
+function periodInvoice(over: Partial<PeriodInvoice> = {}): PeriodInvoice {
+  return {
+    invoice: "FV/1",
+    contractor: "gpw",
+    mode: "report",
+    bagCount: 2,
+    amount: 1_000,
+    pickupDate: "18.09.2026",
+    approvedDate: "02.09.2026",
+    ...over,
+  };
+}
+
+function periodPickup(over: Partial<PeriodPickup> = {}): PeriodPickup {
+  return {
+    address: "Sklepowa 1",
+    shopName: "Sklep",
+    contractor: "gpw",
+    pickupDate: "18.09.2026",
+    bagCount: 2,
+    mode: "report",
+    settled: true,
+    invoice: "FV/1",
+    invoiceKnown: true,
+    invoiceValue: 1_000,
+    ...over,
+  };
+}
+
+function reportOf(periodInvoices: PeriodInvoice[], periodPickups: PeriodPickup[]): StatsReport {
+  return { periodInvoices, periodPickups } as StatsReport;
+}
+
+describe("renameInvoiceInReport", () => {
+  it("test_renameInvoiceInReport_replaces_name_for_the_same_contractor_and_mode", () => {
+    const report = reportOf(
+      [
+        periodInvoice(),
+        periodInvoice({ invoice: "FV/1", contractor: "blue", amount: 50 }),
+        periodInvoice({ invoice: "FV/1", mode: "schedule", amount: 70 }),
+      ],
+      [
+        periodPickup(),
+        periodPickup({ address: "Inna 2", settled: false, invoiceValue: null }),
+        periodPickup({ contractor: "blue", invoiceValue: 50 }),
+        periodPickup({ mode: "schedule", invoiceValue: 70 }),
+      ],
+    );
+    const next = renameInvoiceInReport(report, {
+      from: " FV/1 ",
+      to: "FV/9",
+      contractor: "gpw",
+      mode: "report",
+    });
+    expect(next.periodInvoices.map((row) => [row.invoice, row.contractor, row.mode])).toEqual([
+      ["FV/1", "blue", "report"],
+      ["FV/1", "gpw", "schedule"],
+      ["FV/9", "gpw", "report"],
+    ]);
+    expect(next.periodPickups.map((row) => row.invoice)).toEqual(["FV/9", "FV/1", "FV/1", "FV/1"]);
+    expect(next.periodPickups[0].invoiceValue).toBe(1_000);
+    expect(next.periodPickups[1].settled).toBe(false);
+  });
+
+  it("test_renameInvoiceInReport_merges_into_the_number_that_already_exists", () => {
+    const next = renameInvoiceInReport(
+      reportOf(
+        [
+          periodInvoice({ invoice: "FV/9", bagCount: 1, amount: 400, pickupDate: "10.09.2026", approvedDate: "20.09.2026" }),
+          periodInvoice({ bagCount: 3, amount: 600, pickupDate: "18.09.2026", approvedDate: "01.09.2026" }),
+        ],
+        [
+          periodPickup({ invoice: "FV/9", invoiceValue: 400, address: "Stara 1" }),
+          periodPickup({ invoiceValue: 600 }),
+        ],
+      ),
+      { from: "FV/1", to: "FV/9", contractor: "gpw", mode: "report" },
+    );
+    expect(next.periodInvoices).toEqual([
+      periodInvoice({
+        invoice: "FV/9",
+        bagCount: 4,
+        amount: 1_000,
+        pickupDate: "18.09.2026",
+        approvedDate: "01.09.2026",
+      }),
+    ]);
+    expect(next.periodPickups.map((row) => [row.address, row.invoice, row.invoiceValue])).toEqual([
+      ["Stara 1", "FV/9", 1_000],
+      ["Sklepowa 1", "FV/9", 1_000],
+    ]);
+  });
+
+  it("test_renameInvoiceInReport_leaves_the_report_when_the_number_is_missing", () => {
+    const report = reportOf([periodInvoice({ invoice: "FV/2" })], [periodPickup({ invoice: "FV/2" })]);
+    expect(renameInvoiceInReport(report, { from: "FV/1", to: "FV/9", contractor: "gpw", mode: "report" })).toBe(report);
+    expect(renameInvoiceInReport(report, { from: "FV/2", to: "FV/2", contractor: "gpw", mode: "report" })).toBe(report);
   });
 });
 

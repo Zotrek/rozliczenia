@@ -97,6 +97,7 @@ import {
   buildStatsReport,
   chartShouldStack,
   listPeriodInvoices,
+  renameInvoiceInReport,
   resolveStatsPeriod,
   type StatsPeriodKind,
 } from "./stats.js";
@@ -2431,6 +2432,49 @@ function typeInvoiceEdit(el: HTMLInputElement): void {
   paint(el.dataset.keep);
 }
 
+/** Filtr kolumny trzyma starą nazwę. Po zmianie numeru zostaje zaznaczona nowa, żeby wiersz nie zniknął. */
+function withRenamedFilter(
+  values: readonly string[] | undefined,
+  from: string,
+  to: string,
+): readonly string[] | undefined {
+  if (!values?.includes(from)) {
+    return values;
+  }
+  const next = values.filter((value) => value !== from);
+  if (!next.includes(to)) {
+    next.push(to);
+  }
+  return next;
+}
+
+/** Raport statystyk jest już w pamięci. Sam numer da się podmienić bez ponownego odczytu. */
+function rememberRenamedInvoice(from: string, to: string): void {
+  const report = VIEW.stats.report;
+  if (VIEW.workReturn !== "stats" || report === null) {
+    return;
+  }
+  const pickupNumbers = withRenamedFilter(VIEW.stats.pickups.filters.invoiceNumber, from, to);
+  const invoiceNames = withRenamedFilter(VIEW.stats.invoices.filters.name, from, to);
+  VIEW.stats = {
+    ...VIEW.stats,
+    report: renameInvoiceInReport(report, {
+      from,
+      to,
+      contractor: VIEW.contractor,
+      mode: VIEW.mode,
+    }),
+    pickups: {
+      ...VIEW.stats.pickups,
+      filters: { ...VIEW.stats.pickups.filters, invoiceNumber: pickupNumbers },
+    },
+    invoices: {
+      ...VIEW.stats.invoices,
+      filters: { ...VIEW.stats.invoices.filters, name: invoiceNames },
+    },
+  };
+}
+
 async function saveInvoiceEdit(): Promise<void> {
   const built = invoiceEditBody(VIEW.invoices, VIEW.invoiceEdit, VIEW.invoiceFocus ?? "", VIEW.mode);
   if (!built.ok) {
@@ -2453,6 +2497,10 @@ async function saveInvoiceEdit(): Promise<void> {
     const renamed = typeof built.body.nowyNumer === "string" ? built.body.nowyNumer : "";
     if (renamed !== "" && saved > 0) {
       VIEW.invoiceFocus = renamed;
+      const fromInvoice = typeof built.body.numerFaktury === "string" ? built.body.numerFaktury : "";
+      if (skipped === 0 && Object.keys(VIEW.invoiceEdit.detached).length === 0) {
+        rememberRenamedInvoice(fromInvoice, renamed);
+      }
     }
     if (VIEW.applied && VIEW.invoiceFocus !== null) {
       const read = await loadInvoiceRows(VIEW.applied);

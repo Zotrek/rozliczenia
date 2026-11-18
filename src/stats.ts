@@ -679,28 +679,109 @@ export function listPeriodInvoices(
       pickupDate: group.pickupDate,
       approvedDate: group.approvedDate,
     }))
-    .sort((a, b) => {
-      const byDate = compareSheetDate(b.pickupDate, a.pickupDate);
-      if (byDate !== 0) {
-        return byDate;
-      }
-      const byName = a.invoice.localeCompare(b.invoice, "pl", { numeric: true, sensitivity: "base" });
-      if (byName !== 0) {
-        return byName;
-      }
-      const byWho = a.contractor.localeCompare(b.contractor, "pl");
-      if (byWho !== 0) {
-        return byWho;
-      }
-      if (a.mode === b.mode) {
-        return 0;
-      }
-      return a.mode === "report" ? -1 : 1;
-    });
+    .sort(comparePeriodInvoices);
+}
+
+/** Od najnowszej daty odbioru, potem numer, podwykonawca i tryb. */
+function comparePeriodInvoices(a: PeriodInvoice, b: PeriodInvoice): number {
+  const byDate = compareSheetDate(b.pickupDate, a.pickupDate);
+  if (byDate !== 0) {
+    return byDate;
+  }
+  const byName = a.invoice.localeCompare(b.invoice, "pl", { numeric: true, sensitivity: "base" });
+  if (byName !== 0) {
+    return byName;
+  }
+  const byWho = a.contractor.localeCompare(b.contractor, "pl");
+  if (byWho !== 0) {
+    return byWho;
+  }
+  if (a.mode === b.mode) {
+    return 0;
+  }
+  return a.mode === "report" ? -1 : 1;
 }
 
 function invoiceGroupKey(row: StatsRow, invoice: string): string {
   return `${rowMode(row)}\n${row.contractor}\n${invoice}`;
+}
+
+/**
+ * Numer faktury w już policzonym raporcie.
+ * Ten sam podwykonawca i tryb. Gdy nowy numer już jest, grupy się schodzą.
+ * Nierozliczony odbiór zostaje przy starym numerze.
+ */
+export function renameInvoiceInReport(
+  report: StatsReport,
+  change: { from: string; to: string; contractor: string; mode: SettlementMode },
+): StatsReport {
+  const from = change.from.trim();
+  const to = change.to.trim();
+  if (from === "" || to === "" || from === to) {
+    return report;
+  }
+  const sameParty = (row: { contractor: string; mode: SettlementMode }): boolean =>
+    row.contractor === change.contractor && row.mode === change.mode;
+
+  let source: PeriodInvoice | null = null;
+  let existing: PeriodInvoice | null = null;
+  const rest: PeriodInvoice[] = [];
+  for (const row of report.periodInvoices) {
+    if (sameParty(row) && row.invoice.trim() === from) {
+      const renamed = { ...row, invoice: to };
+      source = source ? mergePeriodInvoice(source, renamed) : renamed;
+      continue;
+    }
+    if (sameParty(row) && row.invoice.trim() === to) {
+      existing = existing ? mergePeriodInvoice(existing, row) : row;
+      continue;
+    }
+    rest.push(row);
+  }
+
+  let renamedPickup = false;
+  const periodPickups = report.periodPickups.map((row) => {
+    if (!row.settled || !sameParty(row) || row.invoice.trim() !== from) {
+      return row;
+    }
+    renamedPickup = true;
+    return { ...row, invoice: to };
+  });
+  if (!source && !renamedPickup) {
+    return report;
+  }
+
+  const merged = source ? (existing ? mergePeriodInvoice(existing, source) : source) : null;
+  const periodInvoices = merged ? [...rest, merged].sort(comparePeriodInvoices) : report.periodInvoices;
+  const withValue =
+    merged && existing
+      ? periodPickups.map((row) =>
+          row.settled && sameParty(row) && row.invoice.trim() === to
+            ? { ...row, invoiceValue: merged.amount }
+            : row,
+        )
+      : periodPickups;
+  return { ...report, periodInvoices, periodPickups: withValue };
+}
+
+function mergePeriodInvoice(left: PeriodInvoice, right: PeriodInvoice): PeriodInvoice {
+  return {
+    invoice: left.invoice,
+    contractor: left.contractor,
+    mode: left.mode,
+    bagCount: addNullableCount(left.bagCount, right.bagCount),
+    amount: addNullableCount(left.amount, right.amount),
+    pickupDate:
+      compareSheetDate(left.pickupDate, right.pickupDate) >= 0 ? left.pickupDate : right.pickupDate,
+    approvedDate: earlierApprovedDate(left.approvedDate, right.approvedDate),
+  };
+}
+
+function addNullableCount(left: number | null, right: number | null): number | null {
+  if (left == null && right == null) {
+    return null;
+  }
+  return (left ?? 0) + (right ?? 0);
 }
 
 /** Najwcześniejsza poprawna data. Pusta albo zła nie przesuwa już zapisanej. */

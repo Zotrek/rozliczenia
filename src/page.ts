@@ -84,6 +84,7 @@ import {
   setPickup,
   setRouteBagRate,
   skippedCount,
+  formatCostFailure,
   formatPartialApprove,
   statementSums,
   tieBody,
@@ -2706,7 +2707,7 @@ async function runApprove(): Promise<void> {
   const statement = currentStatement(VIEW.statement);
   const built = buildApprove(VIEW.statement.invoice, statement, VIEW.statement.selected, VIEW.mode);
   if (!built.ok) {
-    VIEW.status = STATEMENT_ERROR[built.error];
+    VIEW.status = built.detail ?? STATEMENT_ERROR[built.error];
     paint();
     return;
   }
@@ -2723,11 +2724,12 @@ async function runApprove(): Promise<void> {
       return;
     }
     if (result.ok !== true) {
-      VIEW.status = writeError(result.error);
+      const failed = result.error === "cost" ? formatCostFailure(result) : writeError(result.error);
+      VIEW.status = failed;
       reportFailure(
         "ROZ-E-APPROVE",
         "page.ts runApprove",
-        writeError(result.error),
+        failed,
         "Rozliczenie nie zostało zatwierdzone. Zaznaczenie i numer faktury zostają.",
         { error: result.error, technical: result.technical ?? result.error, notJson: result.notJson === true },
       );

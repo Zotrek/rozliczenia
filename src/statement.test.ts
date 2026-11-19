@@ -43,6 +43,7 @@ import {
   setLinesSelected,
   setRouteBagRate,
   skippedCount,
+  formatCostFailure,
   formatPartialApprove,
   statementSums,
   tieBody,
@@ -700,7 +701,21 @@ describe("route edits and commits", () => {
     expect(writeError("invoice")).toBe(STATEMENT_ERROR.invoice);
     expect(writeError("selection")).toBe(STATEMENT_ERROR.selection);
     expect(writeError("busy")).toBe(STATEMENT_ERROR.busy);
+    expect(writeError("cost")).toBe(STATEMENT_ERROR.badCost);
     expect(writeError("unknown")).toBe(STATEMENT_ERROR.write);
+    expect(formatPartialApprove({
+      pominiete: [{ sheetRow: 3098, transportNumber: "", reason: "date" }],
+    })).toBe(
+      "Część wierszy nie weszła w zapis.\n" +
+        "Pominięto (1):\n" +
+        "• Pozycja (wiersz 3098) — niespójna data",
+    );
+    expect(formatCostFailure({
+      pominiete: [{ sheetRow: 3098, transportNumber: "", reason: "cost", koszt: -1500 }],
+    })).toBe(
+      "Koszt jest niepoprawny. Nic nie zapisano.\n" +
+        "• Pozycja (wiersz 3098) — koszt ujemny",
+    );
     const statement = currentStatement(base);
     expect(lineHasTie(statement.lines[0])).toBe(false);
     const withTie = {
@@ -804,6 +819,98 @@ describe("route edits and commits", () => {
       ],
     };
     expect(buildApprove("FV/1", tied, { "\t2\t2": true })).toEqual({ ok: false, error: "tie" });
+  });
+
+  it("test_buildApprove_negative_pickup_route_and_bag_cost_is_sent", () => {
+    const pickup = screen(
+      [row({ sheetRow: 2, pickupRate: -1_500, bagRate: 0, address: "Długa 1", shopName: "A" })],
+      [rate({ sheetRow: 2, shop: "A" })],
+    );
+    const pickupBuilt = buildApprove("FV/1", currentStatement(pickup), { "\t2\t2": true });
+    expect(pickupBuilt.ok).toBe(true);
+    if (pickupBuilt.ok) {
+      expect(pickupBuilt.body.wiersze[0].koszt).toBe(-1_500);
+    }
+
+    const bags = screen(
+      [row({ sheetRow: 2, pickupRate: 0, bagCount: 3, bagRate: -500 })],
+      [rate({ sheetRow: 2, shop: "Sklepowa 1" })],
+    );
+    const bagBuilt = buildApprove("FV/1", currentStatement(bags), { "\t2\t2": true }, "schedule");
+    expect(bagBuilt.ok).toBe(true);
+    if (bagBuilt.ok) {
+      expect(bagBuilt.body.tryb).toBe("harmonogram");
+      expect(bagBuilt.body.wiersze[0]).toMatchObject({
+        koszt: -1_500,
+        stawkaPodjazdu: "0.00",
+        stawkaWorka: "-5.00",
+      });
+    }
+
+    const route = screen(
+      [
+        row({
+          sheetRow: 2,
+          routeName: "trasa",
+          routeRate: -1_500,
+          pickupRate: 0,
+          bagRate: 0,
+          bagCount: 2,
+        }),
+      ],
+      [rate({ sheetRow: 2, shop: "Sklepowa 1" })],
+    );
+    const routeBuilt = buildApprove("FV/1", currentStatement(route), { "route\ttrasa": true });
+    expect(routeBuilt.ok).toBe(true);
+    if (routeBuilt.ok) {
+      expect(routeBuilt.body.wiersze[0].koszt).toBe(-1_500);
+    }
+  });
+
+  it("test_buildApprove_fractional_cost_blocks_the_whole_selection", () => {
+    const base = screen(
+      [
+        row({ sheetRow: 2, address: "Długa 1", shopName: "A" }),
+        row({ sheetRow: 3, address: "Krótka 2", shopName: "B" }),
+      ],
+      [rate({ sheetRow: 2, shop: "A" }), rate({ sheetRow: 3, shop: "B" })],
+    );
+    const statement = currentStatement(base);
+    const line = statement.lines[0];
+    if (line.kind !== "plain") {
+      throw new Error("oczekiwany odbiór zwykły");
+    }
+    const dusty = {
+      ...statement,
+      lines: [{ ...line, shop: { ...line.shop, receptionCost: 30.5 } }, statement.lines[1]],
+    };
+    const built = buildApprove("FV/1", dusty, { "\t2\t2": true, "\t3\t3": true });
+    expect(built.ok).toBe(false);
+    if (!built.ok) {
+      expect(built.error).toBe("badCost");
+      expect(built.detail).toBe(
+        "Koszt jest niepoprawny. Nic nie zapisano.\n" +
+          "• A, Długa 1 (wiersz 2) — koszt nie jest w groszach",
+      );
+    }
+  });
+
+  it("test_buildApprove_cost_near_integer_is_sent_as_grosze", () => {
+    const base = screen([row({ sheetRow: 2 })], [rate({ sheetRow: 2, shop: "Sklepowa 1" })]);
+    const statement = currentStatement(base);
+    const line = statement.lines[0];
+    if (line.kind !== "plain") {
+      throw new Error("oczekiwany odbiór zwykły");
+    }
+    const dusty = {
+      ...statement,
+      lines: [{ ...line, shop: { ...line.shop, receptionCost: 2000.0000001 } }],
+    };
+    const built = buildApprove("FV/1", dusty, { "\t2\t2": true });
+    expect(built.ok).toBe(true);
+    if (built.ok) {
+      expect(built.body.wiersze[0].koszt).toBe(2000);
+    }
   });
 
   it("test_parseAmountText_rejects_empty_frac_and_double_dot", () => {

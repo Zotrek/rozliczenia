@@ -40,6 +40,7 @@ export const STATEMENT_ERROR = {
   stale: "Wiersz się zmienił. Szukaj jeszcze raz.",
   refresh: "Zapisano, ale nie udało się odświeżyć listy.",
   partial: "Część wierszy nie weszła w zapis.",
+  badCost: "Koszt jest niepoprawny. Nic nie zapisano.",
 } as const;
 
 const SKIP_REASON_LABEL: Record<string, string> = {
@@ -59,6 +60,39 @@ export function skipReasonLabel(reason: unknown): string {
   return writeError(reason);
 }
 
+/** Pusty numer transportu (Harmonogram) nie udaje protokołu „?”. */
+function skipPlace(item: Record<string, unknown>): string {
+  const numer = String(item.transportNumber ?? "").trim();
+  const head = numer !== "" ? `Transport ${numer}` : "Pozycja";
+  const row = typeof item.sheetRow === "number" && item.sheetRow > 0 ? ` (wiersz ${item.sheetRow})` : "";
+  return `${head}${row}`;
+}
+
+function costRejectReason(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value) && value < 0) {
+    return "koszt ujemny";
+  }
+  if (value == null || value === "") {
+    return "brak kwoty";
+  }
+  return "koszt nie jest w groszach";
+}
+
+/**
+ * Grosze, które serwer przyjmie. Blisko liczby całkowitej zaokrągla.
+ * Ułamek w rodzaju 30.5 (złote w polu groszy) odpada. Ujemna kwota zostaje.
+ */
+export function approveGrosze(value: unknown): Grosze | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+  const rounded = Math.round(value);
+  if (Math.abs(value - rounded) > 1e-6 || !Number.isSafeInteger(rounded)) {
+    return null;
+  }
+  return rounded;
+}
+
 /** Lista pominiętych przy częściowym zatwierdzeniu — tekst wieloliniowy do UI. */
 export function formatPartialApprove(body: unknown): string {
   const lines: string[] = [STATEMENT_ERROR.partial];
@@ -75,11 +109,23 @@ export function formatPartialApprove(body: unknown): string {
       lines.push("• pozycja bez szczegółów");
       continue;
     }
-    const numer = String(item.transportNumber ?? "").trim() || "?";
-    const reason = skipReasonLabel(item.reason);
-    const row =
-      typeof item.sheetRow === "number" && item.sheetRow > 0 ? ` (wiersz ${item.sheetRow})` : "";
-    lines.push(`• Transport ${numer}${row} — ${reason}`);
+    lines.push(`• ${skipPlace(item)} — ${skipReasonLabel(item.reason)}`);
+  }
+  return lines.join("\n");
+}
+
+/** Serwer odmówił całego zatwierdzenia, bo koszt nie jest groszami. Nic nie zostało zapisane. */
+export function formatCostFailure(body: unknown): string {
+  const lines: string[] = [STATEMENT_ERROR.badCost];
+  if (!isRecord(body) || !Array.isArray(body.pominiete)) {
+    return lines[0];
+  }
+  for (const item of body.pominiete) {
+    if (!isRecord(item)) {
+      lines.push("• pozycja bez szczegółów");
+      continue;
+    }
+    lines.push(`• ${skipPlace(item)} — ${costRejectReason(item.koszt)}`);
   }
   return lines.join("\n");
 }
@@ -166,7 +212,7 @@ export interface ApproveShop {
 }
 
 export type ApproveBuild =
-  | { ok: false; error: "invoice" | "selection" | "tie" }
+  | { ok: false; error: "invoice" | "selection" | "tie" | "badCost"; detail?: string }
   | {
       ok: true;
       body: { action: "approve"; numerFaktury: string; wiersze: ApproveShop[] };
@@ -849,6 +895,7 @@ export function buildApprove(
     return { ok: false, error: "selection" };
   }
   const wiersze: ApproveShop[] = [];
+  const costLines: string[] = [];
   let blocked = false;
   for (const line of chosen) {
     if (lineHasTie(line)) {
@@ -863,8 +910,15 @@ export function buildApprove(
         blocked = true;
         continue;
       }
+      if ("badCost" in item) {
+        costLines.push(`• ${shopPlace(shop)} — ${item.badCost}`);
+        continue;
+      }
       wiersze.push(item);
     }
+  }
+  if (costLines.length > 0) {
+    return { ok: false, error: "badCost", detail: [STATEMENT_ERROR.badCost, ...costLines].join("\n") };
   }
   if (wiersze.length === 0) {
     return { ok: false, error: blocked ? "tie" : "selection" };
@@ -907,6 +961,9 @@ export function writeError(code: unknown): string {
   if (code === "busy") {
     return STATEMENT_ERROR.busy;
   }
+  if (code === "cost") {
+    return STATEMENT_ERROR.badCost;
+  }
   return STATEMENT_ERROR.write;
 }
 
@@ -922,7 +979,13 @@ export function statementSums(screen: StatementScreen): { total: Grosze; selecte
   };
 }
 
-function shopItem(shop: ShopCost, schedule = false, route = false): ApproveShop | null {
+function shopPlace(shop: ShopCost): string {
+  const who = [shop.shopName.trim(), shop.address.trim()].filter((part) => part !== "").join(", ");
+  const row = `wiersz ${shop.sheetRow}`;
+  return who !== "" ? `${who} (${row})` : row;
+}
+
+function shopItem(shop: ShopCost, schedule = false, route = false): ApproveShop | { badCost: string } | null {
   if (!shop.happened) {
     return {
       sheetName: shop.sheetName,
@@ -934,11 +997,15 @@ function shopItem(shop: ShopCost, schedule = false, route = false): ApproveShop 
   if (shop.receptionCost === null) {
     return null;
   }
+  const koszt = approveGrosze(shop.receptionCost);
+  if (koszt === null) {
+    return { badCost: costRejectReason(shop.receptionCost) };
+  }
   const item: ApproveShop = {
     sheetName: shop.sheetName,
     sheetRow: shop.sheetRow,
     transportNumber: shop.transportNumber,
-    koszt: shop.receptionCost,
+    koszt,
   };
   if (schedule) {
     item.stawkaWorka = shop.bagRate === null ? "" : groszeToZlotyText(shop.bagRate);

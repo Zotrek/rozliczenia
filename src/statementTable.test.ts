@@ -83,8 +83,8 @@ describe("visibleStatementLines", () => {
     const dated = freshStatement(
       [
         row({ sheetRow: 2, shopName: "Środek", pickupDate: "19.09.2026" }),
-        row({ sheetRow: 3, address: "A", shopName: "Raz", routeName: "mieszana", pickupDate: "20.09.2026" }),
-        row({ sheetRow: 6, address: "B", shopName: "Dwa", routeName: "mieszana", pickupDate: "21.09.2026" }),
+        row({ sheetRow: 3, address: "A", shopName: "Raz", routeName: "mieszana", routeRate: 10_000, pickupDate: "20.09.2026" }),
+        row({ sheetRow: 6, address: "B", shopName: "Dwa", routeName: "mieszana", routeRate: 10_000, pickupDate: "21.09.2026" }),
         row({ sheetRow: 4, shopName: "Początek", pickupDate: "17.09.2026" }),
       ],
       [],

@@ -56,21 +56,24 @@ export function settle(input: EngineInput): Statement {
   const ties: RateTie[] = [];
   for (const item of order) {
     if (item.kind === "plain") {
-      const shop = buildShop(item.row, input, { kind: "plain" });
+      pushPlain(lines, ties, item.row, input);
+      continue;
+    }
+    const grouped = routeRows.get(item.name) ?? [];
+    // Nazwa trasy bez stawki za trasę nie jest trasą: kwota to stawka za podjazd.
+    if (firstRouteRate(grouped) === null) {
+      for (const row of grouped) {
+        pushPlain(lines, ties, row, input);
+      }
+      continue;
+    }
+    const line = buildRoute(grouped, input);
+    for (const shop of line.shops) {
       if (shop.tie) {
         ties.push(shop.tie);
       }
-      const line: PlainLine = { kind: "plain", shop };
-      lines.push(line);
-    } else {
-      const line = buildRoute(routeRows.get(item.name) ?? [], input);
-      for (const shop of line.shops) {
-        if (shop.tie) {
-          ties.push(shop.tie);
-        }
-      }
-      lines.push(line);
     }
+    lines.push(line);
   }
 
   return { lines, total: sumLines(lines), ties };
@@ -89,6 +92,20 @@ export function sumSelected(statement: Statement, selectedLineKeys: ReadonlySet<
 }
 
 type ShopMode = { kind: "plain" } | { kind: "route"; share: Grosze };
+
+function pushPlain(
+  lines: StatementLine[],
+  ties: RateTie[],
+  row: RegisterRow,
+  input: EngineInput,
+): void {
+  const shop = buildShop(row, input, { kind: "plain" });
+  if (shop.tie) {
+    ties.push(shop.tie);
+  }
+  const line: PlainLine = { kind: "plain", shop };
+  lines.push(line);
+}
 
 function buildRoute(rows: readonly RegisterRow[], input: EngineInput): RouteLine {
   const happenedCount = rows.filter((row) => !screenOf(input, row).didNotHappen).length;

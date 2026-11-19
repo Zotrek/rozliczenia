@@ -248,7 +248,34 @@ describe("settle", () => {
     expect(line.shops[0].legAmount).toBe(15_000);
   });
 
-  it("test_settle_emptyRouteRate_share0", () => {
+  it("test_settle_routeName_without_routeRate_uses_pickupRate", () => {
+    const statement = go([
+      reception({
+        sheetRow: 2,
+        address: "A",
+        routeName: "trasa",
+        routeRate: null,
+        bagCount: 2,
+        pickupRate: 4_000,
+        bagRate: 500,
+      }),
+      reception({
+        sheetRow: 3,
+        address: "B",
+        routeName: "trasa",
+        routeRate: null,
+        bagCount: 0,
+        pickupRate: 2_500,
+        bagRate: null,
+      }),
+    ]);
+    expect(statement.lines.every((line) => line.kind === "plain")).toBe(true);
+    const costs = statement.lines.map((line) => (line.kind === "plain" ? line.shop.legAmount : null));
+    expect(costs).toEqual([4_000, 2_500]);
+    expect(statement.total).toBe(4_000 + 1_000 + 2_500);
+  });
+
+  it("test_settle_routeName_with_one_routeRate_stays_route", () => {
     const line = onlyRoute(
       go([
         reception({
@@ -257,24 +284,22 @@ describe("settle", () => {
           routeName: "trasa",
           routeRate: null,
           bagCount: 0,
-          pickupRate: null,
+          pickupRate: 4_000,
           bagRate: null,
         }),
         reception({
           sheetRow: 3,
           address: "B",
           routeName: "trasa",
-          routeRate: null,
+          routeRate: 15_000,
           bagCount: 0,
-          pickupRate: null,
+          pickupRate: 2_500,
           bagRate: null,
         }),
       ]),
     );
-    expect(line.routeCostApplies).toBe(true);
-    expect(line.routeRate).toBeNull();
-    expect(line.shops.every((shop) => shop.legAmount === 0)).toBe(true);
-    expect(line.routeSum).toBe(0);
+    expect(line.routeRate).toBe(15_000);
+    expect(line.shops.map((shop) => shop.legAmount)).toEqual([7_500, 7_500]);
   });
 
   it("test_settle_zeroRouteRate_share0", () => {

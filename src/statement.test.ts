@@ -395,8 +395,8 @@ describe("freshStatement", () => {
   it("test_freshStatement_preselects_route_shops_without_a_comment", () => {
     const screen = freshStatement(
       [
-        row({ sheetRow: 2, routeName: "Trasa", shopName: "A" }),
-        row({ sheetRow: 3, routeName: "Trasa", shopName: "B" }),
+        row({ sheetRow: 2, routeName: "Trasa", routeRate: 15_000, shopName: "A" }),
+        row({ sheetRow: 3, routeName: "Trasa", routeRate: 15_000, shopName: "B" }),
         row({ sheetRow: 4, shopName: "Podjazd" }),
       ],
       [],
@@ -410,8 +410,8 @@ describe("freshStatement", () => {
   it("test_freshStatement_loads_a_saved_comment_and_leaves_that_shop_unchecked", () => {
     const screen = freshStatement(
       [
-        row({ sheetRow: 2, routeName: "Trasa", shopName: "A", invoiceComment: "  folia  " }),
-        row({ sheetRow: 3, routeName: "Trasa", shopName: "B" }),
+        row({ sheetRow: 2, routeName: "Trasa", routeRate: 15_000, shopName: "A", invoiceComment: "  folia  " }),
+        row({ sheetRow: 3, routeName: "Trasa", routeRate: 15_000, shopName: "B" }),
       ],
       [],
     );

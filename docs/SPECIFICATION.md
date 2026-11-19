@@ -54,9 +54,9 @@ Koszt pozycji składa się ze składników liczonych osobno: **podjazd**, **work
 
 **Podjazd i trasa wykluczają się.**
 
-- Odbiór zwykły (bez trasy): podjazd i worki. Stawki trasy nie ma.
-- Odbiór z trasy: stawka trasy raz na całą trasę i worki. Podjazdu nie ma.
-- Osobnej opcji **tylko za liczbę worków** nie ma. To nie jest przycisk ani checkbox. Gdy podjazd nie ma wejść w koszt, kwota za podjazd na zestawieniu wynosi 0 zł. Koszt odbioru jest wtedy równy sumie za worki. Odbiór z nazwą trasy zawsze ma stawkę trasy.
+- Odbiór zwykły: podjazd i worki. Tak samo, gdy w kolumnie Trasa jest nazwa, a **Stawka za trasę** jest pusta. Kwota to **Stawka za podjazd**.
+- Odbiór z trasy: nazwa trasy i wpisana **Stawka za trasę** (także 0 zł). Stawka raz na całą trasę i worki. Podjazdu nie ma. Wystarczy, że jeden sklep tej nazwy ma stawkę trasy.
+- Osobnej opcji **tylko za liczbę worków** nie ma. To nie jest przycisk ani checkbox. Gdy podjazd nie ma wejść w koszt, kwota za podjazd na zestawieniu wynosi 0 zł. Koszt odbioru jest wtedy równy sumie za worki.
 
 Worki są w każdym z tych przypadków. Nie wyłącza się ich ręcznie. Opłata za worki jest naliczana tylko wtedy, gdy na dzień odbioru obowiązuje stawka za worek, która nie jest pusta ani równa 0. W pozostałych przypadkach opłata za worki wynosi 0 zł, bez ostrzeżenia i bez blokady zatwierdzenia.
 

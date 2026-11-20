@@ -27,7 +27,12 @@ export function lineKey(line: StatementLine): string {
   if (line.kind === "plain") {
     return rowKey(line.shop.sheetRow, line.shop.transportNumber, line.shop.sheetName);
   }
-  return `route\t${line.routeName}`;
+  return `route\t${line.routeKey}`;
+}
+
+/** Na zgłoszenie kluczem jest nazwa. W harmonogramie nazwa i dzień odbioru. */
+export function routeGroupKey(routeName: string, pickupDate: string, splitByDay: boolean): string {
+  return splitByDay ? `${routeName}\t${pickupDate}` : routeName;
 }
 
 export function settle(input: EngineInput): Statement {
@@ -35,20 +40,22 @@ export function settle(input: EngineInput): Statement {
     parseSheetDate(row.pickupDate);
   }
 
+  const splitByDay = input.splitRouteByDay === true;
   const routeRows = new Map<string, RegisterRow[]>();
-  const order: Array<{ kind: "plain"; row: RegisterRow } | { kind: "route"; name: string }> = [];
+  const order: Array<{ kind: "plain"; row: RegisterRow } | { kind: "route"; key: string }> = [];
 
   for (const row of input.rows) {
     if (row.routeName === "") {
       order.push({ kind: "plain", row });
       continue;
     }
-    const group = routeRows.get(row.routeName);
+    const key = routeGroupKey(row.routeName, row.pickupDate, splitByDay);
+    const group = routeRows.get(key);
     if (group) {
       group.push(row);
     } else {
-      routeRows.set(row.routeName, [row]);
-      order.push({ kind: "route", name: row.routeName });
+      routeRows.set(key, [row]);
+      order.push({ kind: "route", key });
     }
   }
 
@@ -59,7 +66,7 @@ export function settle(input: EngineInput): Statement {
       pushPlain(lines, ties, item.row, input);
       continue;
     }
-    const grouped = routeRows.get(item.name) ?? [];
+    const grouped = routeRows.get(item.key) ?? [];
     // Nazwa trasy bez stawki za trasę nie jest trasą: kwota to stawka za podjazd.
     if (firstRouteRate(grouped) === null) {
       for (const row of grouped) {
@@ -67,7 +74,7 @@ export function settle(input: EngineInput): Statement {
       }
       continue;
     }
-    const line = buildRoute(grouped, input);
+    const line = buildRoute(grouped, input, splitByDay);
     for (const shop of line.shops) {
       if (shop.tie) {
         ties.push(shop.tie);
@@ -107,7 +114,7 @@ function pushPlain(
   lines.push(line);
 }
 
-function buildRoute(rows: readonly RegisterRow[], input: EngineInput): RouteLine {
+function buildRoute(rows: readonly RegisterRow[], input: EngineInput, splitByDay: boolean): RouteLine {
   const happenedCount = rows.filter((row) => !screenOf(input, row).didNotHappen).length;
   const routeRate = firstRouteRate(rows);
   const routeCostApplies = happenedCount > 0;
@@ -116,10 +123,12 @@ function buildRoute(rows: readonly RegisterRow[], input: EngineInput): RouteLine
   const happened = shops.filter((shop) => shop.happened);
   const bagSum = sumBagFees(happened);
   const dates = new Set(rows.map((row) => row.pickupDate));
+  const routeName = rows[0]?.routeName ?? "";
 
   return {
     kind: "route",
-    routeName: rows[0]?.routeName ?? "",
+    routeName,
+    routeKey: routeGroupKey(routeName, rows[0]?.pickupDate ?? "", splitByDay),
     date: dates.size === 1 ? rows[0].pickupDate : null,
     routeRate,
     routeCostApplies,

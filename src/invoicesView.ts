@@ -1,4 +1,5 @@
 import { rowKey } from "./engine.js";
+import type { SettlementMode } from "./range.js";
 import { escapeHtml } from "./html.js";
 import {
   emptyInvoiceEdit,
@@ -67,6 +68,7 @@ export function renderFocusedInvoice(
   focus: string,
   notice = "",
   edit: InvoiceEditDraft = emptyInvoiceEdit(),
+  mode?: SettlementMode,
 ): string {
   const label = invoiceFocusLabel(focus);
   const key = focus.trim();
@@ -86,7 +88,7 @@ export function renderFocusedInvoice(
     );
   }
   const group = groups[0];
-  const face = invoiceEditFace(group.rows, edit, group.invoice);
+  const face = invoiceEditFace(group.rows, edit, group.invoice, mode);
   const total = face.total == null ? INVOICE_DASH : escapeHtml(formatPln(face.total));
   const leaving = face.leaving > 0 ? ` · ${face.leaving} do odpięcia` : "";
   const status = edit.status || face.error;

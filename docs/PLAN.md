@@ -149,7 +149,7 @@ Na żywy arkusz ta akcja wchodzi dopiero w W1, nie w M6. Sekretu zapisu nie ma: 
 
 Kwoty na ekranie są wynikiem R1, nie drugim liczeniem w HTML.
 
-- Wiersz zwykły i wiersz trasy. Jedna nazwa u tego podwykonawcy w zakresie to jeden wiersz, także gdy dni się różnią. Gdy dzień nie jest jeden, w dacie jest „—”.
+- Wiersz zwykły i wiersz trasy. Na zgłoszenie jedna nazwa u tego podwykonawcy w zakresie to jeden wiersz, także gdy dni się różnią. Gdy dzień nie jest jeden, w dacie jest „—”. W Harmonogramie ta sama nazwa jest osobną trasą na każdy dzień i stawka liczy się raz na dzień.
 - Rozwinięcie pokazuje sklepy. Liczbę worków zmienia się przy adresie, od razu, akcją z R3, do kolumny 9 tego wiersza.
 - Opcji „tylko za liczbę worków” nie ma. Podjazd, który nie ma wejść w koszt, wpisuje się jako 0 zł w Kwota podjazdu/trasy. Znacznik zostaje „podjazd”.
 - Kwota za podjazd i kwota za worek zmienione na wierszu zostają na ekranie. Do Bazy stawek nie idą.

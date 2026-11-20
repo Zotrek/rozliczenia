@@ -406,7 +406,7 @@ function renderInvoicesScreen(model: RangeViewModel): string {
     ? '<p class="note invoice-note">Pozycje tej faktury. Możesz zmienić numer, odpiąć sklep, zmienić liczbę worków i stawki. Zapis po Zapisz zmiany.</p>'
     : "";
   const body = editing
-    ? `<div class="invoice-body">${note}${renderFocusedInvoice(model.invoices, model.invoiceFocus ?? "", model.invoiceNotice, model.invoiceEdit)}</div>`
+    ? `<div class="invoice-body">${note}${renderFocusedInvoice(model.invoices, model.invoiceFocus ?? "", model.invoiceNotice, model.invoiceEdit, model.mode)}</div>`
     : renderInvoiceList(
         model.invoices,
         model.invoiceFocus,

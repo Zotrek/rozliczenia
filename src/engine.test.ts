@@ -348,6 +348,63 @@ describe("settle", () => {
     expect(costs).toEqual([2_000, 10_000]);
   });
 
+  it("test_settle_schedule_sameNameAndContractor_splits_cost_by_day", () => {
+    const statement = settle({
+      rows: [
+        reception({
+          sheetRow: 2,
+          address: "A",
+          contractor: "iz",
+          pickupDate: "02.11.2026",
+          routeName: "trasa",
+          routeRate: 15_000,
+          bagCount: 2,
+          pickupRate: null,
+          bagRate: 1_000,
+        }),
+        reception({
+          sheetRow: 3,
+          address: "B",
+          contractor: "iz",
+          pickupDate: "02.11.2026",
+          routeName: "trasa",
+          routeRate: 15_000,
+          bagCount: 0,
+          pickupRate: null,
+          bagRate: 1_000,
+        }),
+        reception({
+          sheetRow: 4,
+          address: "C",
+          contractor: "iz",
+          pickupDate: "16.11.2026",
+          routeName: "trasa",
+          routeRate: 15_000,
+          bagCount: 1,
+          pickupRate: null,
+          bagRate: 1_000,
+        }),
+      ],
+      rates: [],
+      screenByRow: {},
+      splitRouteByDay: true,
+    });
+    expect(statement.lines).toHaveLength(2);
+    const first = statement.lines[0];
+    const second = statement.lines[1];
+    if (first.kind !== "route" || second.kind !== "route") {
+      throw new Error("oczekiwano dwóch tras");
+    }
+    expect(first.date).toBe("02.11.2026");
+    expect(second.date).toBe("16.11.2026");
+    expect(first.routeKey).toBe("trasa\t02.11.2026");
+    expect(first.shops[0].legAmount).toBe(7_500);
+    expect(first.routeSum).toBe(15_000 + 2_000);
+    expect(second.routeSum).toBe(15_000 + 1_000);
+    expect(statement.total).toBe(15_000 + 2_000 + 15_000 + 1_000);
+    expect(lineKey(first)).not.toBe(lineKey(second));
+  });
+
   it("test_settle_route_differentDays_date_dash", () => {
     const line = onlyRoute(
       go([

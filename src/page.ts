@@ -656,7 +656,7 @@ async function runSearch(): Promise<void> {
     VIEW.applied = started;
     VIEW.searched = true;
     VIEW.screen = screenAfterSearch();
-    VIEW.statement = freshStatement(read.rows, read.rates);
+    VIEW.statement = freshStatement(read.rows, read.rates, VIEW.mode === "schedule");
     VIEW.invoiceNotice = "";
     VIEW.invoiceEdit = emptyInvoiceEdit();
     VIEW.invoiceEditing = false;
@@ -992,11 +992,11 @@ function onClick(event: MouseEvent): void {
   } else if (action === "save-rates") {
     void saveRates();
   } else if (action === "expand") {
-    const routeName = el.dataset.route ?? "";
-    if (routeName === "") {
+    const routeKey = el.dataset.routeKey || el.dataset.route || "";
+    if (routeKey === "") {
       return;
     }
-    VIEW.statement = toggleOpen(VIEW.statement, routeName);
+    VIEW.statement = toggleOpen(VIEW.statement, routeKey);
     paint();
   } else if (action === "detach") {
     const ref = sheetRef(el);
@@ -1366,7 +1366,7 @@ function onChange(event: Event): void {
   }
   if (el.dataset.pickRoute !== undefined) {
     const shops = commentTargets(currentStatement(VIEW.statement), VIEW.statement.invoiceComments).filter(
-      (target) => target.routeName === el.dataset.pickRoute,
+      (target) => (target.routeKey ?? target.routeName) === el.dataset.pickRoute,
     );
     VIEW.statement = {
       ...VIEW.statement,
@@ -1868,16 +1868,17 @@ function syncCommentChrome(): void {
     line.classList.toggle("will-overwrite", overwrite);
     line.classList.toggle("is-picked", on && !overwrite);
   }
-  const names = new Set<string>();
+  const routeKeys = new Set<string>();
   for (const target of targets) {
-    if (target.routeName !== null) {
-      names.add(target.routeName);
+    const routeKey = target.routeKey ?? target.routeName;
+    if (routeKey) {
+      routeKeys.add(routeKey);
     }
   }
-  for (const name of names) {
-    const shops = targets.filter((target) => target.routeName === name);
+  for (const routeKey of routeKeys) {
+    const shops = targets.filter((target) => (target.routeKey ?? target.routeName) === routeKey);
     const count = shops.filter((target) => picks[target.key] === true).length;
-    const box = root.querySelector(`[data-pick-route="${CSS.escape(name)}"]`);
+    const box = root.querySelector(`[data-pick-route="${CSS.escape(routeKey)}"]`);
     if (box instanceof HTMLInputElement) {
       box.checked = shops.length > 0 && count === shops.length;
       box.indeterminate = count > 0 && count < shops.length;
@@ -1887,7 +1888,7 @@ function syncCommentChrome(): void {
         line.classList.toggle("is-partial", box.indeterminate);
       }
     }
-    const note = root.querySelector(`[data-route-note="${CSS.escape(name)}"]`);
+    const note = root.querySelector(`[data-route-note="${CSS.escape(routeKey)}"]`);
     if (note) {
       note.textContent = routePickNote(shops.length, count);
     }
@@ -2647,8 +2648,16 @@ async function commitEdit(el: HTMLInputElement): Promise<void> {
   }
   if (edit === "pickup-date" || edit === "route-date") {
     const routeName = el.dataset.route ?? "";
+    const routeDate = el.dataset.routeDate ?? "";
     const targets =
-      edit === "route-date" ? VIEW.statement.rows.filter((item) => routeName !== "" && item.routeName === routeName) : [row];
+      edit === "route-date"
+        ? VIEW.statement.rows.filter(
+            (item) =>
+              routeName !== "" &&
+              item.routeName === routeName &&
+              (routeDate === "" || item.pickupDate === routeDate),
+          )
+        : [row];
     const built = pickupDateBody(targets, el.value, VIEW.mode);
     if (!built.ok) {
       VIEW.status = built.error;
@@ -2681,7 +2690,7 @@ async function commitEdit(el: HTMLInputElement): Promise<void> {
     if (routeName === "") {
       return;
     }
-    VIEW.statement = setRouteBagRate(VIEW.statement, routeName, amount);
+    VIEW.statement = setRouteBagRate(VIEW.statement, routeName, amount, el.dataset.routeDate ?? "");
   } else if (edit === "bag-rate") {
     VIEW.statement = setBagRate(
       VIEW.statement,

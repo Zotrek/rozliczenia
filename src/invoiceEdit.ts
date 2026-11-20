@@ -94,8 +94,9 @@ export function invoiceEditFace(
   rows: readonly SettledInvoiceRow[],
   draft: InvoiceEditDraft,
   invoice = "",
+  mode?: SettlementMode,
 ): InvoiceEditFace {
-  const face = assess(rows, draft).face;
+  const face = assess(rows, draft, mode).face;
   const number = readInvoiceNumber(draft, invoice);
   if (!number.ok) {
     return { ...face, dirty: false, invalid: true, error: face.error || number.error };
@@ -119,7 +120,7 @@ export function invoiceEditBody(
   if (!number.ok) {
     return { ok: false, error: number.error };
   }
-  const assessed = assess(rows, draft);
+  const assessed = assess(rows, draft, mode);
   if (assessed.face.invalid) {
     return { ok: false, error: assessed.face.error };
   }
@@ -186,19 +187,27 @@ interface Assessed {
   wiersze: Record<string, unknown>[];
 }
 
-function assess(rows: readonly SettledInvoiceRow[], draft: InvoiceEditDraft): Assessed {
+function assess(
+  rows: readonly SettledInvoiceRow[],
+  draft: InvoiceEditDraft,
+  mode?: SettlementMode,
+): Assessed {
+  const splitByDay = mode === "schedule";
   const parsed = rows.map((row) => parseRow(row, draft));
   const invalid = parsed.find((item) => item.bad);
   const shareChanged = new Set<string>();
   for (const item of parsed) {
     if (item.row.routeName !== "" && (item.detached || item.route.changed)) {
-      shareChanged.add(item.row.routeName);
+      shareChanged.add(routeShareKey(item.row, splitByDay));
     }
   }
   const staying = parsed.filter((item) => !item.detached);
   const costs = invalid
     ? new Map<string, ShopCost>()
-    : shopCosts(staying.map((item) => editedRegisterRow(item)));
+    : shopCosts(
+        staying.map((item) => editedRegisterRow(item)),
+        splitByDay,
+      );
   const lines: Record<string, InvoiceEditLine> = {};
   const wiersze: Record<string, unknown>[] = [];
   let total = 0;
@@ -213,7 +222,8 @@ function assess(rows: readonly SettledInvoiceRow[], draft: InvoiceEditDraft): As
         item.bags.changed ||
         item.pickup.changed ||
         item.bag.changed ||
-        (item.row.routeName !== "" && (shareChanged.has(item.row.routeName) || item.route.changed)));
+        (item.row.routeName !== "" &&
+          (shareChanged.has(routeShareKey(item.row, splitByDay)) || item.route.changed)));
     const receptionCost = !item.detached && write && shop ? shop.receptionCost : item.row.receptionCost;
     const costPerBag = !item.detached && write && shop ? shop.costPerBag : item.row.costPerBag;
     if (!item.detached && receptionCost != null) {
@@ -342,8 +352,12 @@ function editedRegisterRow(item: ParsedInvoiceRow): RegisterRow {
   };
 }
 
-function shopCosts(rows: readonly RegisterRow[]): Map<string, ShopCost> {
-  const statement = settle({ rows, rates: [], screenByRow: {} });
+function routeShareKey(row: { routeName: string; pickupDate: string }, splitByDay: boolean): string {
+  return splitByDay ? `${row.routeName}\t${row.pickupDate}` : row.routeName;
+}
+
+function shopCosts(rows: readonly RegisterRow[], splitByDay: boolean): Map<string, ShopCost> {
+  const statement = settle({ rows, rates: [], screenByRow: {}, splitRouteByDay: splitByDay });
   const costs = new Map<string, ShopCost>();
   for (const line of statement.lines) {
     const shops = line.kind === "plain" ? [line.shop] : line.shops;

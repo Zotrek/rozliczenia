@@ -132,6 +132,45 @@ describe("invoiceEditBody", () => {
     ]);
   });
 
+  it("test_invoiceEditBody_schedule_bag_change_charges_that_day_only", () => {
+    const shops = [
+      row({
+        routeName: "Trasa",
+        routeRate: 10_000,
+        pickupRate: 0,
+        bagRate: 0,
+        bagCount: 1,
+        pickupDate: "02.11.2026",
+        receptionCost: 5_000,
+        costPerBag: 5_000,
+      }),
+      row({
+        sheetRow: 3,
+        transportNumber: "11",
+        address: "Inna 2",
+        shopName: "Sklep B",
+        routeName: "Trasa",
+        routeRate: 10_000,
+        pickupRate: 0,
+        bagRate: 0,
+        bagCount: 1,
+        pickupDate: "16.11.2026",
+        receptionCost: 5_000,
+        costPerBag: 5_000,
+      }),
+    ];
+    const draft = { ...emptyInvoiceEdit(), bags: { "Arkusz1\t2\t10": "2" } };
+    const face = invoiceEditFace(shops, draft, "FV/1", "schedule");
+    expect(face.lines["Arkusz1\t2\t10"].receptionCost).toBe(10_000);
+    expect(face.lines["Arkusz1\t3\t11"].receptionCost).toBe(5_000);
+    const built = invoiceEditBody(shops, draft, "FV/1", "schedule");
+    expect(built.ok).toBe(true);
+    if (built.ok && !built.unchanged) {
+      expect(built.body.wiersze).toHaveLength(1);
+      expect(built.body.wiersze[0]).toMatchObject({ sheetRow: 2, koszt: 10_000 });
+    }
+  });
+
   it("test_invoiceEditBody_route_rate_updates_every_shop_of_that_route", () => {
     const shops = [
       row({

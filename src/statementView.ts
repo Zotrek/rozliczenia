@@ -94,7 +94,7 @@ function table(screen: StatementScreen, statement: Statement): string {
       continue;
     }
     rows.push(routeRow(screen, line, targets));
-    if (!screen.openRoutes[line.routeName]) {
+    if (!screen.openRoutes[line.routeKey]) {
       continue;
     }
     const shared = line.bagRate !== null;
@@ -226,9 +226,9 @@ function routeRow(
   line: Extract<StatementLine, { kind: "route" }>,
   targets: readonly CommentTarget[],
 ): string {
-  const key = routeSelectionKey(line.routeName);
+  const key = routeSelectionKey(line.routeKey);
   const checked = screen.selected[key] === true;
-  const open = screen.openRoutes[line.routeName] === true;
+  const open = screen.openRoutes[line.routeKey] === true;
   const anchor = line.shops[0];
   const happened = line.shops.filter((shop) => shop.happened).length;
   const sub = happened === line.shops.length ? shopsWord(line.shops.length) : `${happened} z ${line.shops.length} w koszcie`;
@@ -241,6 +241,7 @@ function routeRow(
         line.date ?? "",
         "Zapis od razu. Ta data wchodzi na każdy sklep tej trasy w zestawieniu.",
         line.routeName,
+        line.date ?? undefined,
       )
     : DASH;
   const happenedShops = line.shops.filter((shop) => shop.happened);
@@ -255,6 +256,7 @@ function routeRow(
             line.bagRate,
             "Jedna kwota, bo każdy adres, który się odbył, ma tę samą. Zmiana tylko na tym ekranie.",
             line.routeName,
+            line.date ?? undefined,
           ),
           driftValues(screen, happenedShops, "bag"),
         );
@@ -271,14 +273,14 @@ function routeRow(
         driftValues(screen, line.shops, "route"),
       )
     : DASH;
-  const shops = targets.filter((item) => item.routeName === line.routeName);
+  const shops = targets.filter((item) => (item.routeKey ?? item.routeName) === line.routeKey);
   const pickedShops = shops.filter((item) => screen.commentPicks[item.key] === true).length;
   return (
     `<tr class="${joinClass(rowClass(false, checked, "route"), routeCommentClass(shops.length, pickedShops))}" data-kind="route">` +
     `<td class="c">${lineBox(encodeURIComponent(key), checked)}</td>` +
     `<td>${DASH}</td>` +
-    `<td class="adres"><div class="who-line"><button type="button" class="chev" data-action="expand" data-route="${escapeHtml(line.routeName)}" aria-expanded="${open ? "true" : "false"}" aria-label="Sklepy trasy">${open ? "▾" : "▸"}</button>` +
-    `<div>${routePick(line.routeName, sub, shops.length, pickedShops)}${none}${tie}</div></div></td>` +
+    `<td class="adres"><div class="who-line"><button type="button" class="chev" data-action="expand" data-route-key="${escapeHtml(line.routeKey)}" data-route="${escapeHtml(line.routeName)}" aria-expanded="${open ? "true" : "false"}" aria-label="Sklepy trasy">${open ? "▾" : "▸"}</button>` +
+    `<div>${routePick(line.routeName, sub, shops.length, pickedShops, line.routeKey)}${none}${tie}</div></div></td>` +
     `<td class="sklep">${DASH}</td>` +
     `<td data-out="route-date">${date}</td>` +
     `<td><span class="tag tag-route">trasa</span></td>` +
@@ -346,15 +348,15 @@ function commentComposer(screen: StatementScreen, statement: Statement): string 
   );
 }
 
-function routePick(routeName: string, sub: string, total: number, picked: number): string {
+function routePick(routeName: string, sub: string, total: number, picked: number, routeKey = routeName): string {
   if (total === 0) {
     return `<div>${escapeHtml(routeName)}</div><div class="sub">trasa · ${escapeHtml(sub)}</div>`;
   }
   const checked = picked === total ? " checked" : "";
   return (
-    `<label class="pick-line"><input type="checkbox" data-pick-route="${escapeHtml(routeName)}" aria-label="${escapeHtml(`Zaznacz sklepy trasy ${routeName}`)}"${checked}>` +
+    `<label class="pick-line"><input type="checkbox" data-pick-route="${escapeHtml(routeKey)}" aria-label="${escapeHtml(`Zaznacz sklepy trasy ${routeName}`)}"${checked}>` +
     `<span class="stack"><span>${escapeHtml(routeName)}</span>` +
-    `<span class="sub">trasa · ${escapeHtml(sub)} · <span data-route-note="${escapeHtml(routeName)}">${escapeHtml(routePickNote(total, picked))}</span></span></span></label>`
+    `<span class="sub">trasa · ${escapeHtml(sub)} · <span data-route-note="${escapeHtml(routeKey)}">${escapeHtml(routePickNote(total, picked))}</span></span></span></label>`
   );
 }
 
@@ -519,9 +521,17 @@ function tieBox(tie: RateTie | null, rates: readonly SettlementRateRow[]): strin
   return `<div class="tie"><span class="err">Dwie stawki na ten dzień. Wskaż, która obowiązuje.</span>${buttons}</div>`;
 }
 
-function dateInput(shop: ShopCost, edit: string, shown: string, title: string, routeName?: string): string {
+function dateInput(
+  shop: ShopCost,
+  edit: string,
+  shown: string,
+  title: string,
+  routeName?: string,
+  routeDate?: string,
+): string {
   const route = routeName ? ` data-route="${escapeHtml(routeName)}"` : "";
-  return `<input type="date" data-edit="${edit}" ${ref(shop)}${route} value="${escapeHtml(sheetDateInputValue(shown))}" title="${escapeHtml(title)}" aria-label="Data odbioru">`;
+  const day = routeDate ? ` data-route-date="${escapeHtml(routeDate)}"` : "";
+  return `<input type="date" data-edit="${edit}" ${ref(shop)}${route}${day} value="${escapeHtml(sheetDateInputValue(shown))}" title="${escapeHtml(title)}" aria-label="Data odbioru">`;
 }
 
 function sheetDateInputValue(text: string): string {
@@ -579,10 +589,12 @@ function amountInput(
   shown: Grosze | null,
   title: string,
   routeName?: string,
+  routeDate?: string,
 ): string {
   const value = override === null ? "" : override !== undefined ? formatAmountInput(override) : shown === null ? "" : formatAmountInput(shown);
   const route = routeName ? ` data-route="${escapeHtml(routeName)}"` : "";
-  return `<input type="text" inputmode="decimal" data-edit="${edit}" ${ref(shop)}${route} value="${escapeHtml(value)}" title="${escapeHtml(title)}" autocomplete="off">`;
+  const day = routeDate ? ` data-route-date="${escapeHtml(routeDate)}"` : "";
+  return `<input type="text" inputmode="decimal" data-edit="${edit}" ${ref(shop)}${route}${day} value="${escapeHtml(value)}" title="${escapeHtml(title)}" autocomplete="off">`;
 }
 
 function money(value: Grosze | null, dead: boolean): string {

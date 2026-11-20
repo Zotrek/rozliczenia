@@ -124,6 +124,26 @@ describe("currentStatement", () => {
       expect(routeSelectionKey(statement.lines[0].routeName)).toBe(lineKey(statement.lines[0]));
     }
   });
+
+  it("test_currentStatement_schedule_sameName_twoDates_isTwoRoutes", () => {
+    const statement = currentStatement({
+      ...freshStatement(
+        [
+          row({ sheetRow: 2, address: "A", routeName: "trasa", routeRate: 15_000, pickupDate: "02.11.2026", contractor: "iz" }),
+          row({ sheetRow: 3, address: "B", routeName: "trasa", routeRate: 15_000, pickupDate: "16.11.2026", contractor: "iz" }),
+        ],
+        [rate({ sheetRow: 2, shop: "A" }), rate({ sheetRow: 3, shop: "B" })],
+        true,
+      ),
+    });
+    expect(statement.lines).toHaveLength(2);
+    expect(statement.total).toBe(30_000);
+    if (statement.lines[0].kind === "route" && statement.lines[1].kind === "route") {
+      expect(statement.lines[0].date).toBe("02.11.2026");
+      expect(statement.lines[1].date).toBe("16.11.2026");
+      expect(routeSelectionKey(statement.lines[0].routeKey)).toBe(lineKey(statement.lines[0]));
+    }
+  });
 });
 
 describe("screen edits", () => {
@@ -229,6 +249,28 @@ describe("writes", () => {
     expect(next?.rows[0].routeName).toBe("");
     expect(next?.rows[0].routeRate).toBeNull();
     expect(next?.leftRoute["\t2\t2"]).toBe("stara");
+  });
+
+  it("test_commitDetach_schedule_clears_only_that_day", () => {
+    const base = freshStatement(
+      [
+        row({ sheetRow: 2, routeName: "trasa", routeRate: 15_000, pickupDate: "02.11.2026" }),
+        row({ sheetRow: 3, routeName: "trasa", routeRate: 15_000, pickupDate: "16.11.2026" }),
+      ],
+      [],
+      true,
+    );
+    const selected = {
+      ...base,
+      selected: {
+        [routeSelectionKey("trasa\t02.11.2026")]: true as const,
+        [routeSelectionKey("trasa\t16.11.2026")]: true as const,
+      },
+    };
+    const next = commitDetach(selected, 2, "2");
+    expect(next?.selected[routeSelectionKey("trasa\t02.11.2026")]).toBeUndefined();
+    expect(next?.selected[routeSelectionKey("trasa\t16.11.2026")]).toBe(true);
+    expect(next?.rows[1].routeName).toBe("trasa");
   });
 });
 

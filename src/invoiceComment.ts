@@ -12,6 +12,8 @@ export interface CommentChoice {
 export interface CommentTarget extends CommentChoice {
   /** null = podjazd, nie sklep trasy. */
   routeName: string | null;
+  /** null = podjazd. W harmonogramie nazwa i dzień, żeby checkbox nie brał drugiego dnia. */
+  routeKey?: string | null;
 }
 
 export interface RouteCommentFace {
@@ -53,7 +55,7 @@ export function commentTargets(
     }
     for (const shop of line.shops) {
       if (shop.happened) {
-        targets.push(targetOf(shop, line.routeName, comments));
+        targets.push(targetOf(shop, line.routeName, comments, line.routeKey));
       }
     }
   }
@@ -269,12 +271,14 @@ function targetOf(
   shop: ShopCost,
   routeName: string | null,
   comments: Readonly<Record<string, string>>,
+  routeKey: string | null = routeName,
 ): CommentTarget {
   const key = commentKey(shop);
   return {
     key,
     shopName: shownShop(shop.shopName, shop.address),
     routeName,
+    routeKey,
     comment: comments[key] ?? "",
   };
 }

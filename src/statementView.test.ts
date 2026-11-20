@@ -132,7 +132,45 @@ describe("renderStatement", () => {
     expect(html).toContain('data-out="route-date"');
     expect(html).toContain('data-edit="route-date"');
     expect(html).toContain('data-route="trasa" value=""');
+    expect(html).not.toContain("data-route-date");
     expect(html).toContain('data-edit="route-rate"');
+  });
+
+  it("test_renderStatement_schedule_same_route_is_two_days_and_two_rates", () => {
+    const html = renderStatement(
+      screen(
+        [
+          row({
+            sheetRow: 2,
+            address: "A",
+            contractor: "iz",
+            routeName: "trasa",
+            routeRate: 15_000,
+            pickupDate: "02.11.2026",
+            bagCount: 0,
+            bagRate: 0,
+          }),
+          row({
+            sheetRow: 3,
+            address: "B",
+            contractor: "iz",
+            routeName: "trasa",
+            routeRate: 15_000,
+            pickupDate: "16.11.2026",
+            bagCount: 0,
+            bagRate: 0,
+          }),
+        ],
+        [rate({ sheetRow: 2, shop: "A" }), rate({ sheetRow: 3, shop: "B" })],
+        { splitRouteByDay: true },
+      ),
+    );
+    expect(html.split('data-kind="route"').length - 1).toBe(2);
+    expect(html).toContain('data-route-key="trasa\t02.11.2026"');
+    expect(html).toContain('data-route-key="trasa\t16.11.2026"');
+    expect(html).toContain('data-route-date="02.11.2026"');
+    expect(html).toContain('data-route-date="16.11.2026"');
+    expect(html).toContain(`data-out="sum-all">${formatPln(30_000)}`);
   });
 
   it("test_renderStatement_expand_edits_bags_on_that_shop", () => {

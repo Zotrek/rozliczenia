@@ -1,4 +1,4 @@
-import { lineKey, rowKey, settle, sumSelected } from "./engine.js";
+import { lineKey, routeGroupKey, rowKey, settle, sumSelected } from "./engine.js";
 import { commentApplyNotice, commentTargets, openingCommentPicks } from "./invoiceComment.js";
 import { isoToSheetDate, type SettlementMode } from "./range.js";
 import { hasSheetDateShape, parseSheetDate } from "./sheetDate.js";
@@ -186,7 +186,13 @@ export interface StatementScreen {
   rates: SettlementRateRow[];
   screenByRow: Record<string, ScreenState>;
   selected: Record<string, true>;
+  /** Klucz z `routeGroupKey`. W harmonogramie nazwa i dzień, na zgłoszenie sama nazwa. */
   openRoutes: Record<string, true>;
+  /**
+   * Harmonogram: ta sama nazwa trasy jest osobną trasą na każdy dzień odbioru.
+   * Na zgłoszenie jedna nazwa w zakresie zostaje jednym wierszem.
+   */
+  splitRouteByDay?: boolean;
   invoice: string;
   leftRoute: Record<string, string>;
   routeDraft: Record<string, RouteDraft>;
@@ -253,9 +259,13 @@ export function invoiceCommentsFromRows(
   return comments;
 }
 
-export function freshStatement(rows: RegisterRow[], rates: SettlementRateRow[]): StatementScreen {
+export function freshStatement(
+  rows: RegisterRow[],
+  rates: SettlementRateRow[],
+  splitRouteByDay = false,
+): StatementScreen {
   const invoiceComments = invoiceCommentsFromRows(rows);
-  const screen = { ...emptyStatement(), rows, rates, invoiceComments };
+  const screen = { ...emptyStatement(), rows, rates, invoiceComments, splitRouteByDay };
   return {
     ...screen,
     commentPicks: openingCommentPicks(commentTargets(currentStatement(screen), invoiceComments)),
@@ -267,6 +277,7 @@ export function currentStatement(screen: StatementScreen): Statement {
     rows: screen.rows,
     rates: screen.rates,
     screenByRow: screen.screenByRow,
+    splitRouteByDay: screen.splitRouteByDay === true,
   });
 }
 
@@ -359,8 +370,8 @@ export function lineHasTie(line: StatementLine): boolean {
   return line.shops.some((shop) => shop.tie !== null);
 }
 
-export function routeSelectionKey(routeName: string): string {
-  return `route\t${routeName}`;
+export function routeSelectionKey(routeKey: string): string {
+  return `route\t${routeKey}`;
 }
 
 export function readSettlement(body: unknown): SettlementSearchResult {
@@ -523,10 +534,14 @@ export function setRouteBagRate(
   screen: StatementScreen,
   routeName: string,
   amount: Grosze | null,
+  pickupDate = "",
 ): StatementScreen {
   const screenByRow = { ...screen.screenByRow };
   for (const row of screen.rows) {
     if (row.routeName !== routeName) {
+      continue;
+    }
+    if (pickupDate !== "" && row.pickupDate !== pickupDate) {
       continue;
     }
     const key = rowKey(row.sheetRow, row.transportNumber, row.sheetName);
@@ -579,6 +594,8 @@ export function commitDetach(
     return null;
   }
   const left = row.routeName;
+  const split = screen.splitRouteByDay === true;
+  const group = routeGroupKey(left, row.pickupDate, split);
   const rows = screen.rows.map((item) =>
     item.sheetRow === sheetRow &&
     item.transportNumber === transportNumber &&
@@ -587,8 +604,11 @@ export function commitDetach(
       : item,
   );
   const selected = { ...screen.selected };
-  if (!rows.some((item) => item.routeName === left)) {
-    delete selected[routeSelectionKey(left)];
+  const groupRemains = rows.some(
+    (item) => item.routeName !== "" && routeGroupKey(item.routeName, item.pickupDate, split) === group,
+  );
+  if (!groupRemains) {
+    delete selected[routeSelectionKey(group)];
   }
   return {
     ...screen,
@@ -653,13 +673,15 @@ export function adoptRows(
   rates: SettlementRateRow[],
 ): StatementScreen {
   const keys = new Set(rows.map((row) => rowKey(row.sheetRow, row.transportNumber, row.sheetName)));
-  const routeNames = new Set(rows.map((row) => row.routeName).filter((name) => name !== ""));
+  const split = prev.splitRouteByDay === true;
+  const routeKeys = routeKeysOn(rows, split);
   return {
     rows,
     rates,
+    splitRouteByDay: split,
     screenByRow: pick(prev.screenByRow, keys),
-    selected: pickLines(prev.selected, keys, routeNames),
-    openRoutes: pickNames(prev.openRoutes, routeNames),
+    selected: pickLines(prev.selected, keys, routeKeys),
+    openRoutes: pickNames(prev.openRoutes, routeKeys),
     invoice: prev.invoice,
     leftRoute: pick(prev.leftRoute, keys),
     routeDraft: pick(prev.routeDraft, keys),
@@ -1034,6 +1056,16 @@ function pick<T>(source: Record<string, T>, keys: ReadonlySet<string>): Record<s
     }
   }
   return next;
+}
+
+function routeKeysOn(rows: readonly RegisterRow[], split: boolean): Set<string> {
+  const keys = new Set<string>();
+  for (const row of rows) {
+    if (row.routeName !== "") {
+      keys.add(routeGroupKey(row.routeName, row.pickupDate, split));
+    }
+  }
+  return keys;
 }
 
 function pickNames(source: Record<string, true>, names: ReadonlySet<string>): Record<string, true> {

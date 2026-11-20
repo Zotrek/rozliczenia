@@ -73,6 +73,11 @@ export interface EngineInput {
   rates: readonly RateRow[];
   /** Klucz z `rowKey`. */
   screenByRow: Readonly<Record<string, ScreenState>>;
+  /**
+   * Harmonogram: ta sama nazwa u podwykonawcy jest osobną trasą na każdy dzień odbioru.
+   * Na zgłoszenie zostaje jeden wiersz na nazwę w całym zakresie.
+   */
+  splitRouteByDay?: boolean;
 }
 
 export interface RateCandidate {
@@ -132,6 +137,11 @@ export interface PlainLine {
 export interface RouteLine {
   kind: "route";
   routeName: string;
+  /**
+   * Klucz wiersza. Na zgłoszenie sama nazwa.
+   * W harmonogramie nazwa i dzień odbioru, żeby dwa dni nie zlały się w jedną stawkę.
+   */
+  routeKey: string;
   /** null = „—”, gdy dzień odbioru nie jest jeden. */
   date: string | null;
   /** Stawka z kolumny 11. null = pusta. */

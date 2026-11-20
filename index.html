@@ -2069,12 +2069,17 @@ function lineKey(line) {
     if (line.kind === "plain") {
         return rowKey(line.shop.sheetRow, line.shop.transportNumber, line.shop.sheetName);
     }
-    return `route\t${line.routeName}`;
+    return `route\t${line.routeKey}`;
+}
+/** Na zgłoszenie kluczem jest nazwa. W harmonogramie nazwa i dzień odbioru. */
+function routeGroupKey(routeName, pickupDate, splitByDay) {
+    return splitByDay ? `${routeName}\t${pickupDate}` : routeName;
 }
 function settle(input) {
     for (const row of input.rows) {
         parseSheetDate(row.pickupDate);
     }
+    const splitByDay = input.splitRouteByDay === true;
     const routeRows = new Map();
     const order = [];
     for (const row of input.rows) {
@@ -2082,13 +2087,14 @@ function settle(input) {
             order.push({ kind: "plain", row });
             continue;
         }
-        const group = routeRows.get(row.routeName);
+        const key = routeGroupKey(row.routeName, row.pickupDate, splitByDay);
+        const group = routeRows.get(key);
         if (group) {
             group.push(row);
         }
         else {
-            routeRows.set(row.routeName, [row]);
-            order.push({ kind: "route", name: row.routeName });
+            routeRows.set(key, [row]);
+            order.push({ kind: "route", key });
         }
     }
     const lines = [];
@@ -2098,7 +2104,7 @@ function settle(input) {
             pushPlain(lines, ties, item.row, input);
             continue;
         }
-        const grouped = routeRows.get(item.name) ?? [];
+        const grouped = routeRows.get(item.key) ?? [];
         // Nazwa trasy bez stawki za trasę nie jest trasą: kwota to stawka za podjazd.
         if (firstRouteRate(grouped) === null) {
             for (const row of grouped) {
@@ -2106,7 +2112,7 @@ function settle(input) {
             }
             continue;
         }
-        const line = buildRoute(grouped, input);
+        const line = buildRoute(grouped, input, splitByDay);
         for (const shop of line.shops) {
             if (shop.tie) {
                 ties.push(shop.tie);
@@ -2135,7 +2141,7 @@ function pushPlain(lines, ties, row, input) {
     const line = { kind: "plain", shop };
     lines.push(line);
 }
-function buildRoute(rows, input) {
+function buildRoute(rows, input, splitByDay) {
     const happenedCount = rows.filter((row) => !screenOf(input, row).didNotHappen).length;
     const routeRate = firstRouteRate(rows);
     const routeCostApplies = happenedCount > 0;
@@ -2144,9 +2150,11 @@ function buildRoute(rows, input) {
     const happened = shops.filter((shop) => shop.happened);
     const bagSum = sumBagFees(happened);
     const dates = new Set(rows.map((row) => row.pickupDate));
+    const routeName = rows[0]?.routeName ?? "";
     return {
         kind: "route",
-        routeName: rows[0]?.routeName ?? "",
+        routeName,
+        routeKey: routeGroupKey(routeName, rows[0]?.pickupDate ?? "", splitByDay),
         date: dates.size === 1 ? rows[0].pickupDate : null,
         routeRate,
         routeCostApplies,
@@ -2473,7 +2481,7 @@ function commentTargets(statement, comments) {
         }
         for (const shop of line.shops) {
             if (shop.happened) {
-                targets.push(targetOf(shop, line.routeName, comments));
+                targets.push(targetOf(shop, line.routeName, comments, line.routeKey));
             }
         }
     }
@@ -2647,12 +2655,13 @@ function routeCommentFace(shops) {
 function willOverwrite(comment, picked, draft) {
     return picked && comment.trim() !== "" && comment.trim() !== draft.trim();
 }
-function targetOf(shop, routeName, comments) {
+function targetOf(shop, routeName, comments, routeKey = routeName) {
     const key = commentKey(shop);
     return {
         key,
         shopName: shownShop(shop.shopName, shop.address),
         routeName,
+        routeKey,
         comment: comments[key] ?? "",
     };
 }
@@ -2858,9 +2867,9 @@ function invoiceCommentsFromRows(rows) {
     }
     return comments;
 }
-function freshStatement(rows, rates) {
+function freshStatement(rows, rates, splitRouteByDay = false) {
     const invoiceComments = invoiceCommentsFromRows(rows);
-    const screen = { ...emptyStatement(), rows, rates, invoiceComments };
+    const screen = { ...emptyStatement(), rows, rates, invoiceComments, splitRouteByDay };
     return {
         ...screen,
         commentPicks: openingCommentPicks(commentTargets(currentStatement(screen), invoiceComments)),
@@ -2871,6 +2880,7 @@ function currentStatement(screen) {
         rows: screen.rows,
         rates: screen.rates,
         screenByRow: screen.screenByRow,
+        splitRouteByDay: screen.splitRouteByDay === true,
     });
 }
 function selectedKeys(selected) {
@@ -2951,8 +2961,8 @@ function lineHasTie(line) {
     }
     return line.shops.some((shop) => shop.tie !== null);
 }
-function routeSelectionKey(routeName) {
-    return `route\t${routeName}`;
+function routeSelectionKey(routeKey) {
+    return `route\t${routeKey}`;
 }
 function readSettlement(body) {
     if (!isRecord(body) || body.ok !== true || !Array.isArray(body.rows) || !Array.isArray(body.rates)) {
@@ -3070,10 +3080,13 @@ function setBagRate(screen, sheetRow, transportNumber, amount, sheetName = "") {
     return patchScreen(screen, rowKey(sheetRow, transportNumber, sheetName), { bagAmount: amount });
 }
 /** Wspólna kwota worka na ekranie, tylko sklepy trasy, które się odbyły. Do Bazy stawek nie idzie. */
-function setRouteBagRate(screen, routeName, amount) {
+function setRouteBagRate(screen, routeName, amount, pickupDate = "") {
     const screenByRow = { ...screen.screenByRow };
     for (const row of screen.rows) {
         if (row.routeName !== routeName) {
+            continue;
+        }
+        if (pickupDate !== "" && row.pickupDate !== pickupDate) {
             continue;
         }
         const key = rowKey(row.sheetRow, row.transportNumber, row.sheetName);
@@ -3106,14 +3119,17 @@ function commitDetach(screen, sheetRow, transportNumber, sheetName = "") {
         return null;
     }
     const left = row.routeName;
+    const split = screen.splitRouteByDay === true;
+    const group = routeGroupKey(left, row.pickupDate, split);
     const rows = screen.rows.map((item) => item.sheetRow === sheetRow &&
         item.transportNumber === transportNumber &&
         item.sheetName === sheetName
         ? { ...item, routeName: "", routeRate: null }
         : item);
     const selected = { ...screen.selected };
-    if (!rows.some((item) => item.routeName === left)) {
-        delete selected[routeSelectionKey(left)];
+    const groupRemains = rows.some((item) => item.routeName !== "" && routeGroupKey(item.routeName, item.pickupDate, split) === group);
+    if (!groupRemains) {
+        delete selected[routeSelectionKey(group)];
     }
     return {
         ...screen,
@@ -3159,13 +3175,15 @@ function withoutTiedRates(rates, keptSheetRow) {
 /** Po odświeżeniu odczytu zostaje stan ekranu wierszy, które nadal są. */
 function adoptRows(prev, rows, rates) {
     const keys = new Set(rows.map((row) => rowKey(row.sheetRow, row.transportNumber, row.sheetName)));
-    const routeNames = new Set(rows.map((row) => row.routeName).filter((name) => name !== ""));
+    const split = prev.splitRouteByDay === true;
+    const routeKeys = routeKeysOn(rows, split);
     return {
         rows,
         rates,
+        splitRouteByDay: split,
         screenByRow: pick(prev.screenByRow, keys),
-        selected: pickLines(prev.selected, keys, routeNames),
-        openRoutes: pickNames(prev.openRoutes, routeNames),
+        selected: pickLines(prev.selected, keys, routeKeys),
+        openRoutes: pickNames(prev.openRoutes, routeKeys),
         invoice: prev.invoice,
         leftRoute: pick(prev.leftRoute, keys),
         routeDraft: pick(prev.routeDraft, keys),
@@ -3477,6 +3495,15 @@ function pick(source, keys) {
     }
     return next;
 }
+function routeKeysOn(rows, split) {
+    const keys = new Set();
+    for (const row of rows) {
+        if (row.routeName !== "") {
+            keys.add(routeGroupKey(row.routeName, row.pickupDate, split));
+        }
+    }
+    return keys;
+}
 function pickNames(source, names) {
     const next = {};
     for (const name of Object.keys(source)) {
@@ -3714,8 +3741,8 @@ function readInvoiceNumber(draft, invoice) {
     }
     return { ok: true, changed: true, next };
 }
-function invoiceEditFace(rows, draft, invoice = "") {
-    const face = assess(rows, draft).face;
+function invoiceEditFace(rows, draft, invoice = "", mode) {
+    const face = assess(rows, draft, mode).face;
     const number = readInvoiceNumber(draft, invoice);
     if (!number.ok) {
         return { ...face, dirty: false, invalid: true, error: face.error || number.error };
@@ -3730,7 +3757,7 @@ function invoiceEditBody(rows, draft, invoice, mode) {
     if (!number.ok) {
         return { ok: false, error: number.error };
     }
-    const assessed = assess(rows, draft);
+    const assessed = assess(rows, draft, mode);
     if (assessed.face.invalid) {
         return { ok: false, error: assessed.face.error };
     }
@@ -3768,19 +3795,20 @@ function withNumberRows(rows, draft, wiersze) {
     }
     return extra.length === 0 ? wiersze : [...wiersze, ...extra];
 }
-function assess(rows, draft) {
+function assess(rows, draft, mode) {
+    const splitByDay = mode === "schedule";
     const parsed = rows.map((row) => parseRow(row, draft));
     const invalid = parsed.find((item) => item.bad);
     const shareChanged = new Set();
     for (const item of parsed) {
         if (item.row.routeName !== "" && (item.detached || item.route.changed)) {
-            shareChanged.add(item.row.routeName);
+            shareChanged.add(routeShareKey(item.row, splitByDay));
         }
     }
     const staying = parsed.filter((item) => !item.detached);
     const costs = invalid
         ? new Map()
-        : shopCosts(staying.map((item) => editedRegisterRow(item)));
+        : shopCosts(staying.map((item) => editedRegisterRow(item)), splitByDay);
     const lines = {};
     const wiersze = [];
     let total = 0;
@@ -3794,7 +3822,8 @@ function assess(rows, draft) {
                 item.bags.changed ||
                 item.pickup.changed ||
                 item.bag.changed ||
-                (item.row.routeName !== "" && (shareChanged.has(item.row.routeName) || item.route.changed)));
+                (item.row.routeName !== "" &&
+                    (shareChanged.has(routeShareKey(item.row, splitByDay)) || item.route.changed)));
         const receptionCost = !item.detached && write && shop ? shop.receptionCost : item.row.receptionCost;
         const costPerBag = !item.detached && write && shop ? shop.costPerBag : item.row.costPerBag;
         if (!item.detached && receptionCost != null) {
@@ -3907,8 +3936,11 @@ function editedRegisterRow(item) {
         invoiceComment: item.row.invoiceComment,
     };
 }
-function shopCosts(rows) {
-    const statement = settle({ rows, rates: [], screenByRow: {} });
+function routeShareKey(row, splitByDay) {
+    return splitByDay ? `${row.routeName}\t${row.pickupDate}` : row.routeName;
+}
+function shopCosts(rows, splitByDay) {
+    const statement = settle({ rows, rates: [], screenByRow: {}, splitRouteByDay: splitByDay });
     const costs = new Map();
     for (const line of statement.lines) {
         const shops = line.kind === "plain" ? [line.shop] : line.shops;
@@ -3975,7 +4007,7 @@ function renderInvoiceList(rows, focus = null, comment = emptyInvoiceComment(), 
     return `<div class="invoice-body">${note}${notice}${cards}</div>${foot}`;
 }
 /** Edycja jednej faktury: pozycje już rozliczone, bez zaznaczania i bez listy nierozliczonych. */
-function renderFocusedInvoice(rows, focus, notice = "", edit = emptyInvoiceEdit()) {
+function renderFocusedInvoice(rows, focus, notice = "", edit = emptyInvoiceEdit(), mode) {
     const label = invoiceFocusLabel(focus);
     const key = focus.trim();
     if (notice !== "") {
@@ -3990,7 +4022,7 @@ function renderFocusedInvoice(rows, focus, notice = "", edit = emptyInvoiceEdit(
             "<p class=\"note\">W tym zakresie nie ma rozliczonych odbiorów tej faktury.</p></section>");
     }
     const group = groups[0];
-    const face = invoiceEditFace(group.rows, edit, group.invoice);
+    const face = invoiceEditFace(group.rows, edit, group.invoice, mode);
     const total = face.total == null ? INVOICE_DASH : escapeHtml(formatPln(face.total));
     const leaving = face.leaving > 0 ? ` · ${face.leaving} do odpięcia` : "";
     const status = edit.status || face.error;
@@ -6395,7 +6427,7 @@ function table(screen, statement) {
             continue;
         }
         rows.push(routeRow(screen, line, targets));
-        if (!screen.openRoutes[line.routeName]) {
+        if (!screen.openRoutes[line.routeKey]) {
             continue;
         }
         const shared = line.bagRate !== null;
@@ -6503,31 +6535,31 @@ function plainRow(screen, shop, targets) {
         "</tr>");
 }
 function routeRow(screen, line, targets) {
-    const key = routeSelectionKey(line.routeName);
+    const key = routeSelectionKey(line.routeKey);
     const checked = screen.selected[key] === true;
-    const open = screen.openRoutes[line.routeName] === true;
+    const open = screen.openRoutes[line.routeKey] === true;
     const anchor = line.shops[0];
     const happened = line.shops.filter((shop) => shop.happened).length;
     const sub = happened === line.shops.length ? shopsWord(line.shops.length) : `${happened} z ${line.shops.length} w koszcie`;
     const none = happened === 0 ? '<div class="sub">Żaden sklep się nie odbył — kosztu trasy nie ma.</div>' : "";
     const tie = line.shops.some((shop) => shop.tie) ? '<div class="err">Remis stawek. Rozwiń i wskaż wiersz.</div>' : "";
     const date = anchor
-        ? dateInput(anchor, "route-date", line.date ?? "", "Zapis od razu. Ta data wchodzi na każdy sklep tej trasy w zestawieniu.", line.routeName)
+        ? dateInput(anchor, "route-date", line.date ?? "", "Zapis od razu. Ta data wchodzi na każdy sklep tej trasy w zestawieniu.", line.routeName, line.date ?? undefined)
         : DASH;
     const happenedShops = line.shops.filter((shop) => shop.happened);
     const bagRate = line.bagRate === null || !anchor
         ? DASH
-        : withDrift(amountInput(anchor, "bag-rate-route", undefined, line.bagRate, "Jedna kwota, bo każdy adres, który się odbył, ma tę samą. Zmiana tylko na tym ekranie.", line.routeName), driftValues(screen, happenedShops, "bag"));
+        : withDrift(amountInput(anchor, "bag-rate-route", undefined, line.bagRate, "Jedna kwota, bo każdy adres, który się odbył, ma tę samą. Zmiana tylko na tym ekranie.", line.routeName, line.date ?? undefined), driftValues(screen, happenedShops, "bag"));
     const rateInput = anchor
         ? withDrift(amountInput(anchor, "route-rate", undefined, line.routeRate, "Zapis od razu do Stawka za trasę. Kolumny 16 i 17 dopiero przy Zatwierdź", line.routeName), driftValues(screen, line.shops, "route"))
         : DASH;
-    const shops = targets.filter((item) => item.routeName === line.routeName);
+    const shops = targets.filter((item) => (item.routeKey ?? item.routeName) === line.routeKey);
     const pickedShops = shops.filter((item) => screen.commentPicks[item.key] === true).length;
     return (`<tr class="${joinClass(rowClass(false, checked, "route"), routeCommentClass(shops.length, pickedShops))}" data-kind="route">` +
         `<td class="c">${lineBox(encodeURIComponent(key), checked)}</td>` +
         `<td>${DASH}</td>` +
-        `<td class="adres"><div class="who-line"><button type="button" class="chev" data-action="expand" data-route="${escapeHtml(line.routeName)}" aria-expanded="${open ? "true" : "false"}" aria-label="Sklepy trasy">${open ? "▾" : "▸"}</button>` +
-        `<div>${routePick(line.routeName, sub, shops.length, pickedShops)}${none}${tie}</div></div></td>` +
+        `<td class="adres"><div class="who-line"><button type="button" class="chev" data-action="expand" data-route-key="${escapeHtml(line.routeKey)}" data-route="${escapeHtml(line.routeName)}" aria-expanded="${open ? "true" : "false"}" aria-label="Sklepy trasy">${open ? "▾" : "▸"}</button>` +
+        `<div>${routePick(line.routeName, sub, shops.length, pickedShops, line.routeKey)}${none}${tie}</div></div></td>` +
         `<td class="sklep">${DASH}</td>` +
         `<td data-out="route-date">${date}</td>` +
         `<td><span class="tag tag-route">trasa</span></td>` +
@@ -6579,14 +6611,14 @@ function commentComposer(screen, statement) {
         `<p class="note overwrite-hint" data-out="overwrite-hint"${hint ? "" : " hidden"}>${escapeHtml(hint)}</p>` +
         '<p class="note composer-foot">Na tym ekranie. Numer i kwoty bez zmian. Do rejestru jeszcze nie schodzi.</p></footer>');
 }
-function routePick(routeName, sub, total, picked) {
+function routePick(routeName, sub, total, picked, routeKey = routeName) {
     if (total === 0) {
         return `<div>${escapeHtml(routeName)}</div><div class="sub">trasa · ${escapeHtml(sub)}</div>`;
     }
     const checked = picked === total ? " checked" : "";
-    return (`<label class="pick-line"><input type="checkbox" data-pick-route="${escapeHtml(routeName)}" aria-label="${escapeHtml(`Zaznacz sklepy trasy ${routeName}`)}"${checked}>` +
+    return (`<label class="pick-line"><input type="checkbox" data-pick-route="${escapeHtml(routeKey)}" aria-label="${escapeHtml(`Zaznacz sklepy trasy ${routeName}`)}"${checked}>` +
         `<span class="stack"><span>${escapeHtml(routeName)}</span>` +
-        `<span class="sub">trasa · ${escapeHtml(sub)} · <span data-route-note="${escapeHtml(routeName)}">${escapeHtml(routePickNote(total, picked))}</span></span></span></label>`);
+        `<span class="sub">trasa · ${escapeHtml(sub)} · <span data-route-note="${escapeHtml(routeKey)}">${escapeHtml(routePickNote(total, picked))}</span></span></span></label>`);
 }
 function shopAddress(shop, dead, target, screen) {
     const shown = text(addressWithCommaAfterLocality(shop.address), dead);
@@ -6714,9 +6746,10 @@ function tieBox(tie, rates) {
         .join("");
     return `<div class="tie"><span class="err">Dwie stawki na ten dzień. Wskaż, która obowiązuje.</span>${buttons}</div>`;
 }
-function dateInput(shop, edit, shown, title, routeName) {
+function dateInput(shop, edit, shown, title, routeName, routeDate) {
     const route = routeName ? ` data-route="${escapeHtml(routeName)}"` : "";
-    return `<input type="date" data-edit="${edit}" ${ref(shop)}${route} value="${escapeHtml(sheetDateInputValue(shown))}" title="${escapeHtml(title)}" aria-label="Data odbioru">`;
+    const day = routeDate ? ` data-route-date="${escapeHtml(routeDate)}"` : "";
+    return `<input type="date" data-edit="${edit}" ${ref(shop)}${route}${day} value="${escapeHtml(sheetDateInputValue(shown))}" title="${escapeHtml(title)}" aria-label="Data odbioru">`;
 }
 function sheetDateInputValue(text) {
     if (text === "") {
@@ -6759,10 +6792,11 @@ function withDrift(input, drifts) {
     const safe = escapeHtml(title);
     return `<span class="rate-noted">${input}<abbr class="rate-drift" title="${safe}" aria-label="${safe}">!</abbr></span>`;
 }
-function amountInput(shop, edit, override, shown, title, routeName) {
+function amountInput(shop, edit, override, shown, title, routeName, routeDate) {
     const value = override === null ? "" : override !== undefined ? formatAmountInput(override) : shown === null ? "" : formatAmountInput(shown);
     const route = routeName ? ` data-route="${escapeHtml(routeName)}"` : "";
-    return `<input type="text" inputmode="decimal" data-edit="${edit}" ${ref(shop)}${route} value="${escapeHtml(value)}" title="${escapeHtml(title)}" autocomplete="off">`;
+    const day = routeDate ? ` data-route-date="${escapeHtml(routeDate)}"` : "";
+    return `<input type="text" inputmode="decimal" data-edit="${edit}" ${ref(shop)}${route}${day} value="${escapeHtml(value)}" title="${escapeHtml(title)}" autocomplete="off">`;
 }
 function money(value, dead) {
     if (value === null) {
@@ -7278,7 +7312,7 @@ function renderInvoicesScreen(model) {
         ? '<p class="note invoice-note">Pozycje tej faktury. Możesz zmienić numer, odpiąć sklep, zmienić liczbę worków i stawki. Zapis po Zapisz zmiany.</p>'
         : "";
     const body = editing
-        ? `<div class="invoice-body">${note}${renderFocusedInvoice(model.invoices, model.invoiceFocus ?? "", model.invoiceNotice, model.invoiceEdit)}</div>`
+        ? `<div class="invoice-body">${note}${renderFocusedInvoice(model.invoices, model.invoiceFocus ?? "", model.invoiceNotice, model.invoiceEdit, model.mode)}</div>`
         : renderInvoiceList(model.invoices, model.invoiceFocus, model.invoiceComment ?? emptyInvoiceComment(), model.invoiceEdit);
     return ('<div class="statement" data-screen="invoices"><div class="top">' +
         invoiceHeading(model.invoiceFocus, label, editing) +
@@ -7982,7 +8016,7 @@ async function runSearch() {
         VIEW.applied = started;
         VIEW.searched = true;
         VIEW.screen = screenAfterSearch();
-        VIEW.statement = freshStatement(read.rows, read.rates);
+        VIEW.statement = freshStatement(read.rows, read.rates, VIEW.mode === "schedule");
         VIEW.invoiceNotice = "";
         VIEW.invoiceEdit = emptyInvoiceEdit();
         VIEW.invoiceEditing = false;
@@ -8339,11 +8373,11 @@ function onClick(event) {
         void saveRates();
     }
     else if (action === "expand") {
-        const routeName = el.dataset.route ?? "";
-        if (routeName === "") {
+        const routeKey = el.dataset.routeKey || el.dataset.route || "";
+        if (routeKey === "") {
             return;
         }
-        VIEW.statement = toggleOpen(VIEW.statement, routeName);
+        VIEW.statement = toggleOpen(VIEW.statement, routeKey);
         paint();
     }
     else if (action === "detach") {
@@ -8690,7 +8724,7 @@ function onChange(event) {
         return;
     }
     if (el.dataset.pickRoute !== undefined) {
-        const shops = commentTargets(currentStatement(VIEW.statement), VIEW.statement.invoiceComments).filter((target) => target.routeName === el.dataset.pickRoute);
+        const shops = commentTargets(currentStatement(VIEW.statement), VIEW.statement.invoiceComments).filter((target) => (target.routeKey ?? target.routeName) === el.dataset.pickRoute);
         VIEW.statement = {
             ...VIEW.statement,
             commentPicks: setCommentPicks(VIEW.statement.commentPicks, shops.map((target) => target.key), el.checked),
@@ -9141,16 +9175,17 @@ function syncCommentChrome() {
         line.classList.toggle("will-overwrite", overwrite);
         line.classList.toggle("is-picked", on && !overwrite);
     }
-    const names = new Set();
+    const routeKeys = new Set();
     for (const target of targets) {
-        if (target.routeName !== null) {
-            names.add(target.routeName);
+        const routeKey = target.routeKey ?? target.routeName;
+        if (routeKey) {
+            routeKeys.add(routeKey);
         }
     }
-    for (const name of names) {
-        const shops = targets.filter((target) => target.routeName === name);
+    for (const routeKey of routeKeys) {
+        const shops = targets.filter((target) => (target.routeKey ?? target.routeName) === routeKey);
         const count = shops.filter((target) => picks[target.key] === true).length;
-        const box = root.querySelector(`[data-pick-route="${CSS.escape(name)}"]`);
+        const box = root.querySelector(`[data-pick-route="${CSS.escape(routeKey)}"]`);
         if (box instanceof HTMLInputElement) {
             box.checked = shops.length > 0 && count === shops.length;
             box.indeterminate = count > 0 && count < shops.length;
@@ -9160,7 +9195,7 @@ function syncCommentChrome() {
                 line.classList.toggle("is-partial", box.indeterminate);
             }
         }
-        const note = root.querySelector(`[data-route-note="${CSS.escape(name)}"]`);
+        const note = root.querySelector(`[data-route-note="${CSS.escape(routeKey)}"]`);
         if (note) {
             note.textContent = routePickNote(shops.length, count);
         }
@@ -9827,7 +9862,12 @@ async function commitEdit(el) {
     }
     if (edit === "pickup-date" || edit === "route-date") {
         const routeName = el.dataset.route ?? "";
-        const targets = edit === "route-date" ? VIEW.statement.rows.filter((item) => routeName !== "" && item.routeName === routeName) : [row];
+        const routeDate = el.dataset.routeDate ?? "";
+        const targets = edit === "route-date"
+            ? VIEW.statement.rows.filter((item) => routeName !== "" &&
+                item.routeName === routeName &&
+                (routeDate === "" || item.pickupDate === routeDate))
+            : [row];
         const built = pickupDateBody(targets, el.value, VIEW.mode);
         if (!built.ok) {
             VIEW.status = built.error;
@@ -9860,7 +9900,7 @@ async function commitEdit(el) {
         if (routeName === "") {
             return;
         }
-        VIEW.statement = setRouteBagRate(VIEW.statement, routeName, amount);
+        VIEW.statement = setRouteBagRate(VIEW.statement, routeName, amount, el.dataset.routeDate ?? "");
     }
     else if (edit === "bag-rate") {
         VIEW.statement = setBagRate(VIEW.statement, ref.sheetRow, ref.transportNumber, amount, ref.sheetName);

@@ -47,6 +47,7 @@ function statement(targets: { route?: ShopCost[]; plain?: ShopCost[] }): Stateme
     lines.push({
       kind: "route",
       routeName: "Trasa Wybrzeże",
+      routeKey: "Trasa Wybrzeże",
       date: "18.10.2026",
       routeRate: 0,
       routeCostApplies: true,
